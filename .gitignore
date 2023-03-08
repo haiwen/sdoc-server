@@ -1,0 +1,30 @@
+# dependencies
+/node_modules
+
+# dist
+/dist
+
+# dist-slave
+/dist-slave
+
+# package-lock.json
+
+# vscode
+.vscode
+
+# misc
+.DS_Store
+
+# log
+*.log
+
+# pyc
+*.pyc
+
+# server.pid
+server.pid
+
+# *.sh
+index.sh
+deploy.sh
+/.idea
