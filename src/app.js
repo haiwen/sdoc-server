@@ -1,12 +1,14 @@
 import express from 'express';
 import route from './route';
 import bodyParser from 'body-parser';
+import cors from './middlewares/cors';
 
 const app = express();
 
 app.use(bodyParser.urlencoded({ limit: '100mb', extended: false }));
 app.use(bodyParser.json());
 
+app.all("*", cors); // Access-Control-Allow-Origin
 app.use(route);
 
 app.use((err, req, res, next) => {
