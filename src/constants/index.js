@@ -1,0 +1,1 @@
+export const BASE_URL_VERSION1 = '/api/v1/file';

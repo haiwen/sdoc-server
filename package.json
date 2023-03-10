@@ -5,7 +5,7 @@
   "main": "src/bin/www.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon --exec babel-node ./src/bin/www.js"
+    "start": "nodemon --exec babel-node ./src/_bin/www.js"
   },
   "keywords": [
     "sync",
@@ -16,10 +16,15 @@
   "author": "info@seafile.com",
   "license": "ISC",
   "dependencies": {
+    "@babel/plugin-proposal-export-default-from": "^7.18.10",
+    "axios": "^1.3.4",
     "body-parser": "^1.20.2",
+    "connect-multiparty": "^2.2.0",
     "express": "^4.18.2",
+    "form-data": "^4.0.0",
     "log4js": "^6.9.0",
-    "socket.io": "^4.6.1"
+    "socket.io": "^4.6.1",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.21.0",
