@@ -13,11 +13,12 @@ new IOServer(socketIO);
 
 
 server.listen(SERVER_PORT, () => {
+  // eslint-disable-next-line
   console.log("server is serve on http://127.0.0.1:" + SERVER_PORT);
 });
 
 process.on('unhandledRejection', (reason, p) => {
-  logger.error(reason && (reason.stack || reason), 'Unhandled Rejection at Promise', p)
+  logger.error(reason && (reason.stack || reason), 'Unhandled Rejection at Promise', p);
 });
 
 process.on('uncaughtException', (err, origin) => {

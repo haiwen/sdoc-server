@@ -1,6 +1,8 @@
+import fs from 'fs';
+import { v4 } from "uuid";
 import seaServerAPI from "../api/sea-server-api";
 import logger from "../loggers";
-import { deleteDir } from "../utils";
+import { deleteDir, generateDefaultFileContent } from "../utils";
 
 
 
@@ -35,7 +37,7 @@ class FileContentController {
     fs.writeFileSync(tempPath, fileContent, { flag: 'w+' });
 
     try {
-      await seaServerAPI.saveFileContent(token, repoID, filePath, fileName, fileContent);
+      await seaServerAPI.saveFileContent(token, repoID, filePath, fileName, {path: tempPath});
       deleteDir(tempPath);
       res.send({success: true});
       return;

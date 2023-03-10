@@ -16,7 +16,7 @@ const logLevel = process.env.DTABLE_SERVER_LOG_LEVEL || 'info';
 const codeLayout = {
   type: 'pattern',
   pattern: '[%d{yyyy-MM-dd hh:mm:ss}] [%p] %f{1}[%l] - %m',
-}
+};
 
 log4js.configure({
   appenders: { 

@@ -17,7 +17,6 @@ class IOServer {
       const sid = socket.id;
       const { uuid: roomId } = options;
       socket.join(roomId);
-      console.log(options);
       this.ioHelper.sendMessageToPrivate(sid, options);
     });
     
@@ -34,8 +33,8 @@ class IOServer {
     });
     
     socket.on('server-error', (options) => {
-      this.ioHelper.boardcastMessage(options);
-    })
+      this.ioHelper.broadcastMessage(options);
+    });
     
     socket.on('disconnect', () => {
       const sid = socket.id;
@@ -43,6 +42,7 @@ class IOServer {
     });
     
     socket.on('reconnect', () => {
+      const sid = socket.id;
       this.ioHelper.sendMessageToPrivate(sid, 'reconnect success');
     });
   }

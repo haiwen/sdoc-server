@@ -3,7 +3,6 @@ import multipart from 'connect-multiparty';
 import { BASE_URL_VERSION1 } from './constants';
 import { fileContentController } from './controllers';
 
-
 const router = express.Router();
 const multipartMiddleware = multipart();
 

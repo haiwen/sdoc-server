@@ -11,31 +11,32 @@ class Context {
       return this.instance;
     }
     return new Context();
-  }
+  };
 
   saveFile = () => {
 
-  }
+  };
 
   getFile = () => {
 
-  }
+  };
 
   serializeFile = () => {
 
-  }
+  };
 
   saveUser = () => {
 
-  }
+  };
 
   getUsers = () => {
 
-  }
+  };
 
   updateOnlineUser = (isConnect = true) => {
-
-  }
+    // eslint-disable-next-line
+    console.log(isConnect);
+  };
 
 }
 

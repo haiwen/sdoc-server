@@ -11,8 +11,10 @@ app.use(bodyParser.urlencoded({ limit: '100mb', extended: false }));
 app.all("*", cors); // Access-Control-Allow-Origin
 app.use(route);
 
+// eslint-disable-next-line
 app.use((err, req, res, next) => {
   res.status(500).send(err.message);
-})
+  return;
+});
 
 export default app;

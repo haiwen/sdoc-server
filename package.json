@@ -5,7 +5,8 @@
   "main": "src/bin/www.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon --exec babel-node ./src/_bin/www.js"
+    "start": "nodemon --exec babel-node ./src/_bin/www.js",
+    "lint": "eslint \"**/*.js\""
   },
   "keywords": [
     "sync",
@@ -29,8 +30,11 @@
   "devDependencies": {
     "@babel/cli": "^7.21.0",
     "@babel/core": "^7.21.0",
+    "@babel/eslint-parser": "^7.19.1",
     "@babel/node": "^7.20.7",
     "@babel/preset-env": "^7.20.2",
+    "eslint": "^8.35.0",
+    "eslint-plugin-import": "^2.27.5",
     "nodemon": "^2.0.21"
   }
 }
