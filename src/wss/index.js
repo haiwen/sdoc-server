@@ -13,27 +13,27 @@ class IOServer {
     
     this.connectCount++;
 
-    socket.on('join-room', (options) => {
+    socket.on('join-room', (params, callback) => {
       const sid = socket.id;
-      const { uuid: roomId } = options;
+      const { doc_id: roomId } = params;
       socket.join(roomId);
-      this.ioHelper.sendMessageToPrivate(sid, options);
+      this.ioHelper.sendMessageToPrivate(sid, params);
+      callback && callback({status: 1});
     });
     
-    socket.on('leave-room', (options) => {
-      const sid = socket.id;
-      const { uuid: roomId } = options;
-      this.ioHelper.sendMessageToRoom(sid, roomId, options);
+    socket.on('leave-room', (params) => {
+      const { uuid: roomId } = params;
+      this.ioHelper.sendMessageToRoom(socket, roomId, params);
     });
     
-    socket.on('update-content', (options) => {
-      const sid = socket.id;
-      const { uuid: roomId } = options;
-      this.ioHelper.sendMessageToRoom(sid, roomId, options);
+    socket.on('update-document', (params, callback) => {
+      const { doc_id: roomId } = params;
+      this.ioHelper.sendMessageToRoom(socket, roomId, params);
+      callback && callback();
     });
     
-    socket.on('server-error', (options) => {
-      this.ioHelper.broadcastMessage(options);
+    socket.on('server-error', (params) => {
+      this.ioHelper.broadcastMessage(params);
     });
     
     socket.on('disconnect', () => {
