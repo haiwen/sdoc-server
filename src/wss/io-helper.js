@@ -21,8 +21,6 @@ class IOHelper {
   };
 
   sendMessageToRoom = (socket, room_id, params) => {
-    // this.io.in(sid).to(room_id).emit('update-document', params);
-    console.log(socket.id);
     socket.to(room_id).emit('update-document', {...params, socketID: socket.id});
   };
   
