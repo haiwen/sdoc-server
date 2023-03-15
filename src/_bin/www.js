@@ -4,12 +4,17 @@ import { SERVER_PORT } from '../config/config';
 import logger from '../loggers';
 import app from "../app";
 import IOServer from '../wss';
+import DocumentManager from '../managers/document-manager';
 
 const server = http.createServer(app);
 
 // init socket
 const socketIO = io(server, {cors: true});
 new IOServer(socketIO);
+
+// setup auto save operation
+const documentManager = DocumentManager.getInstance();
+documentManager.startSaveTimer();
 
 
 server.listen(SERVER_PORT, () => {
