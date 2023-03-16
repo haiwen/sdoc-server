@@ -5,6 +5,7 @@ import seaServerAPI from "../api/sea-server-api";
 import { deleteDir, generateDefaultFileContent } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
+import Document from '../models/document';
 
 class DocumentManager {
 
@@ -22,7 +23,8 @@ class DocumentManager {
     if (this.instance) {
       return this.instance;
     }
-    return new DocumentManager();
+    this.instance = new DocumentManager();
+    return this.instance;
   };
 
   startSaveTimer = () => {
@@ -34,6 +36,7 @@ class DocumentManager {
       logger.info('Exiting server process:', process.pid);
       this.saveAllDocs();
       setInterval(() => {
+        clearInterval(this.saveTimer);
         process.kill(process.pid, 'SIGKILL');
       }, 10000);
     });
@@ -52,7 +55,7 @@ class DocumentManager {
     const docIds = this.documents.keys();
     for (let docId of docIds) {
       const document = this.documents.get(docId);
-      const meta = document.getMate();
+      const meta = document.getMeta();
       if (meta.isSaving | !meta.need_save) { // is saving or no need save
         continue;
       }
@@ -81,14 +84,14 @@ class DocumentManager {
     // TODO
     const docId = md5(filePath);
     const document = this.documents.get(docId);
-    if (document) return document;
+    if (document) return document.value;
     
     const result = await seaServerAPI.getFileContent(token, repoID, filePath);
     const fileContent = result.data ? result.data : generateDefaultFileContent();
     // todo
     const doc = new Document(docId, fileContent, token, repoID, filePath);
     this.documents.set(docId, doc);
-    return doc;
+    return fileContent;
   };
 
   saveFile = async (token, repoID, filePath, fileName, fileContent) => {
@@ -103,8 +106,16 @@ class DocumentManager {
     }
   };
 
-  serializeFile = () => {
+  execOperationBySocket = (params, callback) => {
+    const documents = this.documents.values();
+    const document = documents.next().value;
 
+    // todo
+    const insert_value = {type: 'paragraph', children: [{ text: '我是小强' }]};
+    const { content } = document.value;
+    const newValue = { content: content.concat(insert_value) };
+    document.setValue(newValue);
+    callback && callback();
   };
 
 }

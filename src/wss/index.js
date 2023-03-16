@@ -1,3 +1,4 @@
+import DocumentManager from "../managers/document-manager";
 import IOHelper from "./io-helper";
 
 class IOServer {
@@ -13,7 +14,14 @@ class IOServer {
     
     this.connectCount++;
 
-    socket.on('join-room', (params, callback) => {
+    socket.on('join-room', async (params, callback) => {
+      // todo???
+      const { token, repoID, filePath } = params;
+      const documentManager = DocumentManager.getInstance();
+      
+      const fileContent = await documentManager.getFile(token, repoID, filePath);
+      // todo
+
       const sid = socket.id;
       const { doc_id: roomId } = params;
       socket.join(roomId);
@@ -28,8 +36,11 @@ class IOServer {
     
     socket.on('update-document', (params, callback) => {
       const { doc_id: roomId } = params;
-      this.ioHelper.sendMessageToRoom(socket, roomId, params);
-      callback && callback();
+      const documentManager = DocumentManager.getInstance();
+      documentManager.execOperationBySocket(params, () => {
+        this.ioHelper.sendMessageToRoom(socket, roomId, params);
+        callback && callback();
+      });
     });
     
     socket.on('server-error', (params) => {
