@@ -16,7 +16,7 @@ export const getDirPath = (path) => {
   }
 };
 
-export function deleteDir(path) {
+export const deleteDir = (path) => {
   if (fs.existsSync(path)) {
     const info = fs.statSync(path);
     if (info.isDirectory()) {
@@ -35,5 +35,43 @@ export function deleteDir(path) {
       fs.unlinkSync(path);
     }
   }
-}
+};
+
+export const TIME_TYPE = {
+  's': 's',
+  'second': 's',
+  'm': 'm',
+  'min': 'm',
+  'minute': 'm',
+  'h': 'h',
+  'hour': 'h',
+};
+
+export const formatTimeToMillisecond = (time) => {
+  if (!time) return null;
+  if (time.length <= 1) return null;
+  if (Number.isNaN(parseInt(time))) return null;
+
+  const value = parseFloat(time);
+  const type = time.slice((value + '').length);
+
+  if (!TIME_TYPE[type]) return null;
+
+  // hour | h
+  if (type.indexOf('h') > -1) {
+    return time = value * 60 * 60 * 1000;
+  }
+  
+  // minute | min | m
+  if (type.indexOf('m') > -1) {
+    return time = value * 60 * 1000;
+  }
+  
+  // second | s
+  if (type.indexOf('s') > -1) {
+    return time = value * 1000;
+  }
+
+};
+
 

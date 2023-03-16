@@ -1,5 +1,5 @@
-import fileContentController from './file-content-controller';
+import documentController from './document-controller';
 
 export {
-  fileContentController
+  documentController
 };

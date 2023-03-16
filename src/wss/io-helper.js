@@ -20,12 +20,12 @@ class IOHelper {
     this.io.emit('message', `server error`);
   };
 
-  sendMessageToRoom = (sid, room_id, options) => {
-    this.io.to(room_id).emit('message', `${options.name} has update content`);
+  sendMessageToRoom = (socket, room_id, params) => {
+    socket.to(room_id).emit('update-document', {...params, socketID: socket.id});
   };
   
-  sendMessageToPrivate = (sid, options) => {
-    this.io.to(sid).emit('message', `${options.name} has join room`);
+  sendMessageToPrivate = (sid, params) => {
+    this.io.to(sid).emit('message', `${params.name} has join room`);
   };
 
 }

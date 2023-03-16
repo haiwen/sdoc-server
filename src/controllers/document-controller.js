@@ -1,18 +1,13 @@
-import fs from 'fs';
-import { v4 } from "uuid";
-import seaServerAPI from "../api/sea-server-api";
 import logger from "../loggers";
-import { deleteDir, generateDefaultFileContent } from "../utils";
+import DocumentManager from '../managers/document-manager';
 
-
-
-class FileContentController {
+class DocumentController {
 
   async loadFileContent(req, res) {
     const { token, repo_id: repoID, file_path: filePath } = req.query;
     try {
-      const result = await seaServerAPI.getFileContent(token, repoID, filePath);
-      const fileContent = result.data ? result.data : generateDefaultFileContent();
+      const documentManager = DocumentManager.getInstance();
+      const fileContent = await documentManager.getFile(token, repoID, filePath);
       res.send(fileContent);
       return;
     } catch(err) {
@@ -32,17 +27,13 @@ class FileContentController {
       file_name: fileName, 
       file_content: fileContent 
     } = req.body;
-    
-    const tempPath = `/tmp/` + v4();
-    fs.writeFileSync(tempPath, fileContent, { flag: 'w+' });
 
     try {
-      await seaServerAPI.saveFileContent(token, repoID, filePath, fileName, {path: tempPath});
-      deleteDir(tempPath);
+      const documentManager = DocumentManager.getInstance();
+      await documentManager.saveFile(token, repoID, filePath, fileName, fileContent);
       res.send({success: true});
       return;
     } catch(err) {
-      deleteDir(tempPath);
       logger.error(err);
       logger.error(`Save ${repoID} file content error`);
       res.status(500).send({'error_msg': 'internal server error'});
@@ -51,6 +42,6 @@ class FileContentController {
   }
 }
 
-const fileContentController = new FileContentController();
+const documentController = new DocumentController();
 
-export default fileContentController;
+export default documentController;

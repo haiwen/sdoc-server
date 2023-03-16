@@ -1,28 +1,16 @@
-class Context {
+class UsersManager {
 
   constructor() {
     this.instance = null;
-    this.users = [];
-    this.files = [];
+    this.users = {};
   }
 
-  static getInstance = () => {
+  static getUserManager = () => {
     if (this.instance) {
       return this.instance;
     }
-    return new Context();
-  };
-
-  saveFile = () => {
-
-  };
-
-  getFile = () => {
-
-  };
-
-  serializeFile = () => {
-
+    this.instance = new UsersManager();
+    return this.instance;
   };
 
   saveUser = () => {
@@ -40,4 +28,4 @@ class Context {
 
 }
 
-export default Context;
+export default UsersManager;
