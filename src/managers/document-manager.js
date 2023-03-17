@@ -97,7 +97,7 @@ class DocumentManager {
 
   saveFile = async (token, repoID, filePath, fileName, fileContent) => {
     const tempPath = `/tmp/` + v4();
-    fs.writeFileSync(tempPath, fileContent, { flag: 'w+' });
+    fs.writeFileSync(tempPath, JSON.stringify(fileContent), { flag: 'w+' });
     try {
       await seaServerAPI.saveFileContent(token, repoID, filePath, fileName, {path: tempPath});
       deleteDir(tempPath);
