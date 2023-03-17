@@ -6,6 +6,7 @@ import { deleteDir, generateDefaultFileContent } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
+import { createEditor } from "slate";
 
 class DocumentManager {
 
@@ -111,9 +112,14 @@ class DocumentManager {
     const document = documents.next().value;
 
     // todo
-    const insert_value = {type: 'paragraph', children: [{ text: '我是小强' }]};
     const { content } = document.value;
-    const newValue = { content: content.concat(insert_value) };
+
+    let editor = createEditor();
+    editor.children = content;
+    editor.apply(params.operation);
+    const newValue = { content: editor.children };
+    editor = null;
+    
     document.setValue(newValue);
     callback && callback();
   };

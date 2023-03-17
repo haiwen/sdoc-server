@@ -21,7 +21,7 @@ class IOHelper {
   };
 
   sendMessageToRoom = (socket, room_id, params) => {
-    socket.to(room_id).emit('update-document', {...params, socketID: socket.id});
+    socket.to(room_id).emit('update-document', {...params});
   };
   
   sendMessageToPrivate = (sid, params) => {
