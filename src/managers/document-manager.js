@@ -1,4 +1,3 @@
-import md5 from "md5";
 import fs from 'fs';
 import { v4 } from "uuid";
 import seaServerAPI from "../api/sea-server-api";
@@ -62,8 +61,8 @@ class DocumentManager {
       }
       try {
         // todo
-        const { token, repoID, filePath, fileName, value: fileContent } = document;
-        await this.saveFile(token, repoID, filePath, fileName, fileContent);
+        const { accessToken, filePath, fileName, value: fileContent } = document;
+        await this.saveFile(accessToken, docId, filePath, fileName, fileContent);
         savedDocs.push(docId);
       } catch (error) {
         // an error occurred while saving the file
@@ -81,27 +80,26 @@ class DocumentManager {
     this.lastSavingInfo.endTime = Date.now();
   };
 
-  getFile = async (token, repoID, filePath) => {
-    // TODO
-    const docId = md5(filePath);
-    const document = this.documents.get(docId);
+  getFile = async (fileUuid, filePath, fileName) => {
+    const document = this.documents.get(fileUuid);
     if (document) return document.value;
     
-    const result = await seaServerAPI.getFileContent(token, repoID, filePath);
+    const result = await seaServerAPI.getFileContent(fileUuid);
     const fileContent = result.data ? result.data : generateDefaultFileContent();
-    // todo
-    const doc = new Document(docId, fileContent, token, repoID, filePath);
-    this.documents.set(docId, doc);
+    const doc = new Document(fileUuid, filePath, fileName, fileContent);
+    this.documents.set(fileUuid, doc);
     return fileContent;
   };
 
-  saveFile = async (token, repoID, filePath, fileName, fileContent) => {
+  saveFile = async (fileUuid, filePath, fileName, fileContent) => {
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(fileContent), { flag: 'w+' });
     try {
-      await seaServerAPI.saveFileContent(token, repoID, filePath, fileName, {path: tempPath});
+      await seaServerAPI.saveFileContent(fileUuid, filePath, fileName, {path: tempPath});
       deleteDir(tempPath);
     } catch(err) {
+      logger.info(err);
+      logger.info(err.message);
       deleteDir(tempPath);
       throw new Error(err);
     }
@@ -116,7 +114,12 @@ class DocumentManager {
 
     let editor = createEditor();
     editor.children = content;
-    editor.apply(params.operation);
+    try {
+      editor.apply(params.operation);
+    } catch(err) {
+      logger.err(err);
+      logger.error('sync operation failed.');
+    }
     const newValue = { content: editor.children };
     editor = null;
     

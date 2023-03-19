@@ -1,55 +1,59 @@
 import axios from 'axios';
 import fs from 'fs';
 import FormData from 'form-data';
-import { SEAHUB_SERVER } from '../config/config';
-import { getDirPath } from '../utils';
+import jwt from 'jsonwebtoken';
+import { SEADOC_PRIVATE_KEY, SEAHUB_SERVER } from '../config/config';
 
 class SeaServerAPI {
 
-  getConfig = (token) => {
+  generateJwtToken = (fileUuid) => {
+    const payload = {
+      exp: Math.floor(Date.now() / 1000) + (5 * 60),
+      permission: 'rw',
+      file_uuid: fileUuid,
+    };
+    const token = jwt.sign(payload, SEADOC_PRIVATE_KEY);
+    return token;
+  };
+
+  getConfig = (fileUuid) => {
+    const accessToken = this.generateJwtToken(fileUuid);
     const config = {
       baseURL: SEAHUB_SERVER,
-      headers: { 'Authorization': 'Token ' + token },
+      headers: { 'Authorization': 'Token ' + accessToken },
     };
     return config;
   };
 
-  getFileDownloadLink = (token, repoID, filePath) => {
-    const config = this.getConfig(token);
-    const path = encodeURIComponent(filePath);
-    const url = '/api2/repos/' + repoID + '/file/?p=' + path + '&reuse=1';
+  getFileDownloadLink = (fileUuid) => {
+    const config = this.getConfig(fileUuid);
+    const url = '/api/v2.1/seadoc/download-link/' + fileUuid + '/';
     return axios.get(url, config);
   };
 
-  getFileUpdateLink = (token, repoID, dirPath) => {
-    const config = this.getConfig(token);
-    const url = '/api2/repos/' + repoID + '/update-link/?p=' + encodeURIComponent(dirPath);
+  getFileUpdateLink = (fileUuid) => {
+    const config = this.getConfig(fileUuid);
+    const url = '/api/v2.1/seadoc/upload-link/' + fileUuid + '/';
     return axios.get(url, config);
   };
 
-  getFileContent = (token, repoID, filePath) => {
-    return this.getFileDownloadLink(token, repoID, filePath).then(res => {
-      const downloadLink = res.data;
+  getFileContent = (fileUuid) => {
+    return this.getFileDownloadLink(fileUuid).then(res => {
+      const { download_link: downloadLink } = res.data;
       return axios.get(downloadLink);
     });
   };
     
-  saveFileContent = (token, repoID, filePath, fileName, fileData) => {    
-    const dirPath = getDirPath(filePath);
-    return this.getFileUpdateLink(token, repoID, dirPath).then(res => {
+  saveFileContent = (fileUuid, filePath, fileName, fileData) => {    
+    return this.getFileUpdateLink(fileUuid).then(res => {
 
-      const uploadLink = res.data;
+      const { upload_link: uploadLink } = res.data;
       const formData = new FormData();
       formData.append("target_file", filePath);
       formData.append("filename", fileName);
       formData.append("file", fs.createReadStream(fileData.path), {fileName: fileName});
-      return (
-        axios.create()({
-          method: 'post',
-          url: uploadLink,
-          data: formData,
-        })
-      );
+
+      return axios.post(uploadLink, formData);
     });
   };
 

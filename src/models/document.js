@@ -1,6 +1,6 @@
 class Document {
 
-  constructor(docId, content, token, repoID, filePath) {
+  constructor(docId, filePath, fileName, content) {
     this.docId = docId;
     this.value = content;
     this.meta = {
@@ -12,12 +12,9 @@ class Document {
       owner: '',
     };
 
-    // todo need delete
-    this.token = token;
-    this.repoID = repoID;
+    // used for interval save file's content
     this.filePath = filePath;
-    const params = filePath.split('/');
-    this.fileName = params[params.length - 1];
+    this.fileName = fileName;
   }
 
   setValue = (value) => {

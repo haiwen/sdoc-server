@@ -14,12 +14,13 @@ class IOServer {
     
     this.connectCount++;
 
+    // todo permission check
+
     socket.on('join-room', async (params, callback) => {
       // todo???
-      const { token, repoID, filePath } = params;
+      const { file_uuid: fileUuid, file_path: filePath, file_name: fileName } = params;
       const documentManager = DocumentManager.getInstance();
-      
-      const fileContent = await documentManager.getFile(token, repoID, filePath);
+      const fileContent = await documentManager.getFile(fileUuid, filePath, fileName);
       // todo
 
       const sid = socket.id;

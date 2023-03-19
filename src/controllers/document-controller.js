@@ -4,15 +4,16 @@ import DocumentManager from '../managers/document-manager';
 class DocumentController {
 
   async loadFileContent(req, res) {
-    const { token, repo_id: repoID, file_path: filePath } = req.query;
+    const { file_uuid: fileUuid } = req.payload;
+
     try {
       const documentManager = DocumentManager.getInstance();
-      const fileContent = await documentManager.getFile(token, repoID, filePath);
+      const fileContent = await documentManager.getFile(fileUuid);
       res.send(fileContent);
       return;
     } catch(err) {
       logger.error(err);
-      logger.error(`Load ${repoID}  file content error`);
+      logger.error(`Load ${fileUuid}  file content error`);
       res.status(500).send({'error_msg': 'internal server error'});
       return;
     }
@@ -20,9 +21,9 @@ class DocumentController {
   
   async saveFileContent(req, res) {
 
+    const { file_uuid: fileUuid } = req.payload;
+
     const { 
-      token, 
-      repo_id: repoID, 
       file_path: filePath, 
       file_name: fileName, 
       file_content: fileContent 
@@ -30,12 +31,12 @@ class DocumentController {
 
     try {
       const documentManager = DocumentManager.getInstance();
-      await documentManager.saveFile(token, repoID, filePath, fileName, fileContent);
+      await documentManager.saveFile(fileUuid, filePath, fileName, fileContent);
       res.send({success: true});
       return;
     } catch(err) {
-      logger.error(err);
-      logger.error(`Save ${repoID} file content error`);
+      logger.error(err.message);
+      logger.error(`Save ${fileUuid} file content error`);
       res.status(500).send({'error_msg': 'internal server error'});
       return;
     }

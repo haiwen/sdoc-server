@@ -2,6 +2,7 @@ import express from 'express';
 import route from './route';
 import bodyParser from 'body-parser';
 import cors from './middleware/cors';
+import auth from './middleware/auth';
 
 const app = express();
 
@@ -9,6 +10,7 @@ app.use(bodyParser.json({ limit: '100mb' }));
 app.use(bodyParser.urlencoded({ limit: '100mb', extended: false }));
 
 app.all("*", cors); // Access-Control-Allow-Origin
+app.use(auth);
 app.use(route);
 
 // eslint-disable-next-line
