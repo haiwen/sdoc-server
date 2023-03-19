@@ -61,7 +61,8 @@ class DocumentManager {
       }
       try {
         // todo
-        const { accessToken, filePath, fileName, value: fileContent } = document;
+        const { accessToken, filePath, fileName, version, children } = document;
+        const fileContent = { version, children };
         await this.saveFile(accessToken, docId, filePath, fileName, fileContent);
         savedDocs.push(docId);
       } catch (error) {
@@ -82,10 +83,15 @@ class DocumentManager {
 
   getFile = async (fileUuid, filePath, fileName) => {
     const document = this.documents.get(fileUuid);
-    if (document) return document.value;
+    if (document) {
+      return {
+        version: document.version,
+        children: document.children,
+      };
+    }
     
     const result = await seaServerAPI.getFileContent(fileUuid);
-    const fileContent = result.data ? result.data : generateDefaultFileContent();
+    const fileContent = result.data ? JSON.parse(result.data) : generateDefaultFileContent();
     const doc = new Document(fileUuid, filePath, fileName, fileContent);
     this.documents.set(fileUuid, doc);
     return fileContent;
@@ -110,10 +116,9 @@ class DocumentManager {
     const document = documents.next().value;
 
     // todo
-    const { content } = document.value;
-
+    const { version, children } = document;
     let editor = createEditor();
-    editor.children = content;
+    editor.children = children;
     try {
       editor.apply(params.operation);
     } catch(err) {

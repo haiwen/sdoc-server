@@ -1,8 +1,9 @@
 class Document {
 
-  constructor(docId, filePath, fileName, content) {
+  constructor(docId, filePath, fileName, fileContent) {
     this.docId = docId;
-    this.value = content;
+    this.version = fileContent.version;
+    this.children = fileContent.children;
     this.meta = {
       save_times: 0,
       need_save: false,
