@@ -39,7 +39,6 @@ const auth = (req, res, next) => {
   
       // write jwt token to the req object
       req.payload = decoded;
-      req.access_token = token;
       next();
     }
 

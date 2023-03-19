@@ -80,22 +80,22 @@ class DocumentManager {
     this.lastSavingInfo.endTime = Date.now();
   };
 
-  getFile = async (accessToken, fileUuid, filePath, fileName) => {
+  getFile = async (fileUuid, filePath, fileName) => {
     const document = this.documents.get(fileUuid);
     if (document) return document.value;
     
-    const result = await seaServerAPI.getFileContent(accessToken, fileUuid);
+    const result = await seaServerAPI.getFileContent(fileUuid);
     const fileContent = result.data ? result.data : generateDefaultFileContent();
-    const doc = new Document(fileUuid, fileContent, filePath, fileName, accessToken);
+    const doc = new Document(fileUuid, filePath, fileName, fileContent);
     this.documents.set(fileUuid, doc);
     return fileContent;
   };
 
-  saveFile = async (accessToken, fileUuid, filePath, fileName, fileContent) => {
+  saveFile = async (fileUuid, filePath, fileName, fileContent) => {
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(fileContent), { flag: 'w+' });
     try {
-      await seaServerAPI.saveFileContent(accessToken, fileUuid, filePath, fileName, {path: tempPath});
+      await seaServerAPI.saveFileContent(fileUuid, filePath, fileName, {path: tempPath});
       deleteDir(tempPath);
     } catch(err) {
       logger.info(err);

@@ -4,12 +4,11 @@ import DocumentManager from '../managers/document-manager';
 class DocumentController {
 
   async loadFileContent(req, res) {
-    const accessToken = req.access_token;
     const { file_uuid: fileUuid } = req.payload;
 
     try {
       const documentManager = DocumentManager.getInstance();
-      const fileContent = await documentManager.getFile(accessToken, fileUuid);
+      const fileContent = await documentManager.getFile(fileUuid);
       res.send(fileContent);
       return;
     } catch(err) {
@@ -22,7 +21,6 @@ class DocumentController {
   
   async saveFileContent(req, res) {
 
-    const accessToken = req.access_token;
     const { file_uuid: fileUuid } = req.payload;
 
     const { 
@@ -33,7 +31,7 @@ class DocumentController {
 
     try {
       const documentManager = DocumentManager.getInstance();
-      await documentManager.saveFile(accessToken, fileUuid, filePath, fileName, fileContent);
+      await documentManager.saveFile(fileUuid, filePath, fileName, fileContent);
       res.send({success: true});
       return;
     } catch(err) {

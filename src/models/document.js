@@ -1,6 +1,6 @@
 class Document {
 
-  constructor(docId, content, filePath, fileName, accessToken) {
+  constructor(docId, filePath, fileName, content) {
     this.docId = docId;
     this.value = content;
     this.meta = {
@@ -15,7 +15,6 @@ class Document {
     // used for interval save file's content
     this.filePath = filePath;
     this.fileName = fileName;
-    this.accessToken = accessToken;
   }
 
   setValue = (value) => {
