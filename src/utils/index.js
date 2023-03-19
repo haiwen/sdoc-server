@@ -74,4 +74,17 @@ export const formatTimeToMillisecond = (time) => {
 
 };
 
+export const getFileUuidFromUrl = (url) => {
+  const pathname = url.split('?')[0];
+  if (pathname.indexOf('/files/') === -1) {
+    return null;
+  }
+  const fileUuidPath = pathname.split('/files/')[1];
+  const splitIndex = fileUuidPath.indexOf('/');
+  if (splitIndex > -1) {
+    return fileUuidPath.split('/')[0];
+  }
+  return fileUuidPath;
+};
+
 
