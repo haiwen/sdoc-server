@@ -2,7 +2,8 @@ import fs from 'fs';
 
 export const generateDefaultFileContent = () => {
   const defaultValue = {
-    content: [{type: 'paragraph', children: [{ text: '' }]}]
+    version: 0,
+    children: [{type: 'paragraph', children: [{ text: '' }]}]
   };
   return defaultValue;
 };

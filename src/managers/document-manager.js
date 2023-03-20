@@ -5,7 +5,7 @@ import { deleteDir, generateDefaultFileContent } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
-import { createEditor } from "slate";
+import { Transforms } from "slate";
 
 class DocumentManager {
 
@@ -61,8 +61,9 @@ class DocumentManager {
       }
       try {
         // todo
-        const { accessToken, filePath, fileName, value: fileContent } = document;
-        await this.saveFile(accessToken, docId, filePath, fileName, fileContent);
+        const { filePath, fileName, version, children } = document;
+        const fileContent = { version, children };
+        await this.saveFile(docId, filePath, fileName, fileContent);
         savedDocs.push(docId);
       } catch (error) {
         // an error occurred while saving the file
@@ -82,7 +83,12 @@ class DocumentManager {
 
   getFile = async (fileUuid, filePath, fileName) => {
     const document = this.documents.get(fileUuid);
-    if (document) return document.value;
+    if (document) {
+      return {
+        version: document.version,
+        children: document.children,
+      };
+    }
     
     const result = await seaServerAPI.getFileContent(fileUuid);
     const fileContent = result.data ? result.data : generateDefaultFileContent();
@@ -110,20 +116,18 @@ class DocumentManager {
     const document = documents.next().value;
 
     // todo
-    const { content } = document.value;
-
-    let editor = createEditor();
-    editor.children = content;
+    const { operation } = params;
+    const { version, children } = document;
+    let editor = { children: children };
     try {
-      editor.apply(params.operation);
+      Transforms.transform(editor, operation);
     } catch(err) {
-      logger.err(err);
+      logger.error(err);
       logger.error('sync operation failed.');
     }
-    const newValue = { content: editor.children };
-    editor = null;
     
-    document.setValue(newValue);
+    document.setValue(editor.children);
+    editor = null;
     callback && callback();
   };
 

@@ -1,8 +1,9 @@
 class Document {
 
-  constructor(docId, filePath, fileName, content) {
-    this.docId = docId;
-    this.value = content;
+  constructor(fileUuid, filePath, fileName, fileContent) {
+    this.fileUuid = fileUuid;
+    this.version = fileContent.version;
+    this.children = fileContent.children;
     this.meta = {
       save_times: 0,
       need_save: false,
@@ -19,7 +20,7 @@ class Document {
 
   setValue = (value) => {
     let last_access = new Date().getTime();
-    this.value = value;
+    this.children = value;
     let need_save = true;
     this.setMeta({last_access, need_save});
   };
