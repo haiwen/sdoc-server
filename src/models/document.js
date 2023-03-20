@@ -20,7 +20,7 @@ class Document {
 
   setValue = (value) => {
     let last_access = new Date().getTime();
-    this.value = value;
+    this.children = value;
     let need_save = true;
     this.setMeta({last_access, need_save});
   };

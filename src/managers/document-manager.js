@@ -125,10 +125,9 @@ class DocumentManager {
       logger.err(err);
       logger.error('sync operation failed.');
     }
-    const newValue = { content: editor.children };
-    editor = null;
     
-    document.setValue(newValue);
+    document.setValue(editor.children);
+    editor = null;
     callback && callback();
   };
 
