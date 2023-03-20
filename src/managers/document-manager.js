@@ -5,7 +5,7 @@ import { deleteDir, generateDefaultFileContent } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
-import { createEditor } from "slate";
+import { Transforms } from "slate";
 
 class DocumentManager {
 
@@ -61,9 +61,9 @@ class DocumentManager {
       }
       try {
         // todo
-        const { accessToken, filePath, fileName, version, children } = document;
+        const { filePath, fileName, version, children } = document;
         const fileContent = { version, children };
-        await this.saveFile(accessToken, docId, filePath, fileName, fileContent);
+        await this.saveFile(docId, filePath, fileName, fileContent);
         savedDocs.push(docId);
       } catch (error) {
         // an error occurred while saving the file
@@ -91,7 +91,7 @@ class DocumentManager {
     }
     
     const result = await seaServerAPI.getFileContent(fileUuid);
-    const fileContent = result.data ? JSON.parse(result.data) : generateDefaultFileContent();
+    const fileContent = result.data ? result.data : generateDefaultFileContent();
     const doc = new Document(fileUuid, filePath, fileName, fileContent);
     this.documents.set(fileUuid, doc);
     return fileContent;
@@ -116,13 +116,13 @@ class DocumentManager {
     const document = documents.next().value;
 
     // todo
+    const { operation } = params;
     const { version, children } = document;
-    let editor = createEditor();
-    editor.children = children;
+    let editor = { children: children };
     try {
-      editor.apply(params.operation);
+      Transforms.transform(editor, operation);
     } catch(err) {
-      logger.err(err);
+      logger.error(err);
       logger.error('sync operation failed.');
     }
     

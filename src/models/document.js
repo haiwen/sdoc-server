@@ -1,7 +1,7 @@
 class Document {
 
-  constructor(docId, filePath, fileName, fileContent) {
-    this.docId = docId;
+  constructor(fileUuid, filePath, fileName, fileContent) {
+    this.fileUuid = fileUuid;
     this.version = fileContent.version;
     this.children = fileContent.children;
     this.meta = {
