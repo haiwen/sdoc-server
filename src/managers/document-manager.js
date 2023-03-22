@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { v4 } from "uuid";
+import { nanoid } from "nanoid";
 import seaServerAPI from "../api/sea-server-api";
 import { deleteDir, generateDefaultFileContent } from "../utils";
 import logger from "../loggers";
@@ -98,7 +98,7 @@ class DocumentManager {
   };
 
   saveFile = async (fileUuid, filePath, fileName, fileContent) => {
-    const tempPath = `/tmp/` + v4();
+    const tempPath = `/tmp/` + nanoid();
     fs.writeFileSync(tempPath, JSON.stringify(fileContent), { flag: 'w+' });
     try {
       await seaServerAPI.saveFileContent(fileUuid, filePath, fileName, {path: tempPath});
