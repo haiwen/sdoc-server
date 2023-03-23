@@ -1,9 +1,10 @@
 import fs from 'fs';
+import { v4 } from "uuid";
 
 export const generateDefaultFileContent = () => {
   const defaultValue = {
     version: 0,
-    children: [{type: 'paragraph', children: [{ text: '' }]}]
+    children: [{id: v4(), type: 'paragraph', children: [{ text: '' }]}]
   };
   return defaultValue;
 };

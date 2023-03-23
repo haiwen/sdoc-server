@@ -25,9 +25,9 @@
     "form-data": "^4.0.0",
     "jsonwebtoken": "9.0.0",
     "log4js": "^6.9.0",
-    "nanoid": "4.0.1",
     "slate": "0.91.4",
-    "socket.io": "4.6.1"
+    "socket.io": "4.6.1",
+    "uuid": "9.0.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.21.0",

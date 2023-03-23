@@ -1,11 +1,11 @@
 import fs from 'fs';
-import { nanoid } from "nanoid";
+import { v4 } from "uuid";
+import { Transforms } from "slate";
 import seaServerAPI from "../api/sea-server-api";
 import { deleteDir, generateDefaultFileContent } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
-import { Transforms } from "slate";
 
 class DocumentManager {
 
@@ -98,7 +98,7 @@ class DocumentManager {
   };
 
   saveFile = async (fileUuid, filePath, fileName, fileContent) => {
-    const tempPath = `/tmp/` + nanoid();
+    const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(fileContent), { flag: 'w+' });
     try {
       await seaServerAPI.saveFileContent(fileUuid, filePath, fileName, {path: tempPath});
