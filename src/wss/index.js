@@ -38,9 +38,9 @@ class IOServer {
     socket.on('update-document', (params, callback) => {
       const { doc_id: roomId } = params;
       const documentManager = DocumentManager.getInstance();
-      documentManager.execOperationBySocket(params, () => {
+      documentManager.execOperationsBySocket(params, (result) => {
         this.ioHelper.sendMessageToRoom(socket, roomId, params);
-        callback && callback();
+        callback && callback(result);
       });
     });
     

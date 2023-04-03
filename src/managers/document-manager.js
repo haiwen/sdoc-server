@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { v4 } from "uuid";
-import { Transforms } from "slate";
+import { Editor, Transforms } from "slate";
 import seaServerAPI from "../api/sea-server-api";
 import { deleteDir, generateDefaultFileContent } from "../utils";
 import logger from "../loggers";
@@ -111,24 +111,43 @@ class DocumentManager {
     }
   };
 
-  execOperationBySocket = (params, callback) => {
+  execOperationsBySocket = (params, callback) => {
     const documents = this.documents.values();
     const document = documents.next().value;
 
     // todo
-    const { operation } = params;
+    const { operations } = params;
     const { version, children } = document;
     let editor = { children: children };
-    try {
-      Transforms.transform(editor, operation);
-    } catch(err) {
-      logger.error(err);
-      logger.error('sync operation failed.');
+    let isOpsExecuteErrored = false;
+    Editor.withoutNormalizing(editor, () => {
+      operations.forEach(item => {
+        try {
+          Transforms.transform(editor, item);
+        } catch(err) {
+          logger.error(err);
+          logger.error('sync operations failed.');
+          isOpsExecuteErrored = true;
+        }
+      });
+    });
+    if (isOpsExecuteErrored) {
+      const result = {
+        success: false,
+        operations: operations
+      };
+      callback && callback(result);
+      return;
     }
-    
-    document.setValue(editor.children);
+
+    const nextVersion = version + 1;
+    document.setValue(editor.children, nextVersion);
     editor = null;
-    callback && callback();
+    const result = {
+      success: true,
+      version: nextVersion,
+    };
+    callback && callback(result);
   };
 
 }
