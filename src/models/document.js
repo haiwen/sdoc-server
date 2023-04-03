@@ -18,9 +18,10 @@ class Document {
     this.fileName = fileName;
   }
 
-  setValue = (value) => {
+  setValue = (value, version) => {
     let last_access = new Date().getTime();
     this.children = value;
+    this.version = version;
     let need_save = true;
     this.setMeta({last_access, need_save});
   };
