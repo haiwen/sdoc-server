@@ -24,8 +24,7 @@ class IOServer {
       // todo
 
       const sid = socket.id;
-      const { doc_id: roomId } = params;
-      socket.join(roomId);
+      socket.join(fileUuid);
       this.ioHelper.sendMessageToPrivate(sid, params);
       callback && callback({status: 1});
     });
@@ -36,10 +35,13 @@ class IOServer {
     });
     
     socket.on('update-document', (params, callback) => {
-      const { doc_id: roomId } = params;
+      const { file_uuid: roomId, operations } = params;
       const documentManager = DocumentManager.getInstance();
       documentManager.execOperationsBySocket(params, (result) => {
-        this.ioHelper.sendMessageToRoom(socket, roomId, params);
+        if (result.success) {
+          const { version } = result;
+          this.ioHelper.sendMessageToRoom(socket, roomId, {operations, version});
+        }
         callback && callback(result);
       });
     });
