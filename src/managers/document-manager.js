@@ -115,9 +115,9 @@ class DocumentManager {
     const documents = this.documents.values();
     const document = documents.next().value;
 
-    const { operations, version } = params;
-    const { version: currentVersion, children } = document;
-    if (currentVersion !== version) {
+    const { version: clientVersion, operations } = params;
+    const { version: serverVersion, children } = document;
+    if (serverVersion !== clientVersion) {
       const result = {
         success: false,
         operations: operations
@@ -148,7 +148,7 @@ class DocumentManager {
       return;
     }
 
-    const nextVersion = currentVersion + 1;
+    const nextVersion = serverVersion + 1;
     document.setValue(editor.children, nextVersion);
     editor = null;
     const result = {
