@@ -19,14 +19,15 @@ class IOServer {
     // todo permission check
 
     socket.on('join-room', async (params, callback) => {
-      // join room
-      socket.join(fileUuid);
-
+      
       // get file content and add file into memory
       const { file_uuid: fileUuid, file_path: filePath, file_name: fileName } = params;
       const documentManager = DocumentManager.getInstance();
       const fileContent = await documentManager.getFile(fileUuid, filePath, fileName);
       
+      // join room
+      socket.join(fileUuid);
+
       // const sid = socket.id;
       // this.ioHelper.sendMessageToPrivate(sid, params);
 

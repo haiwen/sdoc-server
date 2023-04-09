@@ -25,7 +25,8 @@ class OperationsManager {
   };
 
   getLoseOperationList = (fileUuid, version) => {
-    const operationList = this.filesMap.get(fileUuid);
+    const operationList = this.filesMap.get(fileUuid) || [];
+    if (operationList.length === 0) return [];
     return operationList.filter(item => item.version >= version);
   };
 
