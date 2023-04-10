@@ -15,28 +15,28 @@ class OperationsManager {
     return this.instance;
   };
 
-  addOperations = (fileUUid, operations) => {
-    let operationList = this.operationListMap.get(fileUUid) || [];
+  addOperations = (docUuid, operations) => {
+    let operationList = this.operationListMap.get(docUuid) || [];
     operationList.push(operations);
     if (operationList.length >= OPERATIONS_CACHE_LIMIT) {
       operationList = operationList.slice(OPERATIONS_CACHE_LIMIT / 10);
     }
-    this.operationListMap.set(fileUUid, operationList);
+    this.operationListMap.set(docUuid, operationList);
   };
 
-  getLoseOperationList = (fileUuid, version) => {
-    const operationList = this.operationListMap.get(fileUuid) || [];
+  getLoseOperationList = (docUuid, version) => {
+    const operationList = this.operationListMap.get(docUuid) || [];
     if (operationList.length === 0) return [];
     return operationList.filter(item => item.version > version);
   };
 
-  getOperationsSize = (fileUuid) => {
-    const operationList = this.operationListMap.get(fileUuid);
+  getOperationsSize = (docUuid) => {
+    const operationList = this.operationListMap.get(docUuid);
     return operationList.length;
   };
 
-  clearOperations = (fileUuid) => {
-    this.operationListMap.delete(fileUuid);
+  clearOperations = (docUuid) => {
+    this.operationListMap.delete(docUuid);
   };
 
 }

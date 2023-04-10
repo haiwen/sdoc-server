@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import logger from '../loggers';
 import { SEADOC_PRIVATE_KEY } from '../config/config';
-import { getFileUuidFromUrl } from '../utils';
+import { getDocUuidFromUrl } from '../utils';
 
 const auth = (req, res, next) => {
   const authorization = req.headers.authorization;
@@ -23,15 +23,18 @@ const auth = (req, res, next) => {
       }
     }
 
-    const file_uuid = getFileUuidFromUrl(req.originalUrl);
+    const doc_uuid = getDocUuidFromUrl(req.originalUrl);
     // access request initiated with administrator privileges
-    if (!file_uuid) {
+    if (!doc_uuid) {
       // write jwt token to the req object
       req.payload = decoded;
       next();
     } else {
-      if (decoded.file_uuid !== file_uuid) {
-        const message = `file_uuid in token doesn't match the accessed file. file_uuid in token: ${decoded.file_uuid}, accessed file_uuid: ${file_uuid}`;
+      // TODO: access_token file_uuid to doc_id
+      // token's uuid is file_uud
+      const { file_uuid: docUuid } = decoded;
+      if (docUuid !== doc_uuid) {
+        const message = `doc_uuid in token doesn't match the accessed doc. doc_uuid in token: ${docUuid}, accessed doc_uuid: ${doc_uuid}`;
         logger.info(message);
         res.status(403).send({"error_msg": 'You don\'t have permission to access.'});
         return;

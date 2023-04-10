@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { v4 } from "uuid";
 
-export const generateDefaultFileContent = () => {
+export const generateDefaultDocContent = () => {
   const defaultValue = {
     version: 0,
     children: [{id: v4(), type: 'paragraph', children: [{ text: '' }]}]
@@ -76,17 +76,17 @@ export const formatTimeToMillisecond = (time) => {
 
 };
 
-export const getFileUuidFromUrl = (url) => {
+export const getDocUuidFromUrl = (url) => {
   const pathname = url.split('?')[0];
   if (pathname.indexOf('/files/') === -1) {
     return null;
   }
-  const fileUuidPath = pathname.split('/files/')[1];
-  const splitIndex = fileUuidPath.indexOf('/');
+  const docUuidPath = pathname.split('/files/')[1];
+  const splitIndex = docUuidPath.indexOf('/');
   if (splitIndex > -1) {
-    return fileUuidPath.split('/')[0];
+    return docUuidPath.split('/')[0];
   }
-  return fileUuidPath;
+  return docUuidPath;
 };
 
 

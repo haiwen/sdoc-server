@@ -1,9 +1,9 @@
 class Document {
 
-  constructor(fileUuid, filePath, fileName, fileContent) {
-    this.fileUuid = fileUuid;
-    this.version = fileContent.version;
-    this.children = fileContent.children;
+  constructor(docUuid, docPath, docName, docContent) {
+    this.docUuid = docUuid;
+    this.version = docContent.version;
+    this.children = docContent.children;
     this.meta = {
       save_times: 0,
       need_save: false,
@@ -13,9 +13,9 @@ class Document {
       owner: '',
     };
 
-    // used for interval save file's content
-    this.filePath = filePath;
-    this.fileName = fileName;
+    // used for interval save doc's content
+    this.docPath = docPath;
+    this.docName = docName;
   }
 
   setValue = (value, version) => {

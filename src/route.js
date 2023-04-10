@@ -6,7 +6,7 @@ import { documentController } from './controllers';
 const router = express.Router();
 const multipartMiddleware = multipart();
 
-router.get(`${BASE_URL_VERSION1}/:file_uuid/`, documentController.loadFileContent);
-router.post(`${BASE_URL_VERSION1}/:file_uuid/`, multipartMiddleware, documentController.saveFileContent);
+router.get(`${BASE_URL_VERSION1}/:doc_uuid/`, documentController.loadDocContent);
+router.post(`${BASE_URL_VERSION1}/:doc_uuid/`, multipartMiddleware, documentController.saveDocContent);
 
 export default router;

@@ -2,7 +2,7 @@ import fs from 'fs';
 import { v4 } from "uuid";
 import { Editor, Transforms } from "slate";
 import seaServerAPI from "../api/sea-server-api";
-import { deleteDir, generateDefaultFileContent } from "../utils";
+import { deleteDir, generateDefaultDocContent } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
@@ -38,7 +38,7 @@ class DocumentManager {
       setInterval(() => {
         clearInterval(this.saveTimer);
         process.kill(process.pid, 'SIGKILL');
-      }, 10000);
+      }, SAVE_INTERVAL);
     });
   };
 
@@ -60,13 +60,12 @@ class DocumentManager {
         continue;
       }
       try {
-        // todo
-        const { filePath, fileName, version, children } = document;
-        const fileContent = { version, children };
-        await this.saveFile(docId, filePath, fileName, fileContent);
+        const { docPath, docName, version, children } = document;
+        const docContent = { version, children };
+        await this.saveDoc(docId, docPath, docName, docContent);
         savedDocs.push(docId);
       } catch (error) {
-        // an error occurred while saving the file
+        // an error occurred while saving the doc
         logger.error(error);
       }
     }
@@ -81,8 +80,8 @@ class DocumentManager {
     this.lastSavingInfo.endTime = Date.now();
   };
 
-  getFile = async (fileUuid, filePath, fileName) => {
-    const document = this.documents.get(fileUuid);
+  getDoc = async (docUuid, docPath, docName) => {
+    const document = this.documents.get(docUuid);
     if (document) {
       return {
         version: document.version,
@@ -90,18 +89,18 @@ class DocumentManager {
       };
     }
     
-    const result = await seaServerAPI.getFileContent(fileUuid);
-    const fileContent = result.data ? result.data : generateDefaultFileContent();
-    const doc = new Document(fileUuid, filePath, fileName, fileContent);
-    this.documents.set(fileUuid, doc);
-    return fileContent;
+    const result = await seaServerAPI.getDocContent(docUuid);
+    const docContent = result.data ? result.data : generateDefaultDocContent();
+    const doc = new Document(docUuid, docPath, docName, docContent);
+    this.documents.set(docUuid, doc);
+    return docContent;
   };
 
-  saveFile = async (fileUuid, filePath, fileName, fileContent) => {
+  saveDoc = async (docUuid, docPath, docName, docContent) => {
     const tempPath = `/tmp/` + v4();
-    fs.writeFileSync(tempPath, JSON.stringify(fileContent), { flag: 'w+' });
+    fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
-      await seaServerAPI.saveFileContent(fileUuid, filePath, fileName, {path: tempPath});
+      await seaServerAPI.saveDocContent(docUuid, docPath, docName, {path: tempPath});
       deleteDir(tempPath);
     } catch(err) {
       logger.info(err);

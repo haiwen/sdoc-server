@@ -20,18 +20,18 @@ class IOServer {
 
     socket.on('join-room', async (params, callback) => {
       
-      // get file content and add file into memory
-      const { file_uuid: fileUuid, file_path: filePath, file_name: fileName } = params;
+      // get doc content and add doc into memory
+      const { doc_uuid: docUuid, doc_path: docPath, doc_name: docName } = params;
       const documentManager = DocumentManager.getInstance();
-      const fileContent = await documentManager.getFile(fileUuid, filePath, fileName);
+      const docContent = await documentManager.getDoc(docUuid, docPath, docName);
       
       // join room
-      socket.join(fileUuid);
+      socket.join(docUuid);
 
       // const sid = socket.id;
       // this.ioHelper.sendMessageToPrivate(sid, params);
 
-      const { version } = fileContent;
+      const { version } = docContent;
       callback && callback({success: 1, version});
     });
     
@@ -41,31 +41,31 @@ class IOServer {
     });
     
     socket.on('update-document', (params, callback) => {
-      const { file_uuid: fileUuid, operations } = params;
+      const { doc_uuid: docUuid, operations } = params;
       const documentManager = DocumentManager.getInstance();
       documentManager.execOperationsBySocket(params, (result) => {
         if (result.success) {
           const { version } = result;
           const operationsManager = OperationsManager.getInstance();
-          operationsManager.addOperations(fileUuid, {operations, version});
-          this.ioHelper.sendMessageToRoom(socket, fileUuid, {operations, version});
+          operationsManager.addOperations(docUuid, {operations, version});
+          this.ioHelper.sendMessageToRoom(socket, docUuid, {operations, version});
         }
         callback && callback(result);
       });
     });
 
     socket.on('sync-document', async (params, callback) => {
-      const { file_uuid: fileUuid, file_path: filePath, file_name: fileName } = params;
+      const { doc_uuid: docUuid, doc_path: docPath, doc_name: docName } = params;
       const documentManager = DocumentManager.getInstance();
-      const fileContent = await documentManager.getFile(fileUuid, filePath, fileName);
-      const { version: serverVersion } = fileContent;
+      const docContent = await documentManager.getDoc(docUuid, docPath, docName);
+      const { version: serverVersion } = docContent;
       const { version: clientVersion } = params;
       // return document
       if (serverVersion - clientVersion > OPERATIONS_CACHE_LIMIT) {
         const result = {
           success: true,
           mode: 'document',
-          content: fileContent
+          content: docContent
         };
         callback && callback(result);
         return;
@@ -73,7 +73,7 @@ class IOServer {
 
       // return operations
       const operationsManager = OperationsManager.getInstance();
-      const operationList = operationsManager.getLoseOperationList(fileUuid, clientVersion);
+      const operationList = operationsManager.getLoseOperationList(docUuid, clientVersion);
       const result = {
         success: true,
         mode: 'operations',
