@@ -19,7 +19,7 @@ class OperationsManager {
     let operationList = this.filesMap.get(fileUUid) || [];
     operationList.push(operations);
     if (operationList.length >= OPERATIONS_CACHE_LIMIT) {
-      operationList = operationList.slice(100);
+      operationList = operationList.slice(OPERATIONS_CACHE_LIMIT / 10);
     }
     this.filesMap.set(fileUUid, operationList);
   };

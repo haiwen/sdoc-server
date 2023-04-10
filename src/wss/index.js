@@ -54,10 +54,10 @@ class IOServer {
       });
     });
 
-    socket.on('sync-document', (params, callback) => {
+    socket.on('sync-document', async (params, callback) => {
       const { file_uuid: fileUuid, file_path: filePath, file_name: fileName } = params;
       const documentManager = DocumentManager.getInstance();
-      const fileContent = documentManager.getFile(fileUuid, filePath, fileName);
+      const fileContent = await documentManager.getFile(fileUuid, filePath, fileName);
       const { version: serverVersion } = fileContent;
       const { version: clientVersion } = params;
       // return document
