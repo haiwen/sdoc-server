@@ -38,7 +38,7 @@ class DocumentManager {
       setInterval(() => {
         clearInterval(this.saveTimer);
         process.kill(process.pid, 'SIGKILL');
-      }, 10000);
+      }, SAVE_INTERVAL);
     });
   };
 
@@ -90,7 +90,7 @@ class DocumentManager {
     }
     
     const result = await seaServerAPI.getDocContent(docUuid);
-    const docContent = result.data ? JSON.parse(result.data) : generateDefaultDocContent();
+    const docContent = result.data ? result.data : generateDefaultDocContent();
     const doc = new Document(docUuid, docPath, docName, docContent);
     this.documents.set(docUuid, doc);
     return docContent;
