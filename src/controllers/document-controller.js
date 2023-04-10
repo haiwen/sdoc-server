@@ -34,8 +34,10 @@ class DocumentController {
     } = req.body;
 
     try {
+      // Form api: need parse string content to object content
+      const content = JSON.parse(docContent);
       const documentManager = DocumentManager.getInstance();
-      await documentManager.saveDoc(docUuid, docPath, docName, docContent);
+      await documentManager.saveDoc(docUuid, docPath, docName, content);
       res.send({success: true});
       return;
     } catch(err) {
