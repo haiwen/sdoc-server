@@ -115,9 +115,17 @@ class DocumentManager {
     const documents = this.documents.values();
     const document = documents.next().value;
 
-    // todo
-    const { operations } = params;
-    const { version, children } = document;
+    const { version: clientVersion, operations } = params;
+    const { version: serverVersion, children } = document;
+    if (serverVersion !== clientVersion) {
+      const result = {
+        success: false,
+        operations: operations
+      };
+      callback && callback(result);
+      return;
+    }
+    
     let editor = { children: children };
     let isOpsExecuteErrored = false;
     Editor.withoutNormalizing(editor, () => {
@@ -140,7 +148,7 @@ class DocumentManager {
       return;
     }
 
-    const nextVersion = version + 1;
+    const nextVersion = serverVersion + 1;
     document.setValue(editor.children, nextVersion);
     editor = null;
     const result = {

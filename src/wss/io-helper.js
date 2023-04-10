@@ -20,8 +20,8 @@ class IOHelper {
     this.io.emit('message', `server error`);
   };
 
-  sendMessageToRoom = (socket, room_id, params) => {
-    socket.to(room_id).emit('update-document', {...params});
+  sendMessageToRoom = (socket, roomId, params) => {
+    socket.to(roomId).emit('update-document', {...params});
   };
   
   sendMessageToPrivate = (sid, params) => {
