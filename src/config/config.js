@@ -1,7 +1,22 @@
-export const SEAHUB_SERVER = 'http://127.0.0.1:80';
+import fs from 'fs';
+import path from 'path';
 
-export const SERVER_PORT = 7070;
+export function loadJsonFile(file) {
+  var json = fs.readFileSync(file).toString();
+  return JSON.parse(json);
+}
 
-export const SAVE_INTERVAL = 5 * 60 * 1000; // 5 min
+let filePath = process.env.SEADOC_SERVER_CONFIG;
+if (!filePath) {
+  filePath = path.join(__dirname, './config.json');
+}
 
-export const SEADOC_PRIVATE_KEY = 'M@O8VWUb81YvmtWLHGB2I_V7di5-@0p(MF*GrE!sIws23F';
+const config = loadJsonFile(filePath);
+
+export const SEAHUB_SERVER = config.seahub_service_url || 'http://127.0.0.1:80';
+
+export const SERVER_PORT = config.server_port || 7070;
+
+export const SAVE_INTERVAL = config.save_interval || 5 * 60 * 1000; // 5 min
+
+export const SEADOC_PRIVATE_KEY = config.private_key;
