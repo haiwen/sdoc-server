@@ -4,8 +4,11 @@
   "description": "An sync server for sdoc file",
   "main": "src/bin/www.js",
   "scripts": {
+    "clean": "rm -rf dist",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon --exec babel-node ./src/_bin/www.js",
+    "build": "npm run clean && ./node_modules/.bin/babel src --out-dir dist",
+    "serve": "nohup node --max-old-space-size=4096 ./dist/_bin/www.js",
     "lint": "eslint \"**/*.js\""
   },
   "keywords": [
