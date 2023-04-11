@@ -6,7 +6,7 @@ export function loadJsonFile(file) {
   return JSON.parse(json);
 }
 
-let filePath = process.env.SEADOC_SERVER_CONFIG;
+let filePath = process.env.SDOC_SERVER_CONFIG; // sdoc_server_config.json
 if (!filePath) {
   filePath = path.join(__dirname, './config.json');
 }
