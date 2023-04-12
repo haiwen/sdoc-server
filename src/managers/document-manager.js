@@ -88,7 +88,6 @@ class DocumentManager {
         children: document.children,
       };
     }
-    
     const result = await seaServerAPI.getDocContent(docUuid);
     const docContent = result.data ? result.data : generateDefaultDocContent();
     const doc = new Document(docUuid, docPath, docName, docContent);
@@ -111,11 +110,12 @@ class DocumentManager {
   };
 
   execOperationsBySocket = (params, callback) => {
-    const documents = this.documents.values();
-    const document = documents.next().value;
+    const { doc_uuid } = params;
+    const document = this.documents.get(doc_uuid);
 
     const { version: clientVersion, operations } = params;
     const { version: serverVersion, children } = document;
+    logger.debug('clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
     if (serverVersion !== clientVersion) {
       const result = {
         success: false,
