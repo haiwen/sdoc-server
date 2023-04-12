@@ -28,3 +28,6 @@ server.pid
 index.sh
 deploy.sh
 /.idea
+
+# config
+/config
