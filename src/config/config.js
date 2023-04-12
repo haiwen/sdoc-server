@@ -8,7 +8,7 @@ export function loadJsonFile(file) {
 
 let filePath = process.env.SDOC_SERVER_CONFIG; // sdoc_server_config.json
 if (!filePath) {
-  filePath = path.join(__dirname, './config.json');
+  filePath = path.join(__dirname, '../../config/config.json');
 }
 
 const config = loadJsonFile(filePath);
