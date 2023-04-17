@@ -1,11 +1,11 @@
 import fs from 'fs';
 import { v4 } from "uuid";
-import { Editor, Transforms } from "slate";
 import seaServerAPI from "../api/sea-server-api";
 import { deleteDir, generateDefaultDocContent } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
+import { applyOperations } from '../utils/slate-utils';
 
 class DocumentManager {
 
@@ -110,11 +110,11 @@ class DocumentManager {
   };
 
   execOperationsBySocket = (params, callback) => {
-    const { doc_uuid } = params;
-    const document = this.documents.get(doc_uuid);
+    const { doc_uuid, version: clientVersion, operations } = params;
 
-    const { version: clientVersion, operations } = params;
-    const { version: serverVersion, children } = document;
+    const document = this.documents.get(doc_uuid);
+    const { version: serverVersion } = document;
+
     logger.debug('clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
     if (serverVersion !== clientVersion) {
       const result = {
@@ -124,35 +124,21 @@ class DocumentManager {
       callback && callback(result);
       return;
     }
-    
-    let editor = { children: children };
-    let isOpsExecuteErrored = false;
-    Editor.withoutNormalizing(editor, () => {
-      operations.forEach(item => {
-        try {
-          Transforms.transform(editor, item);
-        } catch(err) {
-          logger.error(err);
-          logger.error('sync operations failed.');
-          isOpsExecuteErrored = true;
-        }
-      });
-    });
-    if (isOpsExecuteErrored) {
+
+    // execute operations success
+    if (applyOperations(document, operations)) {
       const result = {
-        success: false,
-        operations: operations
+        success: true,
+        version: document.version,
       };
       callback && callback(result);
       return;
     }
 
-    const nextVersion = serverVersion + 1;
-    document.setValue(editor.children, nextVersion);
-    editor = null;
+    // execute operations failed
     const result = {
-      success: true,
-      version: nextVersion,
+      success: false,
+      operations: operations
     };
     callback && callback(result);
   };
