@@ -1,4 +1,4 @@
-import { Transforms } from "slate";
+import { Transforms } from "@seafile/slate";
 import logger from "../loggers";
 
 export const applyOperations = (document, operations) => {
@@ -7,7 +7,7 @@ export const applyOperations = (document, operations) => {
 
   operations.forEach(item => {
     try {
-      Transforms.transform(editor, item);
+      Transforms.applyToDraft(editor, null, item);
     } catch(err) {
       logger.error(err.message);
       logger.error('sync operations failed.');
