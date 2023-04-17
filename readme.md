@@ -8,7 +8,7 @@
 3. Add configuration content
 ```
   {
-    "seahub_service_url": "http://127.0.0.1:80", // optional, default is http://127.0.0.1:80
+    "seahub_service_url": "http://127.0.0.1:8000", // optional, default is http://127.0.0.1:8000
     "server_port": 7070,  // optional, default is 7070
     "save_interval": 300000, // optional, default is 5 min
     "private_key": "", // required
