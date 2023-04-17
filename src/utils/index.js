@@ -89,4 +89,11 @@ export const getDocUuidFromUrl = (url) => {
   return docUuidPath;
 };
 
+export const isRequestTimeout = (err) => {
+  if (err.code === 'ECONNABORTED' || err.message === 'Network Error' || err.message.includes('timeout')) {
+    return true;
+  }
+  return false;
+};
+
 

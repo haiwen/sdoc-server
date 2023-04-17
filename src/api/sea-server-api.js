@@ -4,6 +4,8 @@ import FormData from 'form-data';
 import jwt from 'jsonwebtoken';
 import { SEADOC_PRIVATE_KEY, SEAHUB_SERVER } from '../config/config';
 
+axios.defaults.timeout = 60 * 1000;
+
 class SeaServerAPI {
 
   generateJwtToken = (docUuid) => {
