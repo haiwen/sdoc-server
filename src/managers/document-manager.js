@@ -56,20 +56,26 @@ class DocumentManager {
     for (let docId of docIds) {
       const document = this.documents.get(docId);
       const meta = document.getMeta();
-      if (meta.isSaving | !meta.need_save) { // is saving or no need save
+      if (meta.is_saving || !meta.need_save) { // is saving or no need save
         continue;
       }
       try {
+        // Update save flag
+        document.setMeta({is_saving: true});
+
+        // Save document
         const { docPath, docName, version, children } = document;
         const docContent = { version, children };
         await this.saveDoc(docId, docPath, docName, docContent);
+
+        // Reset save flag
+        document.setMeta({is_saving: false, need_save: false});
         savedDocs.push(docId);
       } catch (error) {
         // an error occurred while saving the doc
         logger.error(error);
       }
     }
-
     // record saving message
     const count = savedDocs.length;
     logger.info(`${count} docs saved.`);
@@ -100,12 +106,12 @@ class DocumentManager {
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
       await seaServerAPI.saveDocContent(docUuid, docPath, docName, {path: tempPath});
+      logger.info(`Save file ${docName} to ${docPath}`);
       deleteDir(tempPath);
     } catch(err) {
-      logger.info(err);
-      logger.info(err.message);
+      logger.error(err.message);
+      logger.error(err);
       deleteDir(tempPath);
-      throw new Error(err);
     }
   };
 
