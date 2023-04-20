@@ -10,7 +10,8 @@
     "node": true,
     "es6": true,
     "browser": true,
-    "es2021": true
+    "es2021": true,
+    "jest": true
   },
   "rules": {
     "semi": [
