@@ -24,6 +24,14 @@ class IOHelper {
     socket.to(roomId).emit('update-document', {...params});
   };
   
+  sendJoinRoomMessage = (socket, roomId, username) => {
+    socket.to(roomId).emit('join-room', username);
+  };
+
+  sendLeaveRoomMessage = (socket, roomId, username) => {
+    socket.to(roomId).emit('leave-room', username);
+  };
+  
   sendMessageToPrivate = (sid, params) => {
     this.io.to(sid).emit('message', `${params.name} has join room`);
   };
