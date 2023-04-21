@@ -1,6 +1,8 @@
 import { OPERATIONS_CACHE_LIMIT } from "../constants";
 import DocumentManager from "../managers/document-manager";
 import OperationsManager from "../managers/operations-manager";
+import UsersManager from "../managers/users-manager";
+import auth from "./auth";
 import IOHelper from "./io-helper";
 
 class IOServer {
@@ -10,6 +12,7 @@ class IOServer {
     this.io = io;
     this.ioHelper = IOHelper.getInstance(io);
     io.on('connection', (socket) => { this.onConnected(socket); });
+    io.use(auth);
   }
 
   onConnected(socket) {
@@ -28,6 +31,12 @@ class IOServer {
       // join room
       socket.join(docUuid);
 
+      // add current user into memory
+      const { userInfo } = socket;
+      const usersManager = UsersManager.getInstance();
+      usersManager.addUser(docUuid, socket.id, userInfo);
+      this.ioHelper.sendJoinRoomMessage(socket, docUuid, userInfo.username);
+
       // const sid = socket.id;
       // this.ioHelper.sendMessageToPrivate(sid, params);
 
@@ -35,9 +44,14 @@ class IOServer {
       callback && callback({success: 1, version});
     });
     
-    socket.on('leave-room', (params) => {
-      const { uuid: roomId } = params;
-      this.ioHelper.sendMessageToRoom(socket, roomId, params);
+    socket.on('leave-room', () => {
+      const { docUuid } = socket;
+      const usersManager = UsersManager.getInstance();
+      const user = usersManager.getUser(docUuid, socket.id);
+      this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
+      
+      // delete current user from memory
+      usersManager.deleteUser(docUuid, socket.id);
     });
     
     socket.on('update-document', (params, callback) => {
@@ -88,14 +102,15 @@ class IOServer {
     });
     
     socket.on('disconnect', () => {
-      const sid = socket.id;
-      this.ioHelper.sendMessageToPrivate(sid, 'disconnect success');
+      const { docUuid } = socket;
+      const usersManager = UsersManager.getInstance();
+      const user = usersManager.getUser(docUuid, socket.id);
+      this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
+      
+      // delete current user from memory
+      usersManager.deleteUser(docUuid, socket.id);
     });
     
-    socket.on('reconnect', () => {
-      const sid = socket.id;
-      this.ioHelper.sendMessageToPrivate(sid, 'reconnect success');
-    });
   }
 
 }
