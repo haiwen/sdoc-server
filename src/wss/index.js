@@ -43,7 +43,7 @@ class IOServer {
       const { userInfo } = socket;
       const usersManager = UsersManager.getInstance();
       usersManager.addUser(docUuid, socket.id, userInfo);
-      this.ioHelper.sendJoinRoomMessage(socket, docUuid, userInfo.username);
+      this.ioHelper.sendJoinRoomMessage(socket, docUuid, userInfo);
 
       // const sid = socket.id;
       // this.ioHelper.sendMessageToPrivate(sid, params);

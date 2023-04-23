@@ -24,8 +24,8 @@ class IOHelper {
     socket.to(roomId).emit('update-document', {...params});
   };
   
-  sendJoinRoomMessage = (socket, roomId, username) => {
-    socket.to(roomId).emit('join-room', username);
+  sendJoinRoomMessage = (socket, roomId, userInfo) => {
+    socket.to(roomId).emit('join-room', userInfo);
   };
 
   sendLeaveRoomMessage = (socket, roomId, username) => {
