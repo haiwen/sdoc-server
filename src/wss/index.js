@@ -1,4 +1,5 @@
 import { OPERATIONS_CACHE_LIMIT } from "../constants";
+import logger from "../loggers";
 import DocumentManager from "../managers/document-manager";
 import OperationsManager from "../managers/operations-manager";
 import UsersManager from "../managers/users-manager";
@@ -23,10 +24,17 @@ class IOServer {
 
     socket.on('join-room', async (callback) => {
       
-      // get doc content and add doc into memory
+      let docContent = null;
       const { docUuid } = socket;
-      const documentManager = DocumentManager.getInstance();
-      const docContent = await documentManager.getDoc(docUuid);
+      try {
+        // get doc content and add doc into memory
+        const documentManager = DocumentManager.getInstance();
+        docContent = await documentManager.getDoc(docUuid);
+      } catch(err) {
+        logger.error(`SOCKET_MESSAGE: get doc ${docUuid} failed form socket`);
+        callback && callback({success: 0});
+        return;
+      }
       
       // join room
       socket.join(docUuid);
