@@ -1,7 +1,8 @@
 class Document {
 
-  constructor(docUuid, docContent) {
+  constructor(docUuid, docName, docContent) {
     this.docUuid = docUuid;
+    this.docName = docName;
     this.version = docContent.version;
     this.children = docContent.children;
     this.meta = {

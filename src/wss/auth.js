@@ -7,6 +7,7 @@ export default function(socket, next) {
   try {
     const decoded = jwt.verify(token, SEADOC_PRIVATE_KEY);
     socket.docUuid = decoded.file_uuid;
+    socket.docName = decoded.filename;
     socket.userInfo = { 
       username: decoded.username, 
       permission: decoded.permission,

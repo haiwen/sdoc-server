@@ -5,11 +5,10 @@ import { isRequestTimeout } from "../utils";
 class DocumentController {
 
   async loadDocContent(req, res) {
-    const { doc_uuid: docUuid } = req.params;
-
+    const { file_uuid: docUuid, filename: docName } = req.payload;
     try {
       const documentManager = DocumentManager.getInstance();
-      const docContent = await documentManager.getDoc(docUuid);
+      const docContent = await documentManager.getDoc(docUuid, docName);
       res.send(docContent);
       return;
     } catch(err) {
@@ -17,7 +16,7 @@ class DocumentController {
       if (isRequestTimeout(err)) {
         logger.error('Request timed out, please try again later');
       }
-      logger.error(`Load ${docUuid} doc content error`);
+      logger.error(`Load ${docName}(${docUuid}) doc content error`);
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;
     }
@@ -25,7 +24,7 @@ class DocumentController {
   
   async saveDocContent(req, res) {
 
-    const { doc_uuid: docUuid } = req.params;
+    const { file_uuid: docUuid, filename: docName  } = req.payload;
     const { doc_content: docContent } = req.body;
 
     if (!docContent) {
@@ -43,20 +42,15 @@ class DocumentController {
       return;
     }
 
-    try {
-      const documentManager = DocumentManager.getInstance();
-      await documentManager.saveDoc(docUuid, content);
+    const documentManager = DocumentManager.getInstance();
+    const saveFlag = await documentManager.saveDoc(docUuid, docName, content);
+    if (saveFlag) { // saved success
       res.send({success: true});
       return;
-    } catch(err) {
-      logger.error(err.message);
-      if (isRequestTimeout(err)) {
-        logger.error('Request timed out, please try again later');
-      }
-      logger.error(`Save ${docUuid} doc content error`);
-      res.status(500).send({'error_msg': 'Internal Server Error'});
-      return;
     }
+
+    res.status(500).send({'error_msg': 'Internal Server Error'});
+    return;
   }
 }
 

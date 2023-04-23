@@ -25,13 +25,13 @@ class IOServer {
     socket.on('join-room', async (callback) => {
       
       let docContent = null;
-      const { docUuid } = socket;
+      const { docUuid, docName } = socket;
       try {
         // get doc content and add doc into memory
         const documentManager = DocumentManager.getInstance();
-        docContent = await documentManager.getDoc(docUuid);
+        docContent = await documentManager.getDoc(docUuid, docName);
       } catch(err) {
-        logger.error(`SOCKET_MESSAGE: get doc ${docUuid} failed form socket`);
+        logger.error(`SOCKET_MESSAGE: Load ${docName}(${docUuid}) doc content error`);
         callback && callback({success: 0});
         return;
       }
@@ -77,9 +77,10 @@ class IOServer {
     });
 
     socket.on('sync-document', async (params, callback) => {
+      const { docName } = socket;
       const { doc_uuid: docUuid } = params;
       const documentManager = DocumentManager.getInstance();
-      const docContent = await documentManager.getDoc(docUuid);
+      const docContent = await documentManager.getDoc(docUuid, docName);
       const { version: serverVersion } = docContent;
       const { version: clientVersion } = params;
       // return document
