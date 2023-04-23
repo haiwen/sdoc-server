@@ -56,16 +56,14 @@ class UsersManager {
   };
 
   getDocUsers = (docUuid) => {
-    let users = [];
+    let users = {};
     if (this.users.has(docUuid)) {
       const docUsers = this.users.get(docUuid);
       docUsers.forEach((user, socketId) => {
-        users.push(user.username);
+        users[user.username] = user;
       });
-      // delete dup users
-      return [...new Set(users)];
     }
-    return users;
+    return Object.values(users);
   };
 
 }
