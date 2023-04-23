@@ -6,24 +6,10 @@ class DocumentController {
 
   async loadDocContent(req, res) {
     const { doc_uuid: docUuid } = req.params;
-    const { 
-      doc_path: docPath, 
-      doc_name: docName, 
-    } = req.query;
-
-    if (!docPath) {
-      res.status(400).send({"error_msg": `Param 'doc_path' is required`});
-      return;
-    }
-    
-    if (!docName) {
-      res.status(400).send({"error_msg": `Param 'doc_name' is required`});
-      return;
-    }
 
     try {
       const documentManager = DocumentManager.getInstance();
-      const docContent = await documentManager.getDoc(docUuid, docName, docPath);
+      const docContent = await documentManager.getDoc(docUuid);
       res.send(docContent);
       return;
     } catch(err) {
@@ -40,22 +26,7 @@ class DocumentController {
   async saveDocContent(req, res) {
 
     const { doc_uuid: docUuid } = req.params;
-
-    const { 
-      doc_path: docPath, 
-      doc_name: docName, 
-      doc_content: docContent
-    } = req.body;
-
-    if (!docPath) {
-      res.status(400).send({"error_msg": `Param 'doc_path' is required`});
-      return;
-    }
-    
-    if (!docName) {
-      res.status(400).send({"error_msg": `Param 'doc_name' is required`});
-      return;
-    }
+    const { doc_content: docContent } = req.body;
 
     if (!docContent) {
       res.status(400).send({"error_msg": `Param 'doc_content' is required`});
@@ -74,7 +45,7 @@ class DocumentController {
 
     try {
       const documentManager = DocumentManager.getInstance();
-      await documentManager.saveDoc(docUuid, docPath, docName, content);
+      await documentManager.saveDoc(docUuid, content);
       res.send({success: true});
       return;
     } catch(err) {

@@ -52,28 +52,25 @@ class DocumentManager {
 
     let savedDocs = [];
     const startTime = Date.now();
-    const docIds = this.documents.keys();
-    for (let docId of docIds) {
-      const document = this.documents.get(docId);
+    const docUuids = this.documents.keys();
+    for (let docUuid of docUuids) {
+      const document = this.documents.get(docUuid);
       const meta = document.getMeta();
       if (meta.is_saving || !meta.need_save) { // is saving or no need save
         continue;
       }
-      try {
-        // Update save flag
-        document.setMeta({is_saving: true});
 
-        // Save document
-        const { docPath, docName, version, children } = document;
-        const docContent = { version, children };
-        await this.saveDoc(docId, docPath, docName, docContent);
+      // Update save flag
+      document.setMeta({is_saving: true});
 
+      // Save document
+      const { version, children } = document;
+      const docContent = { version, children };
+      const saveFlag = await this.saveDoc(docUuid, docContent);
+      if (saveFlag) {
         // Reset save flag
         document.setMeta({is_saving: false, need_save: false});
-        savedDocs.push(docId);
-      } catch (error) {
-        // an error occurred while saving the doc
-        logger.error(error);
+        savedDocs.push(docUuid);
       }
     }
     // record saving message
@@ -86,7 +83,7 @@ class DocumentManager {
     this.lastSavingInfo.endTime = Date.now();
   };
 
-  getDoc = async (docUuid, docPath, docName) => {
+  getDoc = async (docUuid) => {
     const document = this.documents.get(docUuid);
     if (document) {
       return {
@@ -96,23 +93,27 @@ class DocumentManager {
     }
     const result = await seaServerAPI.getDocContent(docUuid);
     const docContent = result.data ? result.data : generateDefaultDocContent();
-    const doc = new Document(docUuid, docPath, docName, docContent);
+    const doc = new Document(docUuid, docContent);
     this.documents.set(docUuid, doc);
     return docContent;
   };
 
-  saveDoc = async (docUuid, docPath, docName, docContent) => {
+  saveDoc = async (docUuid, docContent) => {
+    let saveFlag = false;
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
-      await seaServerAPI.saveDocContent(docUuid, docPath, docName, {path: tempPath});
-      logger.info(`Save file ${docName} to ${docPath}`);
-      deleteDir(tempPath);
+      await seaServerAPI.saveDocContent(docUuid, {path: tempPath});
+      saveFlag = true;
+      logger.info(`Doc ${docUuid} saved success`);
     } catch(err) {
-      logger.error(err.message);
+      saveFlag = false;
+      logger.error(`Saved doc ${docUuid} failed`);
       logger.error(err);
+    } finally {
       deleteDir(tempPath);
     }
+    return saveFlag;
   };
 
   execOperationsBySocket = (params, callback) => {
