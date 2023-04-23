@@ -64,9 +64,9 @@ class DocumentManager {
       document.setMeta({is_saving: true});
 
       // Save document
-      const { version, children } = document;
+      const { version, children, docName } = document;
       const docContent = { version, children };
-      const saveFlag = await this.saveDoc(docUuid, docContent);
+      const saveFlag = await this.saveDoc(docUuid, docName, docContent);
       if (saveFlag) {
         // Reset save flag
         document.setMeta({is_saving: false, need_save: false});
@@ -83,7 +83,7 @@ class DocumentManager {
     this.lastSavingInfo.endTime = Date.now();
   };
 
-  getDoc = async (docUuid) => {
+  getDoc = async (docUuid, docName) => {
     const document = this.documents.get(docUuid);
     if (document) {
       return {
@@ -93,27 +93,27 @@ class DocumentManager {
     }
     const result = await seaServerAPI.getDocContent(docUuid);
     const docContent = result.data ? result.data : generateDefaultDocContent();
-    const doc = new Document(docUuid, docContent);
+    const doc = new Document(docUuid, docName, docContent);
     this.documents.set(docUuid, doc);
     return docContent;
   };
 
-  saveDoc = async (docUuid, docContent) => {
+  saveDoc = async (docUuid, docName, docContent) => {
     let saveFlag = false;
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath});
       saveFlag = true;
-      logger.info(`Doc ${docUuid} saved success`);
+      logger.info(`${docUuid} saved`);
     } catch(err) {
       saveFlag = false;
-      logger.error(`Saved doc ${docUuid} failed`);
+      logger.error(`${docName}(${docUuid}) save failed`);
       logger.error(err);
     } finally {
       deleteDir(tempPath);
     }
-    return saveFlag;
+    return Promise.resolve(saveFlag);
   };
 
   execOperationsBySocket = (params, callback) => {
