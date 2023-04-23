@@ -1,6 +1,6 @@
 class Document {
 
-  constructor(docUuid, docPath, docName, docContent) {
+  constructor(docUuid, docContent) {
     this.docUuid = docUuid;
     this.version = docContent.version;
     this.children = docContent.children;
@@ -12,10 +12,6 @@ class Document {
       last_save_time: '',
       owner: '',
     };
-
-    // used for interval save doc's content
-    this.docPath = docPath;
-    this.docName = docName;
   }
 
   setValue = (value, version) => {

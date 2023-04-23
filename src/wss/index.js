@@ -21,12 +21,12 @@ class IOServer {
 
     // todo permission check
 
-    socket.on('join-room', async (params, callback) => {
+    socket.on('join-room', async (callback) => {
       
       // get doc content and add doc into memory
-      const { doc_uuid: docUuid, doc_path: docPath, doc_name: docName } = params;
+      const { docUuid } = socket;
       const documentManager = DocumentManager.getInstance();
-      const docContent = await documentManager.getDoc(docUuid, docPath, docName);
+      const docContent = await documentManager.getDoc(docUuid);
       
       // join room
       socket.join(docUuid);
@@ -69,9 +69,9 @@ class IOServer {
     });
 
     socket.on('sync-document', async (params, callback) => {
-      const { doc_uuid: docUuid, doc_path: docPath, doc_name: docName } = params;
+      const { doc_uuid: docUuid } = params;
       const documentManager = DocumentManager.getInstance();
-      const docContent = await documentManager.getDoc(docUuid, docPath, docName);
+      const docContent = await documentManager.getDoc(docUuid);
       const { version: serverVersion } = docContent;
       const { version: clientVersion } = params;
       // return document

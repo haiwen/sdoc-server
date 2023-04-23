@@ -47,17 +47,14 @@ class SeaServerAPI {
     });
   };
     
-  saveDocContent = (docUuid, docPath, docName, docData) => {    
-    return this.getDocUpdateLink(docUuid).then(res => {
+  saveDocContent = (docUuid, docData) => {   
+    const uploadLink = '/api/v2.1/seadoc/upload-file/' + docUuid + '/';
 
-      const { upload_link: uploadLink } = res.data;
-      const formData = new FormData();
-      formData.append("target_file", docPath);
-      formData.append("filename", docName);
-      formData.append("file", fs.createReadStream(docData.path), {fileName: docName});
-
-      return axios.post(uploadLink, formData);
-    });
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(docData.path));
+    
+    const config = this.getConfig(docUuid);
+    return axios.post(uploadLink, formData, config);
   };
 
 }
