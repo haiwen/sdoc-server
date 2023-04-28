@@ -46,13 +46,16 @@ class UsersManager {
   };
   
   deleteUser = (docUuid, socketId) => {
+    let usersCount = 0;
     if (this.users.has(docUuid)) {
       let docUsers = this.users.get(docUuid);
       docUsers.delete(socketId);
-      if (docUsers.size === 0) {
+      usersCount = docUsers.size;
+      if (usersCount === 0) {
         this.users.delete(docUuid);
       }
     }
+    return usersCount;
   };
 
   getDocUsers = (docUuid) => {

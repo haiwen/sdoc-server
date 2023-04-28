@@ -5,6 +5,7 @@ class Document {
     this.docName = docName;
     this.version = docContent.version;
     this.children = docContent.children;
+    this.last_modify_user = docContent.last_modify_user;
     this.meta = {
       save_times: 0,
       need_save: false,
@@ -26,6 +27,10 @@ class Document {
   setMeta = (meta) => {
     meta = Object.assign({}, this.meta, meta);
     this.meta = meta;
+  };
+
+  setLastModifyUser = (user = { username: '' }) => {
+    this.last_modify_user = user.username || '';
   };
 
   getMeta = () => {

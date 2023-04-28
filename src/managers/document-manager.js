@@ -64,8 +64,8 @@ class DocumentManager {
       document.setMeta({is_saving: true});
 
       // Save document
-      const { version, children, docName } = document;
-      const docContent = { version, children };
+      const { version, children, docName, last_modify_user } = document;
+      const docContent = { version, children, last_modify_user };
       const saveFlag = await this.saveDoc(docUuid, docName, docContent);
       if (saveFlag) {
         // Reset save flag
@@ -89,6 +89,7 @@ class DocumentManager {
       return {
         version: document.version,
         children: document.children,
+        last_modify_user: document.last_modify_user
       };
     }
     const result = await seaServerAPI.getDocContent(docUuid);
@@ -103,7 +104,7 @@ class DocumentManager {
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
-      await seaServerAPI.saveDocContent(docUuid, {path: tempPath});
+      await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
       saveFlag = true;
       logger.info(`${docUuid} saved`);
     } catch(err) {
@@ -117,7 +118,7 @@ class DocumentManager {
   };
 
   execOperationsBySocket = (params, callback) => {
-    const { doc_uuid, version: clientVersion, operations } = params;
+    const { doc_uuid, version: clientVersion, operations, user } = params;
 
     const document = this.documents.get(doc_uuid);
     const { version: serverVersion } = document;
@@ -133,7 +134,7 @@ class DocumentManager {
     }
 
     // execute operations success
-    if (applyOperations(document, operations)) {
+    if (applyOperations(document, operations, user)) {
       const result = {
         success: true,
         version: document.version,

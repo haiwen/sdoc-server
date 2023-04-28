@@ -1,7 +1,7 @@
 import { Transforms } from "@seafile/slate";
 import logger from "../loggers";
 
-export const applyOperations = (document, operations) => {
+export const applyOperations = (document, operations, user) => {
   const { version, children } = document;
   const editor = { children };
 
@@ -16,6 +16,7 @@ export const applyOperations = (document, operations) => {
   });
   
   const newVersion = version + 1;
+  document.setLastModifyUser(user);
   document.setValue(editor.children, newVersion);
   return true;
 };

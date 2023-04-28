@@ -24,7 +24,7 @@ class DocumentController {
   
   async saveDocContent(req, res) {
 
-    const { file_uuid: docUuid, filename: docName  } = req.payload;
+    const { file_uuid: docUuid, filename: docName } = req.payload;
     const { doc_content: docContent } = req.body;
 
     if (!docContent) {
