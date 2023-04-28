@@ -62,8 +62,7 @@ class IOServer {
       const usersCount = usersManager.deleteUser(docUuid, socket.id);
       if (usersCount === 0) {
         const documentManager = DocumentManager.getInstance();
-        let docContent = await documentManager.getDoc(docUuid, docName);
-        docContent.version = docContent.version + 1;
+        const docContent = await documentManager.getDoc(docUuid, docName);
         documentManager.saveDoc(docUuid, docName, docContent);
       }
     });
@@ -126,8 +125,7 @@ class IOServer {
       const usersCount = usersManager.deleteUser(docUuid, socket.id);
       if (usersCount === 0) {
         const documentManager = DocumentManager.getInstance();
-        let docContent = await documentManager.getDoc(docUuid, docName);
-        docContent.version = docContent.version + 1;
+        const docContent = await documentManager.getDoc(docUuid, docName);
         documentManager.saveDoc(docUuid, docName, docContent);
       }
     });
