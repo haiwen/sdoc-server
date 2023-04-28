@@ -43,7 +43,7 @@ class DocumentController {
     }
 
     const documentManager = DocumentManager.getInstance();
-    const saveFlag = await documentManager.saveDoc(docUuid, docName, content, 'update');
+    const saveFlag = await documentManager.saveDoc(docUuid, docName, content);
     if (saveFlag) { // saved success
       res.send({success: true});
       return;

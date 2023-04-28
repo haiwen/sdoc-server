@@ -66,7 +66,7 @@ class DocumentManager {
       // Save document
       const { version, children, docName, last_modify_user } = document;
       const docContent = { version, children, last_modify_user };
-      const saveFlag = await this.saveDoc(docUuid, docName, docContent, 'update');
+      const saveFlag = await this.saveDoc(docUuid, docName, docContent);
       if (saveFlag) {
         // Reset save flag
         document.setMeta({is_saving: false, need_save: false});
@@ -99,12 +99,12 @@ class DocumentManager {
     return docContent;
   };
 
-  saveDoc = async (docUuid, docName, docContent, opName = 'update') => {
+  saveDoc = async (docUuid, docName, docContent) => {
     let saveFlag = false;
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
-      await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, { opUser: docContent.last_modify_user, opName });
+      await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
       saveFlag = true;
       logger.info(`${docUuid} saved`);
     } catch(err) {
