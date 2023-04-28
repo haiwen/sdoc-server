@@ -47,11 +47,13 @@ class SeaServerAPI {
     });
   };
     
-  saveDocContent = (docUuid, docData) => {   
+  saveDocContent = (docUuid, docData, others = { opUser: {}, opName: 'update' }) => {   
     const uploadLink = '/api/v2.1/seadoc/upload-file/' + docUuid + '/';
 
     const formData = new FormData();
     formData.append("file", fs.createReadStream(docData.path));
+    formData.append("op_user_name", others.opUser);
+    formData.append("op_name", others.opName);
     
     const config = this.getConfig(docUuid);
     return axios.post(uploadLink, formData, config);

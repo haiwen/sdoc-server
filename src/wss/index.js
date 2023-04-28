@@ -52,25 +52,30 @@ class IOServer {
       callback && callback({success: 1, version});
     });
     
-    socket.on('leave-room', () => {
-      const { docUuid } = socket;
+    socket.on('leave-room', async () => {
+      const { docUuid, docName } = socket;
       const usersManager = UsersManager.getInstance();
       const user = usersManager.getUser(docUuid, socket.id);
       this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
       
       // delete current user from memory
-      usersManager.deleteUser(docUuid, socket.id);
+      const usersCount = usersManager.deleteUser(docUuid, socket.id);
+      if (usersCount === 0) {
+        const documentManager = DocumentManager.getInstance();
+        const docContent = await documentManager.getDoc(docUuid, docName);
+        documentManager.saveDoc(docUuid, docName, docContent, 'last_time_last_left');
+      }
     });
     
     socket.on('update-document', (params, callback) => {
-      const { doc_uuid: docUuid, operations } = params;
+      const { doc_uuid: docUuid, operations, user } = params;
       const documentManager = DocumentManager.getInstance();
       documentManager.execOperationsBySocket(params, (result) => {
         if (result.success) {
           const { version } = result;
           const operationsManager = OperationsManager.getInstance();
           operationsManager.addOperations(docUuid, {operations, version});
-          this.ioHelper.sendMessageToRoom(socket, docUuid, {operations, version});
+          this.ioHelper.sendMessageToRoom(socket, docUuid, {operations, version, user});
         }
         callback && callback(result);
       });
@@ -110,14 +115,19 @@ class IOServer {
       this.ioHelper.broadcastMessage(params);
     });
     
-    socket.on('disconnect', () => {
-      const { docUuid } = socket;
+    socket.on('disconnect', async () => {
+      const { docUuid, docName } = socket;
       const usersManager = UsersManager.getInstance();
       const user = usersManager.getUser(docUuid, socket.id);
       this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
       
       // delete current user from memory
-      usersManager.deleteUser(docUuid, socket.id);
+      const usersCount = usersManager.deleteUser(docUuid, socket.id);
+      if (usersCount === 0) {
+        const documentManager = DocumentManager.getInstance();
+        const docContent = await documentManager.getDoc(docUuid, docName);
+        documentManager.saveDoc(docUuid, docName, docContent, 'last_time_last_left');
+      }
     });
     
   }

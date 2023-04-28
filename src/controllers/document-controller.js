@@ -24,7 +24,7 @@ class DocumentController {
   
   async saveDocContent(req, res) {
 
-    const { file_uuid: docUuid, filename: docName  } = req.payload;
+    const { file_uuid: docUuid, filename: docName } = req.payload;
     const { doc_content: docContent } = req.body;
 
     if (!docContent) {
@@ -43,7 +43,7 @@ class DocumentController {
     }
 
     const documentManager = DocumentManager.getInstance();
-    const saveFlag = await documentManager.saveDoc(docUuid, docName, content);
+    const saveFlag = await documentManager.saveDoc(docUuid, docName, content, 'update');
     if (saveFlag) { // saved success
       res.send({success: true});
       return;
