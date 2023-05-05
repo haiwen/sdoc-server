@@ -1,5 +1,4 @@
 import fs from 'fs';
-import path from 'path';
 
 export function loadJsonFile(file) {
   var json = fs.readFileSync(file).toString();
@@ -7,11 +6,18 @@ export function loadJsonFile(file) {
 }
 
 let filePath = process.env.SDOC_SERVER_CONFIG; // sdoc_server_config.json
-if (!filePath) {
-  filePath = path.join(__dirname, '../../config/config.json');
-}
 
 const config = loadJsonFile(filePath);
+
+export const MYSQL_CONFIG = {
+  host    : config.host,
+  user    : config.user,
+  password: config.password,
+  database: config.database,
+  port    : config.port,
+  connectionLimit: config.connection_limit,
+  cluster_config: config.cluster_config,
+};
 
 export const SEAHUB_SERVER = config.seahub_service_url || 'http://127.0.0.1:80';
 

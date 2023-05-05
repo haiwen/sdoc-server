@@ -75,6 +75,7 @@ class IOServer {
           const { version } = result;
           const operationsManager = OperationsManager.getInstance();
           operationsManager.addOperations(docUuid, {operations, version});
+          operationsManager.recordOperations(docUuid, operations, version, user);
           this.ioHelper.sendMessageToRoom(socket, docUuid, {operations, version, user});
         }
         callback && callback(result);
