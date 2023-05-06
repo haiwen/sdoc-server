@@ -5,6 +5,7 @@ import OperationsManager from "../managers/operations-manager";
 import UsersManager from "../managers/users-manager";
 import auth from "./auth";
 import IOHelper from "./io-helper";
+import { recordOperations } from '../dao/operation-log';
 
 class IOServer {
 
@@ -75,7 +76,7 @@ class IOServer {
           const { version } = result;
           const operationsManager = OperationsManager.getInstance();
           operationsManager.addOperations(docUuid, {operations, version});
-          operationsManager.recordOperations(docUuid, operations, version, user);
+          recordOperations(docUuid, operations, version, user);
           this.ioHelper.sendMessageToRoom(socket, docUuid, {operations, version, user});
         }
         callback && callback(result);

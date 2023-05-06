@@ -1,6 +1,4 @@
 import { OPERATIONS_CACHE_LIMIT } from '../constants';
-import DBHelper from '../db-helper';
-import logger from "../loggers";
 
 class OperationsManager {
 
@@ -40,21 +38,6 @@ class OperationsManager {
   clearOperations = (docUuid) => {
     this.operationListMap.delete(docUuid);
   };
-
-  recordOperations(docUuid, operations, version, user) {
-    let sql = 'INSERT INTO `operation_log` \
-      (doc_uuid, op_id, op_time, operations, author, app) VALUES (?, ?, ?, ?, ?, ?)';
-    let values = [docUuid, version, Date.now(), JSON.stringify(operations), user.username, null];
-    DBHelper(sql, (err, results) => {
-      if (err) {
-        logger.error(err);
-        throw new Error('Database error.');
-      }
-      if (results) {
-        logger.debug('Success record operation log to database.');
-      }
-    }, values);
-  }
 
 }
 
