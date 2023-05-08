@@ -73,8 +73,6 @@ class IOServer {
       documentManager.execOperationsBySocket(params, (result) => {
         if (result.success) {
           const { version } = result;
-          const operationsManager = OperationsManager.getInstance();
-          operationsManager.addOperations(docUuid, {operations, version});
           this.ioHelper.sendMessageToRoom(socket, docUuid, {operations, version, user});
         }
         callback && callback(result);

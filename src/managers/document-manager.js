@@ -6,6 +6,8 @@ import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
 import { applyOperations } from '../utils/slate-utils';
+import { listPendingOperationsByDoc } from '../dao/operation-log';
+import OperationsManager from './operations-manager';
 
 class DocumentManager {
 
@@ -95,8 +97,19 @@ class DocumentManager {
     const result = await seaServerAPI.getDocContent(docUuid);
     const docContent = result.data ? result.data : generateDefaultDocContent();
     const doc = new Document(docUuid, docName, docContent);
+
+    // apply pending operations
+    const results = await listPendingOperationsByDoc(docUuid, doc.version);
+    if (results.length) {
+      this.applyPendingOperations(doc, results);
+    }
+
     this.documents.set(docUuid, doc);
-    return docContent;
+    return {
+      version: doc.version,
+      children: doc.children,
+      last_modify_user: doc.last_modify_user
+    };
   };
 
   saveDoc = async (docUuid, docName, docContent) => {
@@ -139,6 +152,8 @@ class DocumentManager {
         success: true,
         version: document.version,
       };
+      const operationsManager = OperationsManager.getInstance();
+      operationsManager.addOperations(doc_uuid, operations, document.version, user);
       callback && callback(result);
       return;
     }
@@ -149,6 +164,21 @@ class DocumentManager {
       operations: operations
     };
     callback && callback(result);
+  };
+
+  applyPendingOperations = (document, results) => {
+    for (let result of results) {
+      let operations = result.operations;
+      operations = JSON.parse(operations);
+      const version = result.op_id;
+      const user = { username: result.author };
+      if (applyOperations(document, operations, user)) {
+        document.version = version;
+        document.meta.need_save = true;
+      } else {
+        logger.error('apply pending operations failed.', document.docUuid, version, operations);
+      }
+    }
   };
 
 }
