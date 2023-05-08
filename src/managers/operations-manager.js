@@ -1,4 +1,5 @@
 import { OPERATIONS_CACHE_LIMIT } from '../constants';
+import { recordOperations } from '../dao/operation-log';
 
 class OperationsManager {
 
@@ -15,13 +16,15 @@ class OperationsManager {
     return this.instance;
   };
 
-  addOperations = (docUuid, operations) => {
+  addOperations = (docUuid, operations, version, user) => {
     let operationList = this.operationListMap.get(docUuid) || [];
-    operationList.push(operations);
+    let item = {operations, version};
+    operationList.push(item);
     if (operationList.length >= OPERATIONS_CACHE_LIMIT) {
       operationList = operationList.slice(OPERATIONS_CACHE_LIMIT / 10);
     }
     this.operationListMap.set(docUuid, operationList);
+    recordOperations(docUuid, operations, version, user);
   };
 
   getLoseOperationList = (docUuid, version) => {

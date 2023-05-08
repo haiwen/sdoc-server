@@ -5,7 +5,6 @@ CREATE TABLE `operation_log` (
   `op_time` bigint(20) NOT NULL,
   `operations` longtext NOT NULL,
   `author` varchar(255) NOT NULL,
-  `app` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `operation_log_op_time` (`op_time`),
   KEY `operation_log_doc_uuid` (`doc_uuid`),
