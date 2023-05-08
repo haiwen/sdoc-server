@@ -31,6 +31,6 @@ const DBHelper = function (sql, values) {
       }
     });
   });
-}
+};
 
 export default DBHelper;

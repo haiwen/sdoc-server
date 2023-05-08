@@ -7,6 +7,7 @@ import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
 import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
+import OperationsManager from './operations-manager';
 
 class DocumentManager {
 
@@ -151,6 +152,8 @@ class DocumentManager {
         success: true,
         version: document.version,
       };
+      const operationsManager = OperationsManager.getInstance();
+      operationsManager.addOperations(doc_uuid, operations, document.version, user);
       callback && callback(result);
       return;
     }
@@ -173,10 +176,10 @@ class DocumentManager {
         document.version = version;
         document.meta.need_save = true;
       } else {
-        logger.error('apply pending operations failed.', document.docUuid, version, operations)
+        logger.error('apply pending operations failed.', document.docUuid, version, operations);
       }
     }
-  }
+  };
 
 }
 

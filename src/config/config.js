@@ -5,7 +5,7 @@ export function loadJsonFile(file) {
   return JSON.parse(json);
 }
 
-let filePath = process.env.SDOC_SERVER_CONFIG; // sdoc_server_config.json
+const filePath = process.env.SDOC_SERVER_CONFIG; // sdoc_server_config.json
 
 const config = loadJsonFile(filePath);
 

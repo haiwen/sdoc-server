@@ -24,6 +24,7 @@ class OperationsManager {
       operationList = operationList.slice(OPERATIONS_CACHE_LIMIT / 10);
     }
     this.operationListMap.set(docUuid, operationList);
+    // Save current operations into database
     recordOperations(docUuid, operations, version, user);
   };
 

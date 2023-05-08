@@ -6,7 +6,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "test": "node ./scripts/test.js",
-    "start": "nodemon --exec babel-node ./src/_bin/www.js",
+    "start": "export SDOC_SERVER_CONFIG=config/config.json && nodemon --exec babel-node ./src/_bin/www.js",
     "build": "npm run clean && ./node_modules/.bin/babel src --out-dir dist",
     "serve": "node --max-old-space-size=4096 ./dist/_bin/www.js",
     "lint": "eslint \"**/*.js\""
