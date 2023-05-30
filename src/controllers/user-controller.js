@@ -9,15 +9,15 @@ class UserController {
 
     try {
       const usersManager = UsersManager.getInstance();
-      const docContent = await usersManager.getDocUsers(docUuid);
-      res.send({collaborators: docContent});
+      const collaborators = await usersManager.getDocUsers(docUuid);
+      res.send({collaborators: collaborators});
       return;
     } catch(err) {
       logger.error(err.message);
       if (isRequestTimeout(err)) {
         logger.error('Request timed out, please try again later');
       }
-      logger.error(`Load ${docUuid} doc content error`);
+      logger.error(`Load ${docUuid} collaborators error`);
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;
     }
