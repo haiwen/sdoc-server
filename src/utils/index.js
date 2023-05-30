@@ -4,7 +4,10 @@ import { v4 } from "uuid";
 export const generateDefaultDocContent = () => {
   const defaultValue = {
     version: 0,
-    children: [{id: v4(), type: 'paragraph', children: [{ text: '' }]}]
+    children: [
+      {id: v4(), type: 'header1', children: [{ text: '' }]},
+      {id: v4(), type: 'paragraph', children: [{ text: '' }]}
+    ]
   };
   return defaultValue;
 };
