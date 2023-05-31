@@ -1,7 +1,9 @@
 import { normalizeChildren } from "./document-utils";
+// 文档对象
 
 class Document {
 
+  // 文档对象的属性
   constructor(docUuid, docName, docContent) {
     this.docUuid = docUuid;
     this.docName = docName;
@@ -9,6 +11,7 @@ class Document {
     this.children = normalizeChildren(docContent.children);
     this.cursors = {};  // default is empty object
     this.last_modify_user = docContent.last_modify_user;
+    // 元数据
     this.meta = {
       save_times: 0,
       need_save: false,
@@ -19,6 +22,8 @@ class Document {
     };
   }
 
+  // 设置值，并更新版本
+  // 同时设置需要保存，设置 last_access 是当前时间（最后操作的时间）
   setValue = (value, version) => {
     let last_access = new Date().getTime();
     this.children = value;
@@ -27,14 +32,17 @@ class Document {
     this.setMeta({last_access, need_save});
   };
 
+  // 更改元数据（直接对象替换）
   setMeta = (meta) => {
     this.meta = {...this.meta, ...meta};
   };
 
+  // 设置最后更改人
   setLastModifyUser = (user = { username: '' }) => {
     this.last_modify_user = user.username || '';
   };
 
+  // 获取元数据
   getMeta = () => {
     return this.meta;
   };

@@ -70,7 +70,10 @@ export const validExecuteOp = (op) => {
   return isNodeIdValid(node);
 };
 
+// 文件操作中，调用这个函数，执行OP
 export const applyOperations = (document, operations, user) => {
+
+  // 获取当前文档的版本、子节点
   const { version, children } = document;
   const editor = { children };  
   let isExecuteError = false;
@@ -92,6 +95,7 @@ export const applyOperations = (document, operations, user) => {
       break;
     }
 
+    // 每一个操作都执行一下，具体参数参考 Transforms.applyToDraft 这个函数，执行错误就返回“同步操作错误”
     try {
       Transforms.applyToDraft(editor, null, op);
     } catch(err) {
@@ -125,8 +129,11 @@ export const applyOperations = (document, operations, user) => {
     return false;
   }
   
+  // 版本加1
   const newVersion = version + 1;
+  // 设置更新人
   document.setLastModifyUser(user);
+  // 更新当前的值和版本号
   document.setValue(editor.children, newVersion);
   return true;
 };

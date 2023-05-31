@@ -4,9 +4,12 @@ import { isRequestTimeout } from "../utils";
 
 class DocumentController {
 
+  // 加载文档内容
   async loadDocContent(req, res) {
+    // 从请求体中获取 UUID 和 name
     const { file_uuid: docUuid, filename: docName } = req.payload;
     try {
+      // 获取文件管理对象实例，然后异步获取文件内容
       const documentManager = DocumentManager.getInstance();
       const docContent = await documentManager.getDoc(docUuid, docName);
       res.set('Cache-control', 'no-store');
@@ -23,6 +26,7 @@ class DocumentController {
     }
   }
   
+  // 保存文档内容
   async saveDocContent(req, res) {
 
     const { file_uuid: docUuid, filename: docName } = req.payload;
@@ -35,6 +39,7 @@ class DocumentController {
     
     let content = null;
     
+    // 先把 docContent 字符串转换成对象
     try {
       // Form api: need parse string content to object content
       content = JSON.parse(docContent);
@@ -43,6 +48,7 @@ class DocumentController {
       return;
     }
 
+    // 获取实例，并异步保存文档
     const documentManager = DocumentManager.getInstance();
     const saveFlag = await documentManager.saveDoc(docUuid, docName, content);
     if (saveFlag) { // saved success

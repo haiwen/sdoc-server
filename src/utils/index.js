@@ -1,10 +1,12 @@
 import fs from 'fs';
 import { v4 } from "uuid";
 
+// 生成默认的文本对象
 export const generateDefaultText = () => {
   return { id: v4(), text: '' };
 };
 
+// 生成默认的 doc 文件内容
 export const generateDefaultDocContent = () => {
   const defaultValue = {
     version: 0,
@@ -16,6 +18,7 @@ export const generateDefaultDocContent = () => {
   return defaultValue;
 };
 
+// 获取目录路径
 export const getDirPath = (path) => {
   let dir = path.slice(0, path.lastIndexOf('/'));
   if (dir === '') {
@@ -25,12 +28,16 @@ export const getDirPath = (path) => {
   }
 };
 
+// 删除本地目录
 export const deleteDir = (path) => {
+  // 验证目录是否存在，如果存在子目录，深度优先递归删除目录
   if (fs.existsSync(path)) {
     const info = fs.statSync(path);
+    // 子节点是目录
     if (info.isDirectory()) {
       const data = fs.readdirSync(path);
       if (data.length > 0) {
+        // 遍历目录
         for (var i = 0; i < data.length; i++) {
           deleteDir(`${path}/${data[i]}`);
           if (i == data.length - 1) {
@@ -41,6 +48,7 @@ export const deleteDir = (path) => {
         fs.rmdirSync(path);
       }
     } else if (info.isFile()) {
+      // 子节点是文件，直接删除文件
       fs.unlinkSync(path);
     }
   }
@@ -56,6 +64,7 @@ export const TIME_TYPE = {
   'hour': 'h',
 };
 
+// 时间转换成毫秒
 export const formatTimeToMillisecond = (time) => {
   if (!time) return null;
   if (time.length <= 1) return null;
@@ -83,6 +92,7 @@ export const formatTimeToMillisecond = (time) => {
 
 };
 
+// 从 URL 中获取 doc 的 UUID
 export const getDocUuidFromUrl = (url) => {
   const pathname = url.split('?')[0];
   if (pathname.indexOf('/files/') === -1) {
@@ -96,6 +106,7 @@ export const getDocUuidFromUrl = (url) => {
   return docUuidPath;
 };
 
+// 判断错误是否超时
 export const isRequestTimeout = (err) => {
   if (err.code === 'ECONNABORTED' || err.message === 'Network Error' || err.message.includes('timeout')) {
     return true;
