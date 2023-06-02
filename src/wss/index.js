@@ -60,20 +60,21 @@ class IOServer {
       
       // delete current user from memory
       const usersCount = usersManager.deleteUser(docUuid, socket.id);
+      const documentManager = DocumentManager.getInstance();
+      documentManager.deleteCursor(docUuid, user);
       if (usersCount === 0) {
-        const documentManager = DocumentManager.getInstance();
         const docContent = await documentManager.getDoc(docUuid, docName);
         documentManager.saveDoc(docUuid, docName, docContent);
       }
     });
     
     socket.on('update-document', (params, callback) => {
-      const { doc_uuid: docUuid, operations, user } = params;
+      const { doc_uuid: docUuid, operations, user, selection, cursor_data } = params;
       const documentManager = DocumentManager.getInstance();
       documentManager.execOperationsBySocket(params, (result) => {
         if (result.success) {
           const { version } = result;
-          this.ioHelper.sendMessageToRoom(socket, docUuid, {operations, version, user});
+          this.ioHelper.sendMessageToRoom(socket, docUuid, {operations, version, user, selection, cursor_data});
         }
         callback && callback(result);
       });
@@ -121,8 +122,9 @@ class IOServer {
       
       // delete current user from memory
       const usersCount = usersManager.deleteUser(docUuid, socket.id);
+      const documentManager = DocumentManager.getInstance();
+      documentManager.deleteCursor(docUuid, user);
       if (usersCount === 0) {
-        const documentManager = DocumentManager.getInstance();
         const docContent = await documentManager.getDoc(docUuid, docName);
         documentManager.saveDoc(docUuid, docName, docContent);
       }

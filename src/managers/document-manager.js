@@ -91,6 +91,7 @@ class DocumentManager {
       return {
         version: document.version,
         children: document.children,
+        cursors: document.cursors,
         last_modify_user: document.last_modify_user
       };
     }
@@ -108,6 +109,7 @@ class DocumentManager {
     return {
       version: doc.version,
       children: doc.children,
+      cursors: doc.cursors,
       last_modify_user: doc.last_modify_user
     };
   };
@@ -131,7 +133,7 @@ class DocumentManager {
   };
 
   execOperationsBySocket = (params, callback) => {
-    const { doc_uuid, version: clientVersion, operations, user } = params;
+    const { doc_uuid, version: clientVersion, operations, user, selection, cursor_data } = params;
 
     const document = this.documents.get(doc_uuid);
     const { version: serverVersion } = document;
@@ -147,7 +149,7 @@ class DocumentManager {
     }
 
     // execute operations success
-    if (applyOperations(document, operations, user)) {
+    if (applyOperations(document, operations, user, selection, cursor_data)) {
       const result = {
         success: true,
         version: document.version,
@@ -179,6 +181,11 @@ class DocumentManager {
         logger.error('apply pending operations failed.', document.docUuid, version, operations);
       }
     }
+  };
+
+  deleteCursor = (docUuid, user) => {
+    const document = this.documents.get(docUuid);
+    document && document.deleteCursor(user);
   };
 
 }
