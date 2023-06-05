@@ -1,4 +1,3 @@
-import { Range } from "@seafile/slate";
 class Document {
 
   constructor(docUuid, docName, docContent) {
@@ -54,10 +53,7 @@ class Document {
     if (selection) {
       const newCursor = (lastCursorOp && lastCursorOp.newProperties) || {};
   
-      const newCursorData = { ...oldCursor, ...newCursor, ...selection, ...{
-        ...cursorData,
-        isForward: Range.isForward(selection)
-      }};
+      const newCursorData = { ...oldCursor, ...newCursor, ...selection, ...cursorData};
       this.cursors[clientId] = newCursorData;
     } else {
       delete this.cursors[clientId];
