@@ -7,7 +7,7 @@ export const applyOperations = (document, operations, user, selection, cursorDat
   // const normalOperations = operations.filter(operation => operation.type !== 'set_selection');
   
   // sync operation
-  for (let i = 0; i< operations.length; i++) {
+  for (let i = 0; i < operations.length; i++) {
     const op = operations[i];
     if (op.type === 'set_selection') {
       continue;
