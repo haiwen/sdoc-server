@@ -5,6 +5,7 @@ class Document {
     this.docName = docName;
     this.version = docContent.version;
     this.children = docContent.children;
+    this.cursors = {};  // default is empty object
     this.last_modify_user = docContent.last_modify_user;
     this.meta = {
       save_times: 0,
@@ -35,6 +36,33 @@ class Document {
 
   getMeta = () => {
     return this.meta;
+  };
+
+  setCursor = (operations, user, selection, cursorData) => {
+    // selection: { anchor, focus }
+    // cursor: { anchor, focus }
+
+    const { username: clientId } = user;
+    const cursorOps = operations.filter(operation => operation.type === 'set_selection');
+  
+    if (!this.cursors) this.cursors = {};
+  
+    const oldCursor = this.cursors[clientId] ? this.cursors[clientId] : {};
+    const lastCursorOp = cursorOps[cursorOps.length - 1];
+  
+    if (selection) {
+      const newCursor = (lastCursorOp && lastCursorOp.newProperties) || {};
+  
+      const newCursorData = { ...oldCursor, ...newCursor, ...selection, ...cursorData};
+      this.cursors[clientId] = newCursorData;
+    } else {
+      delete this.cursors[clientId];
+    }
+  };
+
+  deleteCursor = (userInfo) => {
+    const { username } = userInfo;
+    delete this.cursors[username];
   };
 
 }
