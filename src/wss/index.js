@@ -83,11 +83,11 @@ class IOServer {
     socket.on('update-cursor', (params) => {
       // update cursor
       const documentManager = DocumentManager.getInstance();
-      documentManager.execCursorOperations(params);
+      documentManager.setCursorLocation(params);
 
       // send message to others
-      const { doc_uuid: docUuid, operations, user, selection, cursor_data } = params;
-      this.ioHelper.sendCursorMessageToRoom(socket, docUuid, {operations, user, selection, cursor_data});
+      const { doc_uuid: docUuid, user, location, cursor_data } = params;
+      this.ioHelper.sendCursorMessageToRoom(socket, docUuid, {user, location, cursor_data});
     });
 
     socket.on('sync-document', async (params, callback) => {

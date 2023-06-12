@@ -5,7 +5,7 @@ import { deleteDir, generateDefaultDocContent } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
-import { applyOperations, syncDocumentCursors } from '../utils/slate-utils';
+import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 
@@ -183,14 +183,12 @@ class DocumentManager {
     }
   };
 
-  execCursorOperations = (params) => {
-    const { doc_uuid, operations, user, selection, cursor_data } = params;
+  setCursorLocation = (params) => {
+    const { doc_uuid, user, location, cursor_data } = params;
 
     // sync document's cursors
     const document = this.documents.get(doc_uuid);
-    syncDocumentCursors(document, operations, user, selection, cursor_data);
-
-    return;
+    document && document.setCursor(user, location, cursor_data);
   };
 
   deleteCursor = (docUuid, user) => {

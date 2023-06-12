@@ -20,8 +20,3 @@ export const applyOperations = (document, operations, user) => {
   document.setValue(editor.children, newVersion);
   return true;
 };
-
-export const syncDocumentCursors = (document, operations, user, selection, cursorData) => {
-  document.setCursor(operations, user, selection, cursorData);
-  return true;
-};

@@ -38,22 +38,16 @@ class Document {
     return this.meta;
   };
 
-  setCursor = (operations, user, selection, cursorData) => {
+  setCursor = (user, location, cursorData) => {
     // selection: { anchor, focus }
     // cursor: { anchor, focus }
 
-    const { username: clientId } = user;
-    const cursorOps = operations.filter(operation => operation.type === 'set_selection');
-  
     if (!this.cursors) this.cursors = {};
+    const { username: clientId } = user;
   
-    const oldCursor = this.cursors[clientId] ? this.cursors[clientId] : {};
-    const lastCursorOp = cursorOps[cursorOps.length - 1];
-  
-    if (selection) {
-      const newCursor = (lastCursorOp && lastCursorOp.newProperties) || {};
-  
-      const newCursorData = { ...oldCursor, ...newCursor, ...selection, ...cursorData};
+    if (location) {
+      const oldCursor = this.cursors[clientId] ? this.cursors[clientId] : {};
+      const newCursorData = { ...oldCursor, ...location, ...cursorData};
       this.cursors[clientId] = newCursorData;
     } else {
       delete this.cursors[clientId];
