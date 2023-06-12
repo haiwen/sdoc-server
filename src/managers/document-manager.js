@@ -5,7 +5,7 @@ import { deleteDir, generateDefaultDocContent } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
-import { applyOperations } from '../utils/slate-utils';
+import { applyOperations, syncDocumentCursors } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 
@@ -133,7 +133,7 @@ class DocumentManager {
   };
 
   execOperationsBySocket = (params, callback) => {
-    const { doc_uuid, version: clientVersion, operations, user, selection, cursor_data } = params;
+    const { doc_uuid, version: clientVersion, operations, user } = params;
 
     const document = this.documents.get(doc_uuid);
     const { version: serverVersion } = document;
@@ -149,7 +149,7 @@ class DocumentManager {
     }
 
     // execute operations success
-    if (applyOperations(document, operations, user, selection, cursor_data)) {
+    if (applyOperations(document, operations, user)) {
       const result = {
         success: true,
         version: document.version,
@@ -181,6 +181,16 @@ class DocumentManager {
         logger.error('apply pending operations failed.', document.docUuid, version, operations);
       }
     }
+  };
+
+  execCursorOperations = (params) => {
+    const { doc_uuid, operations, user, selection, cursor_data } = params;
+
+    // sync document's cursors
+    const document = this.documents.get(doc_uuid);
+    syncDocumentCursors(document, operations, user, selection, cursor_data);
+
+    return;
   };
 
   deleteCursor = (docUuid, user) => {

@@ -80,6 +80,16 @@ class IOServer {
       });
     });
 
+    socket.on('update-cursor', (params) => {
+      // update cursor
+      const documentManager = DocumentManager.getInstance();
+      documentManager.execCursorOperations(params);
+
+      // send message to others
+      const { doc_uuid: docUuid, operations, user, selection, cursor_data } = params;
+      this.ioHelper.sendCursorMessageToRoom(socket, docUuid, {operations, user, selection, cursor_data});
+    });
+
     socket.on('sync-document', async (params, callback) => {
       const { docName } = socket;
       const { doc_uuid: docUuid } = params;
