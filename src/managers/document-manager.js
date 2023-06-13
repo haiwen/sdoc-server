@@ -133,7 +133,7 @@ class DocumentManager {
   };
 
   execOperationsBySocket = (params, callback) => {
-    const { doc_uuid, version: clientVersion, operations, user, selection, cursor_data } = params;
+    const { doc_uuid, version: clientVersion, operations, user } = params;
 
     const document = this.documents.get(doc_uuid);
     const { version: serverVersion } = document;
@@ -149,7 +149,7 @@ class DocumentManager {
     }
 
     // execute operations success
-    if (applyOperations(document, operations, user, selection, cursor_data)) {
+    if (applyOperations(document, operations, user)) {
       const result = {
         success: true,
         version: document.version,
@@ -181,6 +181,14 @@ class DocumentManager {
         logger.error('apply pending operations failed.', document.docUuid, version, operations);
       }
     }
+  };
+
+  setCursorLocation = (params) => {
+    const { doc_uuid, user, location, cursor_data } = params;
+
+    // sync document's cursors
+    const document = this.documents.get(doc_uuid);
+    document && document.setCursor(user, location, cursor_data);
   };
 
   deleteCursor = (docUuid, user) => {
