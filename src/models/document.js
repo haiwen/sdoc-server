@@ -1,10 +1,12 @@
+import { normalizeChildren } from "./document-utils";
+
 class Document {
 
   constructor(docUuid, docName, docContent) {
     this.docUuid = docUuid;
     this.docName = docName;
     this.version = docContent.version;
-    this.children = docContent.children;
+    this.children = normalizeChildren(docContent.children);
     this.cursors = {};  // default is empty object
     this.last_modify_user = docContent.last_modify_user;
     this.meta = {
