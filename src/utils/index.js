@@ -103,4 +103,29 @@ export const isRequestTimeout = (err) => {
   return false;
 };
 
+export const isObject = (obj) => {
+  if (!obj) return false;
+  return Object.prototype.toString.call(obj) === '[object Object]';
+};
+
+export function uuidStrTo32Chars(uuid) {
+  if(uuid.length === 36) {
+    return uuid.split('-').join('');
+  } else {
+    return uuid;
+  }
+}
+
+export function uuidStrTo36Chars(uuid) {
+  if(uuid.length === 32) {
+    let uuid_array = uuid.split('');
+    uuid_array.splice(20, 0, '-');
+    uuid_array.splice(16, 0, '-');
+    uuid_array.splice(12, 0, '-');
+    uuid_array.splice(8, 0, '-');
+    return uuid_array.join('');
+  } else {
+    return uuid;
+  }
+}
 
