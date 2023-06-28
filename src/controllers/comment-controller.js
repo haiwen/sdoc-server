@@ -106,8 +106,8 @@ class CommentController {
 
     try {
       const commentManager = CommendManager.getInstance();
-      const _comment = await commentManager.updateComment(comment_id, { comment, detail, time });
-      res.send({comment: _comment});
+      await commentManager.updateComment(comment_id, { comment, detail, time });
+      res.send({success: true});
       return;
     } catch(err) {
       logger.error(err.message);
