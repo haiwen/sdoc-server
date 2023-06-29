@@ -27,7 +27,7 @@ class CommentController {
   async insertComment(req, res) {
     const { doc_uuid: docUuid } = req.params;
     
-    const { comment, detail, author, time } = req.body;
+    const { comment, detail, author, updated_at } = req.body;
 
     if (!comment) {
       return res.status(400).send(paramIsRequired('comment'));
@@ -45,13 +45,13 @@ class CommentController {
       return res.status(400).send(paramIsRequired('author'));
     }
 
-    if (!time) {
-      return res.status(400).send(paramIsRequired('time'));
+    if (!updated_at) {
+      return res.status(400).send(paramIsRequired('updated_at'));
     }
 
     try {
       const commentManager = CommendManager.getInstance();
-      const _comment = await commentManager.insertComment(docUuid, { comment, detail, author, time });
+      const _comment = await commentManager.insertComment(docUuid, { comment, detail, author, updated_at });
       res.send({comment_id: _comment.insertId});
       return;
     } catch(err) {
@@ -86,7 +86,7 @@ class CommentController {
 
   async updateComment(req, res) {
     const { comment_id } = req.params;
-    const { comment, detail, time } = req.body;
+    const { comment, detail, updated_at } = req.body;
 
     if (!comment) {
       return res.status(400).send(paramIsRequired('comment'));
@@ -100,13 +100,13 @@ class CommentController {
       return res.status(400).send(paramIsError('detail'));
     }
 
-    if (!time) {
-      return res.status(400).send(paramIsRequired('time'));
+    if (!updated_at) {
+      return res.status(400).send(paramIsRequired('updated_at'));
     }
 
     try {
       const commentManager = CommendManager.getInstance();
-      await commentManager.updateComment(comment_id, { comment, detail, time });
+      await commentManager.updateComment(comment_id, { comment, detail, updated_at });
       res.send({success: true});
       return;
     } catch(err) {

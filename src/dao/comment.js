@@ -11,9 +11,10 @@ export const listComments = (docUuid) => {
 
 export const insertComment = (docUuid, commentInfo) => {
   docUuid = uuidStrTo32Chars(docUuid);
-  const { comment, author, time, detail } = commentInfo;
+  const { comment, author, updated_at, detail } = commentInfo;
+  const created_at = updated_at;
   const sql = `INSERT INTO ${TABLE_NAME} (uuid_id, comment, detail, author, created_at, updated_at, resolved) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-  const values = [docUuid, comment, JSON.stringify(detail), author, time, time, 0];
+  const values = [docUuid, comment, JSON.stringify(detail), author, created_at, updated_at, 0];
   return DBHelper(sql, values);
 };
 
@@ -23,8 +24,8 @@ export const deleteComment = (commentId) => {
 };
 
 export const updateComment = (commentId, commentInfo) => {
-  const { comment, detail, time } = commentInfo;
+  const { comment, detail, updated_at } = commentInfo;
   const sql = `UPDATE ${TABLE_NAME} SET comment = ?, detail = ?, updated_at = ? WHERE id = ?`;
-  const values = [comment, JSON.stringify(detail), time, commentId];
+  const values = [comment, JSON.stringify(detail), updated_at, commentId];
   return DBHelper(sql, values);
 };
