@@ -132,6 +132,13 @@ class DocumentManager {
     return Promise.resolve(saveFlag);
   };
 
+  removeDoc(docUuid) {
+    if (this.documents.has(docUuid)) {
+      logger.info('Removed doc ', docUuid, ' from memory');
+      this.documents.delete(docUuid);
+    }
+  }
+
   execOperationsBySocket = (params, callback) => {
     const { doc_uuid, version: clientVersion, operations, user } = params;
 
