@@ -1,5 +1,5 @@
+import seaServerAPI from "../api/sea-server-api";
 import logger from "../loggers";
-import CommendManager from "../managers/comment-manager";
 import { isObject, isRequestTimeout } from "../utils";
 import { internalServerError, paramIsError, paramIsRequired } from "../utils/resp-message-utils";
 
@@ -9,8 +9,8 @@ class CommentController {
     const { doc_uuid: docUuid } = req.params;
 
     try {
-      const commentManager = CommendManager.getInstance();
-      const comments = await commentManager.listComments(docUuid);
+      const result = await seaServerAPI.listComments(docUuid);
+      const { comments } = result.data;
       res.send({ comments });
       return;
     } catch(err) {
@@ -50,9 +50,9 @@ class CommentController {
     }
 
     try {
-      const commentManager = CommendManager.getInstance();
-      const _comment = await commentManager.insertComment(docUuid, { comment, detail, author, updated_at });
-      res.send({comment_id: _comment.insertId});
+      const result = await seaServerAPI.insertComment(docUuid, { comment, detail: JSON.stringify(detail), author, updated_at });
+      const _comment = result.data;
+      res.send({comment: _comment});
       return;
     } catch(err) {
       logger.error(err.message);
@@ -66,11 +66,10 @@ class CommentController {
   }
 
   async deleteComment(req, res) {
-    const { comment_id } = req.params;
+    const { doc_uuid: docUuid, comment_id } = req.params;
 
     try {
-      const commentManager = CommendManager.getInstance();
-      await commentManager.deleteComment(comment_id);
+      await seaServerAPI.deleteComment(docUuid, comment_id);
       res.send({success: true});
       return;
     } catch(err) {
@@ -85,7 +84,7 @@ class CommentController {
   }
 
   async updateComment(req, res) {
-    const { comment_id } = req.params;
+    const { doc_uuid: docUuid, comment_id } = req.params;
     const { comment, detail, updated_at } = req.body;
 
     if (!comment) {
@@ -105,8 +104,7 @@ class CommentController {
     }
 
     try {
-      const commentManager = CommendManager.getInstance();
-      await commentManager.updateComment(comment_id, { comment, detail, updated_at });
+      await seaServerAPI.updateComment(docUuid, comment_id, { comment, detail: JSON.stringify(detail), updated_at });
       res.send({success: true});
       return;
     } catch(err) {

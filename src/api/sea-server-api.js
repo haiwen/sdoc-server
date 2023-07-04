@@ -57,6 +57,35 @@ class SeaServerAPI {
     const config = this.getConfig(docUuid);
     return axios.post(uploadLink, formData, config);
   };
+  
+  listComments = (docUuid) => {
+    const uploadLink = '/api/v2.1/seadoc/comments/' + docUuid + '/';
+  
+    const config = this.getConfig(docUuid);
+    return axios.get(uploadLink, config);
+  };
+  
+  insertComment = (docUuid, comment) => {
+    const uploadLink = '/api/v2.1/seadoc/comments/' + docUuid + '/';
+    const data = comment;
+    
+    const config = this.getConfig(docUuid);
+    return axios.post(uploadLink, data, config);
+  };
+  
+  deleteComment = (docUuid, commentId) => {
+    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/';
+    
+    const config = this.getConfig(docUuid);
+    return axios.delete(uploadLink, config);
+  };
+  
+  updateComment = (docUuid, commentId, comment) => {
+    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/';
+    const data = comment;
+    const config = this.getConfig(docUuid);
+    return axios.put(uploadLink, data, config);
+  };
 
 }
 
