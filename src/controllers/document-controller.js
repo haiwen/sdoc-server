@@ -53,12 +53,12 @@ class DocumentController {
     return;
   }
 
-  async internalRefreshDoc(req, res) {
+  async internalRefreshDocs(req, res) {
     // used for sdoc publish revision
-    const { file_uuid: docUuid } = req.payload;
+    const { doc_uuids: docUuids } = req.body;
     try {
       const documentManager = DocumentManager.getInstance();
-      documentManager.removeDoc(docUuid);
+      documentManager.removeDocs(docUuids);
       res.send({"success": true});
       return;
     } catch(err) {
