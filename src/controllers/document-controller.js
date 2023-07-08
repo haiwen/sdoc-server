@@ -52,6 +52,25 @@ class DocumentController {
     res.status(500).send({'error_msg': 'Internal Server Error'});
     return;
   }
+
+  async internalRefreshDocs(req, res) {
+    // used for sdoc publish revision
+    const { doc_uuids: docUuids } = req.body;
+    try {
+      const documentManager = DocumentManager.getInstance();
+      documentManager.removeDocs(docUuids);
+      res.send({"success": true});
+      return;
+    } catch(err) {
+      logger.error(err.message);
+      if (isRequestTimeout(err)) {
+        logger.error('Request timed out, please try again later');
+      }
+      logger.error(`Remove ${docUuid} doc in memory error`);
+      res.status(500).send({'error_msg': 'Internal Server Error'});
+      return;
+    }
+  }
 }
 
 const documentController = new DocumentController();
