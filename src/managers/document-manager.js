@@ -151,6 +151,7 @@ class DocumentManager {
     if (serverVersion !== clientVersion) {
       const result = {
         success: false,
+        error_type: 'version_behind_server',
         operations: operations
       };
       callback && callback(result);
@@ -172,6 +173,7 @@ class DocumentManager {
     // execute operations failed
     const result = {
       success: false,
+      error_type: 'operation_exec_error',
       operations: operations
     };
     callback && callback(result);
