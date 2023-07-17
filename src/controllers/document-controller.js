@@ -9,6 +9,7 @@ class DocumentController {
     try {
       const documentManager = DocumentManager.getInstance();
       const docContent = await documentManager.getDoc(docUuid, docName);
+      res.set('Cache-control', 'no-store');
       res.send(docContent);
       return;
     } catch(err) {
@@ -66,7 +67,7 @@ class DocumentController {
       if (isRequestTimeout(err)) {
         logger.error('Request timed out, please try again later');
       }
-      logger.error(`Remove ${docUuid} doc in memory error`);
+      logger.error(`Remove ${docUuids.join(' ')} doc in memory error`);
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;
     }

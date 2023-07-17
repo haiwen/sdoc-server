@@ -8,7 +8,6 @@ const app = express();
 
 app.use(bodyParser.json({ limit: '100mb' }));
 app.use(bodyParser.urlencoded({ limit: '100mb', extended: false }));
-
 app.all("*", cors); // Access-Control-Allow-Origin
 app.use(auth);
 app.use(route);
