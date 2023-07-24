@@ -53,7 +53,7 @@ class IOServer {
     });
     
     socket.on('leave-room', async () => {
-      const { docUuid, docName } = socket;
+      const { docUuid } = socket;
       const usersManager = UsersManager.getInstance();
       const user = usersManager.getUser(docUuid, socket.id);
       this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
@@ -63,8 +63,8 @@ class IOServer {
       const documentManager = DocumentManager.getInstance();
       documentManager.deleteCursor(docUuid, user);
       if (usersCount === 0) {
-        const docContent = await documentManager.getDoc(docUuid, docName);
-        documentManager.saveDoc(docUuid, docName, docContent);
+        const savedBySocket = true;
+        await documentManager.saveDoc(docUuid, savedBySocket);
       }
     });
     
@@ -125,7 +125,7 @@ class IOServer {
     });
     
     socket.on('disconnect', async () => {
-      const { docUuid, docName } = socket;
+      const { docUuid } = socket;
       const usersManager = UsersManager.getInstance();
       const user = usersManager.getUser(docUuid, socket.id);
       this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
@@ -135,8 +135,8 @@ class IOServer {
       const documentManager = DocumentManager.getInstance();
       documentManager.deleteCursor(docUuid, user);
       if (usersCount === 0) {
-        const docContent = await documentManager.getDoc(docUuid, docName);
-        documentManager.saveDoc(docUuid, docName, docContent);
+        const savedBySocket = true;
+        await documentManager.saveDoc(docUuid, savedBySocket);
       }
     });
     
