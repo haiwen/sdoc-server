@@ -28,8 +28,7 @@ class Document {
   };
 
   setMeta = (meta) => {
-    meta = Object.assign({}, this.meta, meta);
-    this.meta = meta;
+    this.meta = {...this.meta, ...meta};
   };
 
   setLastModifyUser = (user = { username: '' }) => {

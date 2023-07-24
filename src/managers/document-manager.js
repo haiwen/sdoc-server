@@ -56,22 +56,9 @@ class DocumentManager {
     const startTime = Date.now();
     const docUuids = this.documents.keys();
     for (let docUuid of docUuids) {
-      const document = this.documents.get(docUuid);
-      const meta = document.getMeta();
-      if (meta.is_saving || !meta.need_save) { // is saving or no need save
-        continue;
-      }
-
-      // Update save flag
-      document.setMeta({is_saving: true});
-
       // Save document
-      const { version, children, docName, last_modify_user } = document;
-      const docContent = { version, children, last_modify_user };
-      const saveFlag = await this.saveDoc(docUuid, docName, docContent);
+      const saveFlag = await this.saveDoc(docUuid);
       if (saveFlag) {
-        // Reset save flag
-        document.setMeta({is_saving: false, need_save: false});
         savedDocs.push(docUuid);
       }
     }
@@ -114,21 +101,35 @@ class DocumentManager {
     };
   };
 
-  saveDoc = async (docUuid, docName, docContent) => {
+  saveDoc = async (docUuid, savedBySocket = false) => {
+    const document = this.documents.get(docUuid);
+    const meta = document.getMeta();
+    if (meta.is_saving || !meta.need_save) { // is saving or no need save
+      return Promise.resolve(false);
+    }
+  
+    document.setMeta({is_saving: true});
+
+    // Get save info
+    const { version, children, docName, last_modify_user } = document;
+    const docContent = { version, children, last_modify_user };
+
     let saveFlag = false;
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
       saveFlag = true;
-      logger.info(`${docUuid} saved`);
+      logger.info(`${savedBySocket ? 'Socket: ' : ''}${docUuid} saved`);
     } catch(err) {
       saveFlag = false;
-      logger.error(`${docName}(${docUuid}) save failed`);
+      logger.error(`${savedBySocket ? 'Socket:' : ''}${docName}(${docUuid}) save failed`);
       logger.error(err);
     } finally {
       deleteDir(tempPath);
     }
+
+    document.setMeta({is_saving: false, need_save: false});
     return Promise.resolve(saveFlag);
   };
 
