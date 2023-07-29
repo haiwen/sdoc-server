@@ -50,7 +50,7 @@ class CommentController {
     }
 
     try {
-      const result = await seaServerAPI.insertComment(docUuid, { comment, detail: JSON.stringify(detail), author, updated_at });
+      const result = await seaServerAPI.insertComment(docUuid, { comment, detail: detail, author, updated_at });
       const _comment = result.data;
       res.send({comment: _comment});
       return;
