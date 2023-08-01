@@ -85,26 +85,42 @@ class CommentController {
 
   async updateComment(req, res) {
     const { doc_uuid: docUuid, comment_id } = req.params;
-    const { comment, detail, updated_at } = req.body;
+    const { comment, detail, updated_at, resolved } = req.body;
 
-    if (!comment) {
-      return res.status(400).send(paramIsRequired('comment'));
-    }
-    
-    if (!detail) {
-      return res.status(400).send(paramIsRequired('detail'));
-    }
-    
-    if (!isObject(detail) || !detail.element_id) {
-      return res.status(400).send(paramIsError('detail'));
+    let updatedComment = null;
+
+    // update comment state
+    if (Object.keys(req.body).includes('resolved')) {
+      updatedComment = {
+        resolved: resolved ? 'true' : 'false',
+      };
+    } else {
+      if (!comment) {
+        return res.status(400).send(paramIsRequired('comment'));
+      }
+      
+      if (!detail) {
+        return res.status(400).send(paramIsRequired('detail'));
+      }
+      
+      if (!isObject(detail) || !detail.element_id) {
+        return res.status(400).send(paramIsError('detail'));
+      }
+  
+      if (!updated_at) {
+        return res.status(400).send(paramIsRequired('updated_at'));
+      }
+
+      updatedComment = {
+        comment,
+        detail: JSON.stringify(detail),
+        updated_at,
+      };
     }
 
-    if (!updated_at) {
-      return res.status(400).send(paramIsRequired('updated_at'));
-    }
 
     try {
-      await seaServerAPI.updateComment(docUuid, comment_id, { comment, detail: JSON.stringify(detail), updated_at });
+      await seaServerAPI.updateComment(docUuid, comment_id, updatedComment);
       res.send({success: true});
       return;
     } catch(err) {
