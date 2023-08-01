@@ -87,6 +87,35 @@ class SeaServerAPI {
     return axios.put(uploadLink, data, config);
   };
 
+  listReplies = (docUuid, commentId) => {
+    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/';
+  
+    const config = this.getConfig(docUuid);
+    return axios.get(uploadLink, config);
+  };
+  
+  insertReply = (docUuid, commentId, reply) => {
+    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/';
+    const data = reply;
+    
+    const config = this.getConfig(docUuid);
+    return axios.post(uploadLink, data, config);
+  };
+  
+  deleteReply = (docUuid, commentId, replyId) => {
+    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/' + replyId + '/';
+    
+    const config = this.getConfig(docUuid);
+    return axios.delete(uploadLink, config);
+  };
+  
+  updateReply = (docUuid, commentId, replyId, reply) => {
+    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/' + replyId + '/';
+    const data = reply;
+    const config = this.getConfig(docUuid);
+    return axios.put(uploadLink, data, config);
+  };
+
 }
 
 const seaServerAPI = new SeaServerAPI;
