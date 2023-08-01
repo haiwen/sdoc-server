@@ -42,7 +42,7 @@ class ReplyController {
     }
 
     try {
-      const result = await seaServerAPI.insertReply(docUuid, commentId, { reply, author });
+      const result = await seaServerAPI.insertReply(docUuid, commentId, { type, reply, author });
       const _reply = result.data;
       res.send({reply: _reply});
       return;
