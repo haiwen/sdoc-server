@@ -74,7 +74,7 @@ class DocumentController {
   }
 
   async normalizeSdoc(req, res) {
-    const { doc_uuid: docUuid } = req.body;
+    const { file_uuid: docUuid } = req.payload;
     try {
       const documentManager = DocumentManager.getInstance();
       documentManager.normalizeSdoc(docUuid);
