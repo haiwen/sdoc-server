@@ -72,6 +72,25 @@ class DocumentController {
       return;
     }
   }
+
+  async normalizeSdoc(req, res) {
+    const { file_uuid: docUuid } = req.payload;
+    try {
+      const documentManager = DocumentManager.getInstance();
+      documentManager.normalizeSdoc(docUuid);
+      res.send({"success": true});
+      return;
+    } catch(err) {
+      logger.error(err.message);
+      if (isRequestTimeout(err)) {
+        logger.error('Request timed out, please try again later');
+      }
+      logger.error(`Normalize doc ${docUuid} failed`);
+      res.status(500).send({'error_msg': 'Internal Server Error'});
+      return;
+    }
+  }
+
 }
 
 const documentController = new DocumentController();

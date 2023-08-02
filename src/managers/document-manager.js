@@ -8,6 +8,7 @@ import Document from '../models/document';
 import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
+import { normalizeChildren } from '../models/document-utils';
 
 class DocumentManager {
 
@@ -141,6 +142,11 @@ class DocumentManager {
       }
     }
   }
+
+  normalizeSdoc = (docUuid) => {
+    const document = this.documents.get(docUuid);
+    document.children = normalizeChildren(document.children);
+  };
 
   execOperationsBySocket = (params, callback) => {
     const { doc_uuid, version: clientVersion, operations, user } = params;
