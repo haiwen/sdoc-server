@@ -33,7 +33,7 @@ class ReplyController {
       return res.status(400).send(paramIsRequired('type'));
     }
 
-    if (!reply) {
+    if (!reply && reply !== false) {
       return res.status(400).send(paramIsRequired('reply'));
     }
 
