@@ -45,8 +45,8 @@ export const isNodeChildrenValid = (node) => {
   if (!Array.isArray(node.children)) return false;
   if (node.children.length === 0) return false; // node.children is empty array
 
-  const isNodeChildrenValid = node.children.every(child => isNodeChildrenValid(child));
-  return isNodeChildrenValid;
+  const isValid = node.children.every(child => isNodeChildrenValid(child));
+  return isValid;
 };
 
 export const isNodeIdValid = (node) => {
