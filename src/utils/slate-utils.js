@@ -38,7 +38,7 @@ export const calculateAffectedBlocks = (operations) => {
   return [...new Set(blocks)];
 };
 
-export const isNodeValid = (node) => {
+export const isNodeChildrenValid = (node) => {
   if (Text.isText(node)) return true;
 
   if (!node.children) return false;
@@ -49,7 +49,7 @@ export const isNodeValid = (node) => {
   return isNodeChildrenValid;
 };
 
-export const validNode = (node) => {
+export const isNodeIdValid = (node) => {
   let isNodeValid = true;
   let isNodeChildrenValid = true;
 
@@ -58,7 +58,7 @@ export const validNode = (node) => {
   }
 
   if (node.children) {
-    isNodeChildrenValid = node.children.every(child => validNode(child));
+    isNodeChildrenValid = node.children.every(child => isNodeIdValid(child));
   }
 
   return isNodeValid && isNodeChildrenValid;
@@ -67,7 +67,7 @@ export const validNode = (node) => {
 export const validExecuteOp = (op) => {
   const { type, node } = op;
   if (type !== 'insert_node') return true;
-  return validNode(node);
+  return isNodeIdValid(node);
 };
 
 export const applyOperations = (document, operations, user) => {
@@ -105,7 +105,7 @@ export const applyOperations = (document, operations, user) => {
   let isNodeValueInvalid = false;
   const newNodeValues = blocks.map(block => {
     const node = editor.children[block];
-    if (!isNodeValueInvalid && !isNodeValid(node)) {
+    if (!isNodeValueInvalid && !isNodeChildrenValid(node)) {
       isNodeValueInvalid = true;
     }
     return {
