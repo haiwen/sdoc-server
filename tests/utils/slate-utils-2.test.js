@@ -1,23 +1,21 @@
-import { validNode } from '../../src/utils/slate-utils';
+import { isNodeChildrenValid } from '../../src/utils/slate-utils';
 
-describe('test valid node function', () => {
-  it('valid no children node', () => {
+describe('test is node children valid function', () => {
+  it('valid no children node, node is text', () => {
     const node1 = {
-      id: 'add',
       text: 'hello'
     };
     const node2 = {
-      text: 'hello, my name is LiLy'
     };
 
-    const exp1 = validNode(node1);
-    const exp2 = validNode(node2);
+    const exp1 = isNodeChildrenValid(node1);
+    const exp2 = isNodeChildrenValid(node2);
 
     expect(exp1).toBe(true);
     expect(exp2).toBe(false);
   });
 
-  it('valid has children node 1', () => {
+  it('valid has children node and children node is text', () => {
     const node1 = {
       type: 'paragraph',
       children: [
@@ -30,59 +28,38 @@ describe('test valid node function', () => {
       id: '111',
       type: 'paragraph',
       children: [
-        {
-          text: 'hello'
-        }
       ]
     };
 
-    const exp1 = validNode(node1);
-    const exp2 = validNode(node2);
+    const exp1 = isNodeChildrenValid(node1);
+    const exp2 = isNodeChildrenValid(node2);
 
-    expect(exp1).toBe(false);
+    expect(exp1).toBe(true);
     expect(exp2).toBe(false);
   });
 
-  it('valid has children node 2', () => {
+  it('valid has children node and children node is not text', () => {
     const node1 = {
-      type: 'paragraph',
-      children: [
-        {
-          text: 'hello'
-        }
-      ]
-    };
-    const node2 = {
-      id: '111',
-      type: 'paragraph',
-      children: [
-        {
-          id: '222',
-          text: 'hello'
-        }
-      ]
-    };
-
-    const exp1 = validNode(node1);
-    const exp2 = validNode(node2);
-
-    expect(exp1).toBe(false);
-    expect(exp2).toBe(true);
-  });
-
-  it('valid has children node 3', () => {
-    const node1 = {
-      type: 'list',
+      type: 'ordered_list',
       children: [
         {
           type: 'list-item',
           children: [
             {
-              type: 'lic-item',
+              type: 'list-lic',
               children: [
-                {
-                  text: 'hello'
-                }
+                {text: 'aaa'}
+              ]
+            }
+          ]
+        },
+        {
+          type: 'list-item',
+          children: [
+            {
+              type: 'list-lic',
+              children: [
+                {text: 'bbb'}
               ]
             }
           ]
@@ -90,36 +67,19 @@ describe('test valid node function', () => {
       ]
     };
     const node2 = {
-      id: '111',
-      type: 'list',
+      type: 'ordered_list',
       children: [
-        {
-          id: '111_a',
-          type: 'list-item',
-          children: [
-            {
-              id: '111_a_b',
-              type: 'lic-item',
-              children: [
-                {
-                  id: '111_a_b_1',
-                  text: 'hello'
-                }
-              ]
-            }
-          ]
-        }
       ]
     };
 
-    const exp1 = validNode(node1);
-    const exp2 = validNode(node2);
+    const exp1 = isNodeChildrenValid(node1);
+    const exp2 = isNodeChildrenValid(node2);
 
-    expect(exp1).toBe(false);
-    expect(exp2).toBe(true);
+    expect(exp1).toBe(true);
+    expect(exp2).toBe(false);
   });
 
-  it('valid has children node 2', () => {
+  it('valid more layers node', () => {
     const node1 = {
       type: 'list',
       children: [
@@ -184,8 +144,6 @@ describe('test valid node function', () => {
                       id: '222-bbb_222',
                       type: 'lic-item',
                       children: [{
-                        id: '222-bbb_222_1',
-                        text: 'hello'
                       }]
                     }
                   ]
@@ -197,11 +155,11 @@ describe('test valid node function', () => {
       ]
     };
 
-    const exp1 = validNode(node1);
-    const exp2 = validNode(node2);
+    const exp1 = isNodeChildrenValid(node1);
+    const exp2 = isNodeChildrenValid(node2);
 
-    expect(exp1).toBe(false);
-    expect(exp2).toBe(true);
+    expect(exp1).toBe(true);
+    expect(exp2).toBe(false);
   });
 
 });
