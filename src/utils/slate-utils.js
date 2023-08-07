@@ -1,5 +1,53 @@
-import { Transforms } from "@seafile/slate";
+import { Transforms, Text } from "@seafile/slate";
+import deepCopy from 'deep-copy';
 import logger from "../loggers";
+
+export const calculateAffectedBlocks = (operations) => {
+  let blocks = [];
+  operations.forEach(operation => {
+    const { type } = operation;
+    switch(type) {
+      case 'insert_text':
+      case 'remove_text':
+      case 'insert_node':
+      case 'remove_node':
+      case 'merge_node':
+      case 'set_node': {
+        const { path } = operation;
+        blocks.push(path[0]);
+        break;
+      }
+      case 'split_node': {
+        const { path } = operation;
+        blocks.push(path[0]);
+        blocks.push(path[0] + 1);
+        break;
+      }
+      case 'move_node': {
+        const { path, newPath } = operation;
+        blocks.push(path[0]);
+        blocks.push(newPath[0]);
+        break;
+      }
+      default: {  // set_selection
+        break;
+      }
+    }
+  });
+  // split_node and move_node may calculate the same block node
+  return [...new Set(blocks)];
+};
+
+export const isNodeValid = (node) => {
+  if (Text.isText(node)) return true;
+
+  if (!node.children) return false;
+  if (!Array.isArray(node.children)) return false;
+  if (node.children.length === 0) return false; // node.children is empty array
+
+  const isNodeChildrenValid = node.children.every(child => isNodeChildrenValid(child));
+  return isNodeChildrenValid;
+};
 
 export const validNode = (node) => {
   let isNodeValid = true;
@@ -26,6 +74,16 @@ export const applyOperations = (document, operations, user) => {
   const { version, children } = document;
   const editor = { children };  
   let isExecuteError = false;
+  // Calculate the top-level block associated with operations
+  const blocks = calculateAffectedBlocks(operations);
+  const oldNodeValues = blocks.map(block => {
+    const node = editor.children[block];
+    return {
+      path: [block],
+      node: deepCopy(node),
+    };
+  });
+
   for (let i = 0; i < operations.length; i++) {
     const op = operations[i];
 
@@ -41,6 +99,26 @@ export const applyOperations = (document, operations, user) => {
       logger.error(err.message);
       logger.error('sync operation failed.', JSON.stringify(op));
     }
+  }
+
+  // Calculate whether the relevant block after executing the operations
+  let isNodeValueInvalid = false;
+  const newNodeValues = blocks.map(block => {
+    const node = editor.children[block];
+    if (!isNodeValueInvalid && !isNodeValid(node)) {
+      isNodeValueInvalid = true;
+    }
+    return {
+      path: [block],
+      node: deepCopy(node),
+    };
+  });
+
+  if (isNodeValueInvalid) {
+    logger.error('Old node message: ', JSON.stringify(oldNodeValues));
+    logger.error('Executed operations: ', JSON.stringify(operations));
+    logger.error('New node message: ', JSON.stringify(newNodeValues));
+    return false;
   }
 
   if (isExecuteError) {
