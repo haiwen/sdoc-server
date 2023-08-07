@@ -102,11 +102,11 @@ export const applyOperations = (document, operations, user) => {
   }
 
   // Calculate whether the relevant block after executing the operations
-  let isNodeValueInvalid = false;
+  let isNodeChildrenInvalid = false;
   const newNodeValues = blocks.map(block => {
     const node = editor.children[block];
-    if (!isNodeValueInvalid && !isNodeChildrenValid(node)) {
-      isNodeValueInvalid = true;
+    if (!isNodeChildrenInvalid && !isNodeChildrenValid(node)) {
+      isNodeChildrenInvalid = true;
     }
     return {
       path: [block],
@@ -114,7 +114,7 @@ export const applyOperations = (document, operations, user) => {
     };
   });
 
-  if (isNodeValueInvalid) {
+  if (isNodeChildrenInvalid) {
     logger.error('Old node message: ', JSON.stringify(oldNodeValues));
     logger.error('Executed operations: ', JSON.stringify(operations));
     logger.error('New node message: ', JSON.stringify(newNodeValues));
