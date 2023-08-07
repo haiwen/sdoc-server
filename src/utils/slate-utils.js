@@ -35,7 +35,7 @@ export const calculateAffectedBlocks = (operations) => {
     }
   });
   // split_node and move_node may calculate the same block node
-  return [...new Set(blocks)];
+  return [...new Set(blocks)].sort((a, b) => a - b);
 };
 
 export const isNodeChildrenValid = (node) => {
