@@ -56,7 +56,9 @@ class IOServer {
       const { docUuid } = socket;
       const usersManager = UsersManager.getInstance();
       const user = usersManager.getUser(docUuid, socket.id);
-      this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
+      if (user) {
+        this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
+      }
       
       // delete current user from memory
       const usersCount = usersManager.deleteUser(docUuid, socket.id);
@@ -128,7 +130,9 @@ class IOServer {
       const { docUuid } = socket;
       const usersManager = UsersManager.getInstance();
       const user = usersManager.getUser(docUuid, socket.id);
-      this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
+      if (user) {
+        this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
+      }
       
       // delete current user from memory
       const usersCount = usersManager.deleteUser(docUuid, socket.id);
