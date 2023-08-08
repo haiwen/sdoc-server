@@ -6,7 +6,7 @@ let logFile = './sdoc-server.log';
 if (process.env.LOG_DIR) {
   logFile = path.join(process.env.LOG_DIR, 'sdoc-server.log');
 }
-const logLevel = process.env.DTABLE_SERVER_LOG_LEVEL || 'info';
+const logLevel = process.env.SDOC_SERVER_LOG_LEVEL || 'info';
 
 // const commonLayout = {
 //   type: 'pattern',
@@ -23,7 +23,7 @@ log4js.configure({
     logger: { 
       type: 'dateFile', 
       filename: logFile,
-      pattern: ".yyyy-MM-dd", 
+      pattern: "yyyy-MM-dd",
       keepFileExt: true,
       layout: codeLayout,
     },
