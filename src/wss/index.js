@@ -63,7 +63,7 @@ class IOServer {
       // delete current user from memory
       const usersCount = usersManager.deleteUser(docUuid, socket.id);
       const documentManager = DocumentManager.getInstance();
-      documentManager.deleteCursor(docUuid, user);
+      user && documentManager.deleteCursor(docUuid, user);
       if (usersCount === 0) {
         const savedBySocket = true;
         await documentManager.saveDoc(docUuid, savedBySocket);
@@ -137,7 +137,7 @@ class IOServer {
       // delete current user from memory
       const usersCount = usersManager.deleteUser(docUuid, socket.id);
       const documentManager = DocumentManager.getInstance();
-      documentManager.deleteCursor(docUuid, user);
+      user && documentManager.deleteCursor(docUuid, user);
       if (usersCount === 0) {
         const savedBySocket = true;
         await documentManager.saveDoc(docUuid, savedBySocket);
