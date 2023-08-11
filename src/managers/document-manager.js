@@ -150,8 +150,8 @@ class DocumentManager {
         error_type: 'version_behind_server',
         operations: operations
       };
-      logger.warn('clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
-      logger.warn('apply operations failed: version is not match', document.docUuid, user.username, operations);
+      logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
+      logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s, execute operations %o', document.docUuid, user.username, operations);
       callback && callback(result);
       return;
     }
