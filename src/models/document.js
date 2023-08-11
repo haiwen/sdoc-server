@@ -39,6 +39,15 @@ class Document {
     return this.meta;
   };
 
+  toJson = () => {
+    return {
+      version: this.version,
+      children: this.children,
+      cursors: this.cursors,
+      last_modify_user: this.last_modify_user,
+    };
+  };
+
   setCursor = (user, location, cursorData) => {
     // selection: { anchor, focus }
     // cursor: { anchor, focus }
