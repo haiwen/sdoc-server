@@ -154,13 +154,14 @@ class DocumentManager {
     const document = this.documents.get(doc_uuid);
     const { version: serverVersion } = document;
 
-    logger.debug('clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
     if (serverVersion !== clientVersion) {
       const result = {
         success: false,
         error_type: 'version_behind_server',
         operations: operations
       };
+      logger.warn('clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
+      logger.warn('apply operations failed: version is not match', document.docUuid, user.username, operations);
       callback && callback(result);
       return;
     }

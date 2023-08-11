@@ -17,6 +17,7 @@ const documentManager = DocumentManager.getInstance();
 documentManager.startSaveTimer();
 
 
+logger.info('Starting sdoc server process:', process.pid);
 server.listen(SERVER_PORT, () => {
   // eslint-disable-next-line
   console.log("server is serve on http://127.0.0.1:" + SERVER_PORT);
