@@ -70,9 +70,23 @@ class IOServer {
       }
     });
     
-    socket.on('update-document', (params, callback) => {
+    socket.on('update-document', async (params, callback) => {
+      const { docName } = socket;
       const { doc_uuid: docUuid, operations, user, selection, cursor_data } = params;
       const documentManager = DocumentManager.getInstance();
+      try {
+        // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
+        await documentManager.getDoc(docUuid, docName);
+      } catch(e) {
+        logger.error(`SOCKET_MESSAGE: Load ${docName}(${docUuid}) doc content error`);
+        const result = {
+          success: false,
+          error_type: 'document_content_load_failed',
+          operations: operations
+        };
+        callback && callback(result);
+        return;
+      }
       documentManager.execOperationsBySocket(params, (result) => {
         if (result.success) {
           const { version } = result;
