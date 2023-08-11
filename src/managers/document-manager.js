@@ -76,12 +76,7 @@ class DocumentManager {
   getDoc = async (docUuid, docName) => {
     const document = this.documents.get(docUuid);
     if (document) {
-      return {
-        version: document.version,
-        children: document.children,
-        cursors: document.cursors,
-        last_modify_user: document.last_modify_user
-      };
+      return document.toJson();
     }
     const result = await seaServerAPI.getDocContent(docUuid);
     const docContent = result.data ? result.data : generateDefaultDocContent();
@@ -94,12 +89,7 @@ class DocumentManager {
     }
 
     this.documents.set(docUuid, doc);
-    return {
-      version: doc.version,
-      children: doc.children,
-      cursors: doc.cursors,
-      last_modify_user: doc.last_modify_user
-    };
+    return doc.toJson();
   };
 
   saveDoc = async (docUuid, savedBySocket = false) => {
