@@ -166,7 +166,14 @@ class DocumentManager {
     }
 
     // execute operations success
-    if (applyOperations(document, operations, user)) {
+    let isExecuteSuccess = false;
+    try {
+      isExecuteSuccess = applyOperations(document, operations, user);
+    } catch (e) {
+      logger.error('apply operations failed.', document.docUuid, operations);
+      isExecuteSuccess = false;
+    }
+    if (isExecuteSuccess) {
       const result = {
         success: true,
         version: document.version,
@@ -192,11 +199,17 @@ class DocumentManager {
       operations = JSON.parse(operations);
       const version = result.op_id;
       const user = { username: result.author };
-      if (applyOperations(document, operations, user)) {
+      let isExecuteSuccess = false;
+      try {
+        isExecuteSuccess = applyOperations(document, operations, user);
+      } catch (e) {
+        logger.error('apply pending operations failed.', document.docUuid, version, operations);
+        isExecuteSuccess = false;
+      }
+      
+      if (isExecuteSuccess) {
         document.version = version;
         document.meta.need_save = true;
-      } else {
-        logger.error('apply pending operations failed.', document.docUuid, version, operations);
       }
     }
   };
