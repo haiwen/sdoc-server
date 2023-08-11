@@ -105,12 +105,12 @@ export const applyOperations = (document, operations, user) => {
   let isNodeChildrenInvalid = false;
   const newNodeValues = blocks.map(block => {
     const node = editor.children[block];
-    if (!isNodeChildrenInvalid && !isNodeChildrenValid(node)) {
+    if (node && !isNodeChildrenInvalid && !isNodeChildrenValid(node)) {
       isNodeChildrenInvalid = true;
     }
     return {
       path: [block],
-      node: deepCopy(node),
+      node: node && deepCopy(node),
     };
   });
 
