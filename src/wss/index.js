@@ -74,26 +74,12 @@ class IOServer {
       const { docName } = socket;
       const { doc_uuid: docUuid, operations, user, selection, cursor_data } = params;
       const documentManager = DocumentManager.getInstance();
-      try {
-        // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
-        await documentManager.getDoc(docUuid, docName);
-      } catch(e) {
-        logger.error(`SOCKET_MESSAGE: Load ${docName}(${docUuid}) doc content error`);
-        const result = {
-          success: false,
-          error_type: 'document_content_load_failed',
-          operations: operations
-        };
-        callback && callback(result);
-        return;
+      const result = await documentManager.execOperationsBySocket(params, docName);
+      if (result.success) {
+        const { version } = result;
+        this.ioHelper.sendMessageToRoom(socket, docUuid, {operations, version, user, selection, cursor_data});
       }
-      documentManager.execOperationsBySocket(params, (result) => {
-        if (result.success) {
-          const { version } = result;
-          this.ioHelper.sendMessageToRoom(socket, docUuid, {operations, version, user, selection, cursor_data});
-        }
-        callback && callback(result);
-      });
+      callback && callback(result);
     });
 
     socket.on('update-cursor', (params) => {

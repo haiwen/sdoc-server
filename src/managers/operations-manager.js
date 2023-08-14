@@ -16,7 +16,11 @@ class OperationsManager {
     return this.instance;
   };
 
-  addOperations = (docUuid, operations, version, user) => {
+  addOperations = async (docUuid, operations, version, user) => {
+    // Save current operations into database
+    await recordOperations(docUuid, operations, version, user);
+
+    // Record current operations into memory
     let operationList = this.operationListMap.get(docUuid) || [];
     let item = {operations, version};
     operationList.push(item);
@@ -24,8 +28,6 @@ class OperationsManager {
       operationList = operationList.slice(OPERATIONS_CACHE_LIMIT / 10);
     }
     this.operationListMap.set(docUuid, operationList);
-    // Save current operations into database
-    recordOperations(docUuid, operations, version, user);
   };
 
   getLoseOperationList = (docUuid, version) => {
