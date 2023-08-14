@@ -177,6 +177,16 @@ class DocumentManager {
       logger.error('apply operations failed.', document.docUuid, operations);
       isExecuteSuccess = false;
     }
+    
+    // execute operations failed
+    if (!isExecuteSuccess) {
+      const result = {
+        success: false,
+        error_type: 'operation_exec_error',
+        operations: operations
+      };
+      return Promise.resolve(result);
+    }
 
     if (isExecuteSuccess) {
       try {
@@ -191,16 +201,6 @@ class DocumentManager {
         };
         return Promise.resolve(result);
       }
-    }
-    
-    // execute operations failed
-    if (!isExecuteSuccess) {
-      const result = {
-        success: false,
-        error_type: 'operation_exec_error',
-        operations: operations
-      };
-      return Promise.resolve(result);
     }
 
     // execute operations success
