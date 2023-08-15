@@ -32,7 +32,11 @@ class OperationsManager {
 
   getLoseOperationList = async (docUuid, version) => {
     let operationList = this.operationListMap.get(docUuid);
-    if (operationList && operationList.length === 0) return [];
+    if (operationList) {
+      if (operationList.length === 0) return [];
+      return operationList.filter(item => item.version > version);
+    }
+    // operationList is not exist load it from database
     operationList = await listPendingOperationsByDoc(docUuid, version);
     // format query result
     operationList = JSON.parse(JSON.stringify(operationList));
