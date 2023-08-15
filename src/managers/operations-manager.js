@@ -1,5 +1,5 @@
 import { OPERATIONS_CACHE_LIMIT } from '../constants';
-import { recordOperations } from '../dao/operation-log';
+import { listPendingOperationsByDoc, recordOperations } from '../dao/operation-log';
 
 class OperationsManager {
 
@@ -30,9 +30,17 @@ class OperationsManager {
     this.operationListMap.set(docUuid, operationList);
   };
 
-  getLoseOperationList = (docUuid, version) => {
-    const operationList = this.operationListMap.get(docUuid) || [];
-    if (operationList.length === 0) return [];
+  getLoseOperationList = async (docUuid, version) => {
+    let operationList = this.operationListMap.get(docUuid);
+    if (operationList && operationList.length === 0) return [];
+    operationList = await listPendingOperationsByDoc(docUuid, version);
+    // format query result
+    operationList = JSON.parse(JSON.stringify(operationList));
+    // add version filed for operation
+    operationList = operationList.map(item => {
+      item.version = item.op_id;
+      return item;
+    });
     return operationList.filter(item => item.version > version);
   };
 

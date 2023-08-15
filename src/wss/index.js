@@ -112,7 +112,7 @@ class IOServer {
 
       // return operations
       const operationsManager = OperationsManager.getInstance();
-      const operationList = operationsManager.getLoseOperationList(docUuid, clientVersion);
+      const operationList = await operationsManager.getLoseOperationList(docUuid, clientVersion);
       const result = {
         success: true,
         mode: 'operations',
