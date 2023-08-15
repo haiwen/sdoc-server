@@ -138,12 +138,26 @@ class DocumentManager {
     document.children = normalizeChildren(document.children);
   };
 
-  execOperationsBySocket = (params, callback) => {
+  execOperationsBySocket = async (params, docName) => {
     const { doc_uuid, version: clientVersion, operations, user } = params;
 
     const document = this.documents.get(doc_uuid);
-    const { version: serverVersion } = document;
+    if (!document) {
+      try {
+        // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
+        await this.getDoc(doc_uuid, docName);
+      } catch(e) {
+        logger.error(`SOCKET_MESSAGE: Load ${docName}(${doc_uuid}) doc content error`);
+        const result = {
+          success: false,
+          error_type: 'document_content_load_failed',
+          operations: operations
+        };
+        return Promise.resolve(result);
+      }
+    }
 
+    const { version: serverVersion } = document;
     if (serverVersion !== clientVersion) {
       const result = {
         success: false,
@@ -152,8 +166,7 @@ class DocumentManager {
       };
       logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
       logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s, execute operations %o', document.docUuid, user.username, operations);
-      callback && callback(result);
-      return;
+      return Promise.resolve(result);
     }
 
     // execute operations success
@@ -164,24 +177,39 @@ class DocumentManager {
       logger.error('apply operations failed.', document.docUuid, operations);
       isExecuteSuccess = false;
     }
-    if (isExecuteSuccess) {
+    
+    // execute operations failed
+    if (!isExecuteSuccess) {
       const result = {
-        success: true,
-        version: document.version,
+        success: false,
+        error_type: 'operation_exec_error',
+        operations: operations
       };
-      const operationsManager = OperationsManager.getInstance();
-      operationsManager.addOperations(doc_uuid, operations, document.version, user);
-      callback && callback(result);
-      return;
+      return Promise.resolve(result);
     }
 
-    // execute operations failed
+    if (isExecuteSuccess) {
+      try {
+        const operationsManager = OperationsManager.getInstance();
+        await operationsManager.addOperations(doc_uuid, operations, document.version, user);
+      } catch(e) {
+        logger.error('Save operations into database error:', document.docUuid, operations);
+        const result = {
+          success: false,
+          error_type: 'Internal_server_error',
+          operations: operations,
+        };
+        return Promise.resolve(result);
+      }
+    }
+
+    // execute operations success
     const result = {
-      success: false,
-      error_type: 'operation_exec_error',
-      operations: operations
+      success: true,
+      version: document.version,
     };
-    callback && callback(result);
+    return Promise.resolve(result);
+
   };
 
   applyPendingOperations = (document, results) => {
