@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { v4 } from "uuid";
 import seaServerAPI from "../api/sea-server-api";
-import { deleteDir, generateDefaultDocContent } from "../utils";
+import { deleteDir, generateDefaultDocContent, isSdocContentValid } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
@@ -80,6 +80,11 @@ class DocumentManager {
     }
     const result = await seaServerAPI.getDocContent(docUuid);
     const docContent = result.data ? result.data : generateDefaultDocContent();
+    if (!isSdocContentValid(docContent)) {
+      const error = new Error('The content of the document does not conform to the sdoc specification');
+      error.error_type = 'content_invalid';
+      throw error;
+    }
     const doc = new Document(docUuid, docName, docContent);
 
     // apply pending operations

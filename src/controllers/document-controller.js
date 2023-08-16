@@ -17,6 +17,13 @@ class DocumentController {
       if (isRequestTimeout(err)) {
         logger.error('Request timed out, please try again later');
       }
+      if (err.error_type === 'content_invalid') {
+        logger.error(err.message);
+        return res.status(500).send({
+          'error_type': 'content_invalid',
+          'error_msg': err.message
+        });
+      }
       logger.error(`Load ${docName}(${docUuid}) doc content error`);
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;

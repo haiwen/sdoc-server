@@ -16,6 +16,16 @@ export const generateDefaultDocContent = () => {
   return defaultValue;
 };
 
+export const isSdocContentValid = (content) => {
+  if (!content['children'] || (!content['version'] && content['version'] !== 0)) {
+    return false;
+  }
+  if (!Array.isArray(content['children'])) {
+    return false;
+  }
+  return true;
+};
+
 export const getDirPath = (path) => {
   let dir = path.slice(0, path.lastIndexOf('/'));
   if (dir === '') {
