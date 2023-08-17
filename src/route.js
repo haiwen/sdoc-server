@@ -8,6 +8,7 @@ const multipartMiddleware = multipart();
 
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/`, documentController.loadDocContent);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/`, multipartMiddleware, documentController.saveDocContent);
+router.post(`${BASE_URL_VERSION1}/:doc_uuid/rebase/`, multipartMiddleware, documentController.saveDocContentByRebase);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/internal-refresh-docs`, documentController.internalRefreshDocs);
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/normalize-sdoc`, documentController.normalizeSdoc);
 

@@ -136,6 +136,13 @@ class DocumentManager {
     return Promise.resolve(saveFlag);
   };
 
+  saveDocByRebase = async (docUuid, content) => {
+    const document = this.documents.get(docUuid);
+    document.setMeta({ need_save: true, is_saving: false });
+    document.setValue(content.children, content.version + 1);
+    document.setLastModifyUser({ username: document.last_modify_user });
+  };
+
   removeDocs(docUuids) {
     for (let docUuid of docUuids) {
       if (this.documents.has(docUuid)) {
