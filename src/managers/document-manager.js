@@ -10,6 +10,7 @@ import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
+import UsersManager from './users-manager';
 
 class DocumentManager {
 
@@ -74,6 +75,20 @@ class DocumentManager {
     this.lastSavingInfo.endTime = Date.now();
   };
 
+  reloadDoc = async (docUuid, docName) => {
+    const result = await seaServerAPI.getDocContent(docUuid);
+    const docContent = result.data ? result.data : generateDefaultDocContent(docName);
+    if (!isSdocContentValid(docContent)) {
+      const error = new Error('The content of the document does not conform to the sdoc specification');
+      error.error_type = 'content_invalid';
+      throw error;
+    }
+    const doc = new Document(docUuid, docName, docContent);
+
+    this.documents.set(docUuid, doc);
+    return doc.toJson();
+  };
+
   getDoc = async (docUuid, docName) => {
     const document = this.documents.get(docUuid);
     if (document) {
@@ -136,11 +151,28 @@ class DocumentManager {
     return Promise.resolve(saveFlag);
   };
 
-  saveDocByRebase = async (docUuid, content) => {
+  replaceDoc = async (docUuid, user, content) => {
     const document = this.documents.get(docUuid);
-    document.setMeta({ need_save: true, is_saving: false });
-    document.setValue(content.children, content.version + 1);
-    document.setLastModifyUser({ username: document.last_modify_user });
+    document.setMeta({ need_save: true, is_saving: false, cursors: {} });
+    document.setValue(content.children, content.version);
+    document.setLastModifyUser({ username: user.username });
+    const operationsManager = OperationsManager.getInstance();
+    operationsManager.clearOperations(docUuid);
+    return Promise.resolve(true);
+  };
+
+  removeDocFromMemory = async (docUuid) => {
+    if (this.documents.has(docUuid)) {
+      logger.info('Removed doc ', docUuid, ' from memory');
+      const operationsManager = OperationsManager.getInstance();
+      operationsManager.clearOperations(docUuid);
+      this.documents.delete(docUuid);
+    }
+    return Promise.resolve(true);
+  };
+
+  isDocInMemory = (docUuid) => {
+    return this.documents.has(docUuid);
   };
 
   removeDocs(docUuids) {
@@ -148,6 +180,22 @@ class DocumentManager {
       if (this.documents.has(docUuid)) {
         logger.info('Removed doc ', docUuid, ' from memory');
         this.documents.delete(docUuid);
+      }
+    }
+  }
+
+  internalRefreshDocs(docUuids) {
+    for (let docUuid of docUuids) {
+      if (this.documents.has(docUuid)) {
+        const document = this.documents.get(docUuid);
+        const usersManager = UsersManager.getInstance();
+        const docUsers = usersManager.getDocUsers(docUuid);
+        if (docUsers.length > 0) {
+          this.reloadDoc(docUuid, document.docName);
+        } else {
+          logger.info('Removed doc ', docUuid, ' from memory');
+          this.documents.delete(docUuid);
+        }
       }
     }
   }

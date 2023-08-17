@@ -16,8 +16,6 @@ class IOServer {
     io.use(auth);
   }
 
-  // 
-
   onConnected(socket) {
     
     this.connectCount++;
@@ -143,6 +141,48 @@ class IOServer {
       if (usersCount === 0) {
         const savedBySocket = true;
         await documentManager.saveDoc(docUuid, savedBySocket);
+      }
+    });
+
+    socket.on('replace-document', async (params, callback) => {
+      const { docName } = socket;
+      const { doc_uuid: docUuid, user, document } = params;
+      const documentManager = DocumentManager.getInstance();
+      const saveFlag = await documentManager.replaceDoc(docUuid, user, document);
+
+      // saved success
+      if (saveFlag) {
+        const newDocument = await documentManager.getDoc(docUuid, docName);
+        this.ioHelper.sendReplaceDocMessageToRoom(socket, docUuid);
+        callback && callback({ version: newDocument.version });
+        return;
+      }
+
+      this.ioHelper.sendReplaceDocErrorMessageToRoom(socket, docUuid);
+    });
+
+    socket.on('publish-document', async (params, callback) => {
+      const { doc_uuid: docUuid, origin_doc_uuid: originDocUuid, origin_doc_name: originDocName, update_origin_doc: isNeedUpdateOriginDoc } = params;
+      const documentManager = DocumentManager.getInstance();
+      const saveFlag = await documentManager.removeDocFromMemory(docUuid);
+
+      saveFlag && this.ioHelper.sendPublishMessageToRoom(socket, docUuid);
+      saveFlag && callback && callback();
+      !saveFlag && this.ioHelper.sendPublishErrorMessageToRoom(socket, docUuid);
+
+      // update origin document
+      if (isNeedUpdateOriginDoc) {
+        try {
+          if (documentManager.isDocInMemory(originDocUuid)) {
+
+            // get doc content and add doc into memory
+            const originDocument = await documentManager.reloadDoc(originDocUuid, originDocName);
+            originDocument && this.ioHelper.sendReplaceOtherDocMessageToRoom(originDocUuid);
+          }
+        } catch(err) {
+          logger.error(`SOCKET_MESSAGE: Load ${originDocUuid}(${originDocName}) doc content error`);
+          return;
+        }
       }
     });
     

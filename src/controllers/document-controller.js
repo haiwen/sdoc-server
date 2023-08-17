@@ -2,7 +2,6 @@ import logger from "../loggers";
 import DocumentManager from '../managers/document-manager';
 import { resetDocContentCursors } from "../models/document-utils";
 import { isRequestTimeout } from "../utils";
-import IOHelper from "../wss/io-helper";
 
 class DocumentController {
 
@@ -31,40 +30,6 @@ class DocumentController {
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;
     }
-  }
-
-  async saveDocContentByRebase(req, res) {
-    const { file_uuid: docUuid } = req.payload;
-    const { doc_content: docContent } = req.body;
-
-    if (!docContent) {
-      res.status(400).send({"error_msg": `Param 'doc_content' is required`});
-      return;
-    }
-    
-    let content = null;
-    
-    try {
-      // Form api: need parse string content to object content
-      content = JSON.parse(docContent);
-    } catch(err) {
-      res.status(400).send({"error_msg": `Param 'doc_content' is not in the correct format`});
-      return;
-    }
-
-    const documentManager = DocumentManager.getInstance();
-    logger.error('error: ', JSON.stringify(content));
-    const saveFlag = true;
-    // const saveFlag = await documentManager.saveDocByRebase(docUuid, content);
-    if (saveFlag) { // saved success
-      const io = IOHelper.getInstance();
-      // io.sendRebaseMessageToRoom();
-      res.send({success: true});
-      return;
-    }
-
-    res.status(500).send({'error_msg': 'Internal Server Error'});
-    return;
   }
   
   async saveDocContent(req, res) {
@@ -103,7 +68,7 @@ class DocumentController {
     const { doc_uuids: docUuids } = req.body;
     try {
       const documentManager = DocumentManager.getInstance();
-      documentManager.removeDocs(docUuids);
+      documentManager.internalRefreshDocs(docUuids);
       res.send({"success": true});
       return;
     } catch(err) {

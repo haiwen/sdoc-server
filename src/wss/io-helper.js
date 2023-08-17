@@ -24,8 +24,20 @@ class IOHelper {
     socket.to(roomId).emit('update-document', {...params});
   };
 
-  sendRebaseMessageToRoom = (socket, roomId, document) => {
-    socket.to(roomId).emit('rebase-document', document);
+  sendReplaceDocMessageToRoom = (socket, roomId) => {
+    socket.to(roomId).emit('doc-replaced');
+  };
+
+  sendReplaceDocErrorMessageToRoom = (socket, roomId) => {
+    socket.to(roomId).emit('doc-replaced-error');
+  };
+
+  sendPublishMessageToRoom = (socket, roomId) => {
+    socket.to(roomId).emit('doc-published');
+  };
+
+  sendPublishErrorMessageToRoom = (socket, roomId) => {
+    socket.to(roomId).emit('doc-published-error');
   };
   
   sendCursorMessageToRoom = (socket, roomId, params) => {
@@ -42,6 +54,10 @@ class IOHelper {
   
   sendMessageToPrivate = (sid, params) => {
     this.io.to(sid).emit('message', `${params.name} has join room`);
+  };
+
+  sendReplaceOtherDocMessageToRoom = (roomId) => {
+    this.io.to(roomId).emit('doc-replaced');
   };
 
 }
