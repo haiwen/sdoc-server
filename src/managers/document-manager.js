@@ -156,7 +156,6 @@ class DocumentManager {
         const result = {
           success: false,
           error_type: 'document_content_load_failed',
-          operations: operations
         };
         return Promise.resolve(result);
       }
@@ -164,10 +163,12 @@ class DocumentManager {
 
     const { version: serverVersion } = document;
     if (serverVersion !== clientVersion) {
+      const operationsManager = OperationsManager.getInstance(); 
+      const loseOperations = await operationsManager.getLoseOperationList(doc_uuid, clientVersion);
       const result = {
         success: false,
         error_type: 'version_behind_server',
-        operations: operations
+        lose_operations: loseOperations,
       };
       logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
       logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s, execute operations %o', document.docUuid, user.username, operations);
@@ -188,7 +189,6 @@ class DocumentManager {
       const result = {
         success: false,
         error_type: 'operation_exec_error',
-        operations: operations
       };
       return Promise.resolve(result);
     }
@@ -202,7 +202,6 @@ class DocumentManager {
         const result = {
           success: false,
           error_type: 'Internal_server_error',
-          operations: operations,
         };
         return Promise.resolve(result);
       }
