@@ -155,7 +155,7 @@ class DocumentManager {
         logger.error(`SOCKET_MESSAGE: Load ${docName}(${doc_uuid}) doc content error`);
         const result = {
           success: false,
-          error_type: 'document_content_load_failed',
+          error_type: 'load_document_content_error',
         };
         return Promise.resolve(result);
       }
@@ -188,7 +188,7 @@ class DocumentManager {
     if (!isExecuteSuccess) {
       const result = {
         success: false,
-        error_type: 'operation_exec_error',
+        error_type: 'execute_client_operations_error',
       };
       return Promise.resolve(result);
     }
@@ -198,10 +198,10 @@ class DocumentManager {
         const operationsManager = OperationsManager.getInstance();
         await operationsManager.addOperations(doc_uuid, operations, document.version, user);
       } catch(e) {
-        logger.error('Save operations into database error:', document.docUuid, operations);
+        logger.error('Save operations to database error:', document.docUuid, operations);
         const result = {
           success: false,
-          error_type: 'Internal_server_error',
+          error_type: 'save_operations_to_database_error',
         };
         return Promise.resolve(result);
       }
