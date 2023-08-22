@@ -99,6 +99,12 @@ class DocumentManager {
 
   saveDoc = async (docUuid, savedBySocket = false) => {
     const document = this.documents.get(docUuid);
+    // The save function is an asynchronous function, which does not affect the normal execution of other programs,
+    //  and there is a possibility that the file has been deleted when the next file is saved
+    if (!document) {
+      logger.info(`SDoc ${docUuid} has been removed from memory`);
+      return Promise.resolve(false);
+    }
     const meta = document.getMeta();
     if (meta.is_saving || !meta.need_save) { // is saving or no need save
       return Promise.resolve(false);
