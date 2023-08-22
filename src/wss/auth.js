@@ -16,7 +16,7 @@ export default function(socket, next) {
     };
     socket.payload = decoded;
   } catch (err) {
-    logger.error(err.message);
+    logger.debug(err.message);
     next(err);
     return;
   }
