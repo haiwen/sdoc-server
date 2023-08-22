@@ -1,15 +1,16 @@
 import fs from 'fs';
 import { v4 } from "uuid";
 
-export const generateDefaultText = () => {
-  return { id: v4(), text: '' };
+export const generateDefaultText = (text = '') => {
+  return { id: v4(), text };
 };
 
-export const generateDefaultDocContent = () => {
+export const generateDefaultDocContent = (docName) => {
+  const headerText = docName ? docName.split('.')[0] : '';
   const defaultValue = {
     version: 0,
     children: [
-      {id: v4(), type: 'header1', children: [generateDefaultText()]},
+      {id: v4(), type: 'header1', children: [generateDefaultText(headerText)]},
       {id: v4(), type: 'paragraph', children: [generateDefaultText()]}
     ]
   };
