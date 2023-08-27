@@ -1,16 +1,17 @@
 import logger from "../loggers";
 import DocumentManager from '../managers/document-manager';
-import { isRequestTimeout } from "../utils";
+import { formatDocContent, isRequestTimeout } from "../utils";
 
 class DocumentController {
 
   async loadDocContent(req, res) {
-    const { file_uuid: docUuid, filename: docName } = req.payload;
+    const { file_uuid: docUuid, filename: docName, username } = req.payload;
     try {
       const documentManager = DocumentManager.getInstance();
       const docContent = await documentManager.getDoc(docUuid, docName);
+      const newDocContent = formatDocContent(docContent, username);
       res.set('Cache-control', 'no-store');
-      res.send(docContent);
+      res.send(newDocContent);
       return;
     } catch(err) {
       logger.error(err.message);

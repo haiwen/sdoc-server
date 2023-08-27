@@ -140,3 +140,19 @@ export function uuidStrTo36Chars(uuid) {
   }
 }
 
+/**
+ * delete current user's cursor from returned value
+ * @param {*} docContent 
+ * @param {*} username 
+ * @returns 
+ */
+export function formatDocContent(docContent, username) {
+    const { cursors = {}  } = docContent;
+    if (cursors[username]) {
+      delete cursors[username];
+      docContent.cursors = cursors;
+      return docContent;
+    }
+    return docContent;
+}
+
