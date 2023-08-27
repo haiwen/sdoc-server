@@ -1,4 +1,3 @@
-import deepCopy from 'deep-copy';
 import { OPERATIONS_CACHE_LIMIT } from "../constants";
 import logger from "../loggers";
 import DocumentManager from "../managers/document-manager";
@@ -74,13 +73,11 @@ class IOServer {
     socket.on('update-document', async (params, callback) => {
       const { docName } = socket;
       const { doc_uuid: docUuid, operations, user, selection, cursor_data } = params;
-      // Prevent copying of references
-      const dupOperations = deepCopy(operations);
       const documentManager = DocumentManager.getInstance();
       const result = await documentManager.execOperationsBySocket(params, docName);
       if (result.success) {
         const { version } = result;
-        this.ioHelper.sendMessageToRoom(socket, docUuid, { operations: dupOperations, version, user, selection, cursor_data});
+        this.ioHelper.sendMessageToRoom(socket, docUuid, { operations, version, user, selection, cursor_data});
       }
       callback && callback(result);
     });
