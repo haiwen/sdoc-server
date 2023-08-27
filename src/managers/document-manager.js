@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { v4 } from "uuid";
+import deepCopy from 'deep-copy';
 import seaServerAPI from "../api/sea-server-api";
 import { deleteDir, generateDefaultDocContent, isSdocContentValid } from "../utils";
 import logger from "../loggers";
@@ -184,7 +185,9 @@ class DocumentManager {
     // execute operations success
     let isExecuteSuccess = false;
     try {
-      isExecuteSuccess = applyOperations(document, operations, user);
+      // Prevent copying of references
+      const dupOperations = deepCopy(operations);
+      isExecuteSuccess = applyOperations(document, dupOperations, user);
     } catch (e) {
       logger.error('apply operations failed.', document.docUuid, operations);
       isExecuteSuccess = false;
