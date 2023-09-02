@@ -10,7 +10,7 @@ export const generateDefaultDocContent = (docName) => {
   const defaultValue = {
     version: 0,
     children: [
-      {id: v4(), type: 'header1', children: [generateDefaultText(headerText)]},
+      {id: v4(), type: 'title', children: [generateDefaultText(headerText)]},
       {id: v4(), type: 'paragraph', children: [generateDefaultText()]}
     ]
   };
