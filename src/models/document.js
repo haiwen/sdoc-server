@@ -6,6 +6,7 @@ class Document {
     this.docUuid = docUuid;
     this.docName = docName;
     this.version = docContent.version;
+    this.format_version = docContent.format_version || 1;
     this.children = normalizeChildren(docContent.children);
     this.cursors = {};  // default is empty object
     this.last_modify_user = docContent.last_modify_user;
@@ -42,6 +43,7 @@ class Document {
   toJson = () => {
     return {
       version: this.version,
+      format_version: this.format_version,
       children: this.children,
       cursors: this.cursors,
       last_modify_user: this.last_modify_user,

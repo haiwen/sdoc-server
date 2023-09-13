@@ -2,14 +2,14 @@ import fs from 'fs';
 import { v4 } from "uuid";
 import deepCopy from 'deep-copy';
 import seaServerAPI from "../api/sea-server-api";
-import { deleteDir, generateDefaultDocContent, isSdocContentValid } from "../utils";
+import { deleteDir } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
 import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
-import { normalizeChildren } from '../models/document-utils';
+import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
 
 class DocumentManager {
 
@@ -114,8 +114,8 @@ class DocumentManager {
     document.setMeta({is_saving: true});
 
     // Get save info
-    const { version, children, docName, last_modify_user } = document;
-    const docContent = { version, children, last_modify_user };
+    const { version, format_version, children, docName, last_modify_user } = document;
+    const docContent = { version, format_version, children, last_modify_user };
 
     let saveFlag = false;
     const tempPath = `/tmp/` + v4();

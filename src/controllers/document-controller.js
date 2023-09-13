@@ -1,6 +1,7 @@
 import logger from "../loggers";
 import DocumentManager from '../managers/document-manager';
-import { formatDocContent, isRequestTimeout } from "../utils";
+import { formatDocContent } from "../models/document-utils";
+import { isRequestTimeout } from "../utils";
 
 class DocumentController {
 
