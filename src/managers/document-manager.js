@@ -123,7 +123,7 @@ class DocumentManager {
     }
     const meta = document.getMeta();
     if (meta.is_saving || !meta.need_save) { // is saving or no need save
-      return Promise.resolve(false);
+      return Promise.resolve(true);
     }
   
     document.setMeta({is_saving: true});

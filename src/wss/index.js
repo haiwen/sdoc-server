@@ -144,6 +144,13 @@ class IOServer {
       }
     });
 
+    socket.on('save-document', async (params, callback) => {
+      const { doc_uuid: docUuid } = params;
+      const documentManager = DocumentManager.getInstance();
+      const saveFlag = await documentManager.saveDoc(docUuid);
+      callback && callback(saveFlag);
+    });
+
     socket.on('replace-document', async (params, callback) => {
       const { docName } = socket;
       const { doc_uuid: docUuid, user, document } = params;
