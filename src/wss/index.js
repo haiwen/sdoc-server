@@ -171,11 +171,19 @@ class IOServer {
     socket.on('publish-document', async (params, callback) => {
       const { doc_uuid: docUuid, origin_doc_uuid: originDocUuid, origin_doc_name: originDocName, update_origin_doc: isNeedUpdateOriginDoc } = params;
       const documentManager = DocumentManager.getInstance();
-      const saveFlag = await documentManager.removeDocFromMemory(docUuid);
-
-      saveFlag && this.ioHelper.sendPublishMessageToRoom(socket, docUuid);
-      saveFlag && callback && callback();
-      !saveFlag && this.ioHelper.sendPublishErrorMessageToRoom(socket, docUuid);
+      const { saveFlag, removeFlag, publishFlag } = await documentManager.publishDoc(docUuid, socket.userInfo.username, isNeedUpdateOriginDoc);
+      if (!saveFlag) {
+        logger.error(`${docUuid} save failed.`);
+      }
+      if (!removeFlag) {
+        logger.error(`${docUuid} remove from memory failed.`);
+      }
+      callback && callback(publishFlag);
+      if (publishFlag) {
+        this.ioHelper.sendPublishMessageToRoom(socket, docUuid);
+      } else {
+        this.ioHelper.sendPublishErrorMessageToRoom(socket, docUuid);
+      }
 
       // update origin document
       if (isNeedUpdateOriginDoc) {

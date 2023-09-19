@@ -151,6 +151,35 @@ class DocumentManager {
     return Promise.resolve(saveFlag);
   };
 
+  publishDoc = async (docUuid, username, isNeedUpdateOriginDoc) => {
+    const saveFlag = await this.saveDoc(docUuid, username, true);
+    let publishFlag = false;
+    if (isNeedUpdateOriginDoc) {
+      try {
+        await seaServerAPI.publishRevision(docUuid, username);
+        publishFlag = true;
+        logger.info(`${docUuid} published`);
+      } catch (error) {
+        publishFlag = false;
+        logger.info(`${docUuid} published error`);
+        // logger.error(error);
+      }
+    } else {
+      try {
+        await seaServerAPI.deleteDoc(docUuid, username);
+        publishFlag = true;
+        logger.info(`${docUuid} published`);
+      } catch (error) {
+        publishFlag = false;
+        logger.info(`${docUuid} published error`);
+        // logger.error(error);
+      }
+    }
+    const removeFlag = await this.removeDocFromMemory(docUuid);
+
+    return Promise.resolve({ saveFlag, removeFlag, publishFlag });
+  };
+
   replaceDoc = async (docUuid, user, content) => {
     const document = this.documents.get(docUuid);
     document.setMeta({ need_save: true, is_saving: false, cursors: {} });
@@ -180,22 +209,6 @@ class DocumentManager {
       if (this.documents.has(docUuid)) {
         logger.info('Removed doc ', docUuid, ' from memory');
         this.documents.delete(docUuid);
-      }
-    }
-  }
-
-  internalRefreshDocs(docUuids) {
-    for (let docUuid of docUuids) {
-      if (this.documents.has(docUuid)) {
-        const document = this.documents.get(docUuid);
-        const usersManager = UsersManager.getInstance();
-        const docUsers = usersManager.getDocUsers(docUuid);
-        if (docUsers.length > 0) {
-          this.reloadDoc(docUuid, document.docName);
-        } else {
-          logger.info('Removed doc ', docUuid, ' from memory');
-          this.documents.delete(docUuid);
-        }
       }
     }
   }

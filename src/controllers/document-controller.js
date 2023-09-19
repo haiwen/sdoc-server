@@ -63,25 +63,6 @@ class DocumentController {
     return;
   }
 
-  async internalRefreshDocs(req, res) {
-    // used for sdoc publish revision
-    const { doc_uuids: docUuids } = req.body;
-    try {
-      const documentManager = DocumentManager.getInstance();
-      documentManager.internalRefreshDocs(docUuids);
-      res.send({"success": true});
-      return;
-    } catch(err) {
-      logger.error(err.message);
-      if (isRequestTimeout(err)) {
-        logger.error('Request timed out, please try again later');
-      }
-      logger.error(`Remove ${docUuids.join(' ')} doc in memory error`);
-      res.status(500).send({'error_msg': 'Internal Server Error'});
-      return;
-    }
-  }
-
   async normalizeSdoc(req, res) {
     const { file_uuid: docUuid } = req.payload;
     try {
