@@ -48,6 +48,9 @@ class IOHelper {
     this.io.to(roomId).emit(message);
   };
 
+  sendNotificationToPrivate = (sid, notification) => {
+    this.io.to(sid).emit('new-notification', notification);
+  };
 }
 
 export default IOHelper;
