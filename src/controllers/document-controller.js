@@ -2,6 +2,7 @@ import logger from "../loggers";
 import DocumentManager from '../managers/document-manager';
 import { resetDocContentCursors } from "../models/document-utils";
 import { isRequestTimeout } from "../utils";
+import IOHelper from "../wss/io-helper";
 
 class DocumentController {
 
@@ -76,6 +77,26 @@ class DocumentController {
         logger.error('Request timed out, please try again later');
       }
       logger.error(`Normalize doc ${docUuid} failed`);
+      res.status(500).send({'error_msg': 'Internal Server Error'});
+      return;
+    }
+  }
+
+  async removeContent(req, res) {
+    const { doc_uuid: docUuid } = req.params;
+    const ioHelper = IOHelper.getInstance();
+    try {
+      const documentManager = DocumentManager.getInstance();
+      documentManager.removeDoc(docUuid);
+      ioHelper.sendRemoveMessageToRoom(docUuid);
+      res.status(200).send({'success': true});
+      return;
+    } catch(err) {
+      logger.error(err.message);
+      if (isRequestTimeout(err)) {
+        logger.error('Request timed out, please try again later');
+      }
+      logger.error(`Remove ${docUuid} doc in memory error`);
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;
     }

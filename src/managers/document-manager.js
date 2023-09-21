@@ -10,7 +10,6 @@ import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
-import UsersManager from './users-manager';
 
 class DocumentManager {
 
@@ -151,32 +150,23 @@ class DocumentManager {
     return Promise.resolve(saveFlag);
   };
 
-  publishDoc = async (docUuid, username, isNeedUpdateOriginDoc) => {
+  removeDoc = async (docUuid) => {
+    const removeFlag = await this.removeDocFromMemory(docUuid);
+    return Promise.resolve(removeFlag);
+  };
+
+  publishDoc = async (docUuid, username) => {
     const saveFlag = await this.saveDoc(docUuid, username, true);
     let publishFlag = false;
-    if (isNeedUpdateOriginDoc) {
-      try {
-        await seaServerAPI.publishRevision(docUuid, username);
-        publishFlag = true;
-        logger.info(`${docUuid} published`);
-      } catch (error) {
-        publishFlag = false;
-        logger.info(`${docUuid} published error`);
-        // logger.error(error);
-      }
-    } else {
-      try {
-        await seaServerAPI.deleteDoc(docUuid, username);
-        publishFlag = true;
-        logger.info(`${docUuid} published`);
-      } catch (error) {
-        publishFlag = false;
-        logger.info(`${docUuid} published error`);
-        // logger.error(error);
-      }
+    try {
+      await seaServerAPI.publishRevision(docUuid, username);
+      publishFlag = true;
+      logger.info(`${docUuid} published`);
+    } catch (error) {
+      publishFlag = false;
+      logger.info(`${docUuid} published error`);
     }
     const removeFlag = await this.removeDocFromMemory(docUuid);
-
     return Promise.resolve({ saveFlag, removeFlag, publishFlag });
   };
 

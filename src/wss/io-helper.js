@@ -60,6 +60,14 @@ class IOHelper {
     this.io.to(roomId).emit('doc-replaced');
   };
 
+  sendRemoveMessageToRoom = (roomId) => {
+    this.io.to(roomId).emit('doc-removed');
+  };
+
+  sendRemoveErrorMessageToRoom = (roomId) => {
+    this.io.to(roomId).emit('doc-removed-error');
+  };
+
 }
 
 export default IOHelper;

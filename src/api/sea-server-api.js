@@ -68,12 +68,6 @@ class SeaServerAPI {
     formData.append('replace', replace);
     return axios.post(url, formData, config);
   };
-
-  deleteDoc = (docUuid, username) => {
-    const url = '/api/v2.1/seadoc/revision/' + docUuid + '/';
-    const config = this.getConfig(docUuid, username);
-    return axios.delete(url, config);
-  };
   
   listComments = (docUuid) => {
     const uploadLink = '/api/v2.1/seadoc/comments/' + docUuid + '/';
