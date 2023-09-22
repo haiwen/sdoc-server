@@ -38,7 +38,7 @@ export const isSdocContentValid = (content) => {
  * @param {*} username 
  * @returns 
  */
-export function formatDocContent(docContent, username) {
+export function resetDocContentCursors(docContent, username) {
   const { cursors = {}  } = docContent;
   if (cursors[username]) {
     delete cursors[username];
