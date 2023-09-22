@@ -46,8 +46,14 @@ class ReplyController {
       const result = await seaServerAPI.insertReply(docUuid, commentId, { type, reply, author });
       const _reply = result.data;
       res.send({reply: _reply});
-      const notificationManager = NotificationManager.getInstance();
-      notificationManager.sendNotificationToRoom(docUuid, 'reply', _reply)
+      const notification = result.data.notification;
+      const toUsers = notification.to_users;
+      if (toUsers.length > 0) {
+        const notificationManager = NotificationManager.getInstance();
+        for (let username of toUsers) {
+          notificationManager.sendNotificationToUser(docUuid, username, notification)
+        }
+      }
       return;
     } catch(err) {
       logger.error(err.message);

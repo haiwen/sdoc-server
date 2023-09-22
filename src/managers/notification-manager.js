@@ -15,20 +15,24 @@ class NotificationManager {
     return this.instance;
   };
 
-  sendNotificationToRoom = (docUuid, msgType, notification) => {
+  sendNotificationToRoom = (docUuid, notification) => {
     const usersManager = UsersManager.getInstance();
     const socketIds = usersManager.getSocketIds(docUuid);
     const ioHelper = IOHelper.getInstance();
-    for (let socketId of socketIds) {
-      ioHelper.sendNotificationToPrivate(socketId, {"msg_type": msgType, "notification": notification});
+    if (socketIds.length > 0) {
+      for (let socketId of socketIds) {
+        ioHelper.sendNotificationToPrivate(socketId, notification);
+      }
     }
   };
 
-  sendNotificationToUser = (docUuid, username, msgType, notification) => {
+  sendNotificationToUser = (docUuid, username, notification) => {
     const usersManager = UsersManager.getInstance();
     const socketId = usersManager.getSocketId(docUuid, username);
     const ioHelper = IOHelper.getInstance();
-    ioHelper.sendNotificationToPrivate(socketId, {"msg_type": msgType, "notification": notification});
+    if (socketId) {
+      ioHelper.sendNotificationToPrivate(socketId, notification);
+    }
   };
 
 }

@@ -2,7 +2,6 @@ import seaServerAPI from "../api/sea-server-api";
 import logger from "../loggers";
 import { isObject, isRequestTimeout } from "../utils";
 import { internalServerError, paramIsError, paramIsRequired } from "../utils/resp-message-utils";
-import NotificationManager from "../managers/notification-manager";
 
 class CommentController {
 
@@ -54,8 +53,6 @@ class CommentController {
       const result = await seaServerAPI.insertComment(docUuid, { comment, detail: JSON.stringify(detail), author, updated_at });
       const _comment = result.data;
       res.send({comment: _comment});
-      const notificationManager = NotificationManager.getInstance();
-      notificationManager.sendNotificationToRoom(docUuid, 'comment', _comment)
       return;
     } catch(err) {
       logger.error(err.message);
