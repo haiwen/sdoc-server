@@ -1,6 +1,6 @@
 import logger from "../loggers";
 import DocumentManager from '../managers/document-manager';
-import { formatDocContent } from "../models/document-utils";
+import { resetDocContentCursors } from "../models/document-utils";
 import { isRequestTimeout } from "../utils";
 
 class DocumentController {
@@ -10,7 +10,7 @@ class DocumentController {
     try {
       const documentManager = DocumentManager.getInstance();
       const docContent = await documentManager.getDoc(docUuid, docName);
-      const newDocContent = formatDocContent(docContent, username);
+      const newDocContent = resetDocContentCursors(docContent, username);
       res.set('Cache-control', 'no-store');
       res.send(newDocContent);
       return;

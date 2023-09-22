@@ -1,3 +1,4 @@
+import formatDocContentToNewVersion from './document-format';
 import { normalizeChildren } from "./document-utils";
 
 class Document {
@@ -5,11 +6,14 @@ class Document {
   constructor(docUuid, docName, docContent) {
     this.docUuid = docUuid;
     this.docName = docName;
-    this.version = docContent.version;
-    this.format_version = docContent.format_version || 1;
-    this.children = normalizeChildren(docContent.children);
+
+    // const newDocContent = docContent;
+    const newDocContent = formatDocContentToNewVersion(docContent);
+    this.version = newDocContent.version;
+    this.format_version = newDocContent.format_version;
+    this.children = normalizeChildren(newDocContent.children);
+    this.last_modify_user = newDocContent.last_modify_user;
     this.cursors = {};  // default is empty object
-    this.last_modify_user = docContent.last_modify_user;
     this.meta = {
       save_times: 0,
       need_save: false,
