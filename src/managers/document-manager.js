@@ -155,21 +155,6 @@ class DocumentManager {
     return Promise.resolve(removeFlag);
   };
 
-  publishDoc = async (docUuid, username) => {
-    const saveFlag = await this.saveDoc(docUuid, username, true);
-    let publishFlag = false;
-    try {
-      await seaServerAPI.publishRevision(docUuid, username);
-      publishFlag = true;
-      logger.info(`${docUuid} published`);
-    } catch (error) {
-      publishFlag = false;
-      logger.info(`${docUuid} published error`);
-    }
-    const removeFlag = await this.removeDocFromMemory(docUuid);
-    return Promise.resolve({ saveFlag, removeFlag, publishFlag });
-  };
-
   replaceDoc = async (docUuid, user, content) => {
     const document = this.documents.get(docUuid);
     document.setMeta({ need_save: true, is_saving: false, cursors: {} });

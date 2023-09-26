@@ -60,14 +60,6 @@ class SeaServerAPI {
     const config = this.getConfig(docUuid);
     return axios.post(uploadLink, formData, config);
   };
-
-  publishRevision = (docUuid, username, replace = 1) => {
-    const url = SEAHUB_SERVER + '/api/v2.1/seadoc/publish-revision/'+ docUuid + '/';
-    const config = this.getConfig(docUuid, username);
-    const formData = new FormData();
-    formData.append('replace', replace);
-    return axios.post(url, formData, config);
-  };
   
   listComments = (docUuid) => {
     const uploadLink = '/api/v2.1/seadoc/comments/' + docUuid + '/';

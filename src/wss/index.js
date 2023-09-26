@@ -167,37 +167,6 @@ class IOServer {
 
       this.ioHelper.sendReplaceDocErrorMessageToRoom(socket, docUuid);
     });
-
-    socket.on('publish-document', async (params, callback) => {
-      const { doc_uuid: docUuid, origin_doc_uuid: originDocUuid, origin_doc_name: originDocName } = params;
-      const documentManager = DocumentManager.getInstance();
-      const { saveFlag, removeFlag, publishFlag } = await documentManager.publishDoc(docUuid, socket.userInfo.username);
-      if (!saveFlag) {
-        logger.error(`${docUuid} save failed.`);
-      }
-      if (!removeFlag) {
-        logger.error(`${docUuid} remove from memory failed.`);
-      }
-      callback && callback(publishFlag);
-      if (publishFlag) {
-        this.ioHelper.sendPublishMessageToRoom(socket, docUuid);
-      } else {
-        this.ioHelper.sendPublishErrorMessageToRoom(socket, docUuid);
-      }
-
-      // update origin document
-      try {
-        if (documentManager.isDocInMemory(originDocUuid)) {
-
-          // get doc content and add doc into memory
-          const originDocument = await documentManager.reloadDoc(originDocUuid, originDocName);
-          originDocument && this.ioHelper.sendReplaceOtherDocMessageToRoom(originDocUuid);
-        }
-      } catch(err) {
-        logger.error(`SOCKET_MESSAGE: Load ${originDocUuid}(${originDocName}) doc content error`);
-        return;
-      }
-    });
     
   }
 

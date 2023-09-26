@@ -3,6 +3,7 @@ import DocumentManager from '../managers/document-manager';
 import { resetDocContentCursors } from "../models/document-utils";
 import { isRequestTimeout } from "../utils";
 import IOHelper from "../wss/io-helper";
+import { MESSAGE } from '../constants';
 
 class DocumentController {
 
@@ -88,7 +89,7 @@ class DocumentController {
     try {
       const documentManager = DocumentManager.getInstance();
       documentManager.removeDoc(docUuid);
-      ioHelper.sendRemoveMessageToRoom(docUuid);
+      ioHelper.sendMessageToAllInRoom(docUuid, MESSAGE.DOC_REMOVED);
       res.status(200).send({'success': true});
       return;
     } catch(err) {
@@ -100,6 +101,52 @@ class DocumentController {
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;
     }
+  }
+
+  async saveDoc(req, res) {
+    const { doc_uuid: docUuid } = req.params;
+    const { username } = req.payload;
+    const documentManager = DocumentManager.getInstance();
+    const saveFlag = await documentManager.saveDoc(docUuid, username, true);
+    if (saveFlag) {
+      res.status(200).send({'success': true});
+      return;
+    }
+    res.status(500).send({'error_msg': 'Doc save failed'});
+    return;
+  }
+
+  async publishDoc(req, res) {
+    const { doc_uuid: docUuid } = req.params;
+    const { origin_doc_uuid: originDocUuid, origin_doc_name: originDocName } = req.body;
+    const documentManager = DocumentManager.getInstance();
+
+    // send message to all: doc has been publish
+    const ioHelper = IOHelper.getInstance();
+    ioHelper.sendMessageToAllInRoom(docUuid, MESSAGE.DOC_PUBLISHED);
+
+    const removeFlag = await documentManager.removeDocFromMemory(docUuid);
+    if (!removeFlag) {
+      logger.error(`Doc ${docUuid} remove from memory failed`);
+    }
+
+    if (!documentManager.isDocInMemory(originDocUuid)) {
+      res.status(200).send({'success': true});
+      return;
+    }
+
+    try {
+
+      // get doc content and add doc into memory
+      const originDocument = await documentManager.reloadDoc(originDocUuid, originDocName);
+      originDocument && ioHelper.sendMessageToAllInRoom(originDocUuid, MESSAGE.DOC_REPLACED);
+      res.status(200).send({'success': true});
+      return;
+    } catch(err) {
+      res.status(500).send({'error_msg': 'Internal Server Error'});
+      return;
+    }
+
   }
 
 }
