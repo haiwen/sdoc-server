@@ -75,6 +75,7 @@ class DocumentManager {
   };
 
   reloadDoc = async (docUuid, docName) => {
+    this.removeDocFromMemory(docUuid);
     const result = await seaServerAPI.getDocContent(docUuid);
     const docContent = result.data ? result.data : generateDefaultDocContent(docName);
     if (!isSdocContentValid(docContent)) {
@@ -153,16 +154,6 @@ class DocumentManager {
   removeDoc = async (docUuid) => {
     const removeFlag = await this.removeDocFromMemory(docUuid);
     return Promise.resolve(removeFlag);
-  };
-
-  replaceDoc = async (docUuid, user, content) => {
-    const document = this.documents.get(docUuid);
-    document.setMeta({ need_save: true, is_saving: false, cursors: {} });
-    document.setValue(content.children, content.version);
-    document.setLastModifyUser({ username: user.username });
-    const operationsManager = OperationsManager.getInstance();
-    operationsManager.clearOperations(docUuid);
-    return Promise.resolve(true);
   };
 
   removeDocFromMemory = async (docUuid) => {

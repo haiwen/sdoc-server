@@ -149,6 +149,30 @@ class DocumentController {
 
   }
 
+  async reloadDoc(req, res) {
+    const { doc_uuid: docUuid } = req.params;
+    const { doc_name: docName } = req.body;
+    const documentManager = DocumentManager.getInstance();
+    const ioHelper = IOHelper.getInstance();
+
+    if (!documentManager.isDocInMemory(docUuid)) {
+      res.status(200).send({'success': true});
+      return;
+    }
+
+    try {
+
+      // get doc content and add doc into memory
+      await documentManager.reloadDoc(docUuid, docName);
+      ioHelper.sendMessageToAllInRoom(docUuid, MESSAGE.DOC_REPLACED);
+      res.status(200).send({'success': true});
+      return;
+    } catch(err) {
+      res.status(500).send({'error_msg': 'Internal Server Error'});
+      return;
+    }
+  }
+
 }
 
 const documentController = new DocumentController();

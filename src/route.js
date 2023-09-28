@@ -12,6 +12,7 @@ router.delete(`${BASE_URL_VERSION1}/:doc_uuid/`, documentController.removeConten
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/normalize-sdoc`, documentController.normalizeSdoc);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/save/`, multipartMiddleware, documentController.saveDoc);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/publish/`, multipartMiddleware, documentController.publishDoc);
+router.post(`${BASE_URL_VERSION1}/:doc_uuid/replace/`, multipartMiddleware, documentController.reloadDoc);
 
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/collaborators`, userController.getCollaborators);
 
