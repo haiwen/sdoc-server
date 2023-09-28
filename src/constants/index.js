@@ -8,8 +8,5 @@ export const OPERATIONS_CACHE_LIMIT = 1000;
 export const MESSAGE = {
   DOC_REPLACED: 'doc-replaced',
   DOC_REMOVED: 'doc-removed',
-  DOC_REMOVED_ERROR: 'doc-removed-error',
   DOC_PUBLISHED: 'doc-published',
-  DOC_PUBLISHED_ERROR: 'doc-published-error',
-
 };
