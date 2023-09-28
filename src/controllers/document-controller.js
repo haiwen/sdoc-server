@@ -138,15 +138,14 @@ class DocumentController {
     try {
 
       // get doc content and add doc into memory
-      const originDocument = await documentManager.reloadDoc(originDocUuid, originDocName);
-      originDocument && ioHelper.sendMessageToAllInRoom(originDocUuid, MESSAGE.DOC_REPLACED);
+      await documentManager.reloadDoc(originDocUuid, originDocName);
+      ioHelper.sendMessageToAllInRoom(originDocUuid, MESSAGE.DOC_REPLACED);
       res.status(200).send({'success': true});
       return;
     } catch(err) {
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;
     }
-
   }
 
   async reloadDoc(req, res) {

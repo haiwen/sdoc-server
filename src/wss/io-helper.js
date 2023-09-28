@@ -23,6 +23,7 @@ class IOHelper {
   sendMessageToRoom = (socket, roomId, params) => {
     socket.to(roomId).emit('update-document', {...params});
   };
+
   sendCursorMessageToRoom = (socket, roomId, params) => {
     socket.to(roomId).emit('update-cursor', {...params});
   };
