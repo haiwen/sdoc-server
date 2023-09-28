@@ -74,6 +74,21 @@ class DocumentManager {
     this.lastSavingInfo.endTime = Date.now();
   };
 
+  reloadDoc = async (docUuid, docName) => {
+    this.removeDocFromMemory(docUuid);
+    const result = await seaServerAPI.getDocContent(docUuid);
+    const docContent = result.data ? result.data : generateDefaultDocContent(docName);
+    if (!isSdocContentValid(docContent)) {
+      const error = new Error('The content of the document does not conform to the sdoc specification');
+      error.error_type = 'content_invalid';
+      throw error;
+    }
+    const doc = new Document(docUuid, docName, docContent);
+
+    this.documents.set(docUuid, doc);
+    return doc.toJson();
+  };
+
   getDoc = async (docUuid, docName) => {
     const document = this.documents.get(docUuid);
     if (document) {
@@ -108,7 +123,7 @@ class DocumentManager {
     }
     const meta = document.getMeta();
     if (meta.is_saving || !meta.need_save) { // is saving or no need save
-      return Promise.resolve(false);
+      return Promise.resolve(true);
     }
   
     document.setMeta({is_saving: true});
@@ -134,6 +149,25 @@ class DocumentManager {
 
     document.setMeta({is_saving: false, need_save: false});
     return Promise.resolve(saveFlag);
+  };
+
+  removeDoc = async (docUuid) => {
+    const removeFlag = await this.removeDocFromMemory(docUuid);
+    return Promise.resolve(removeFlag);
+  };
+
+  removeDocFromMemory = async (docUuid) => {
+    if (this.documents.has(docUuid)) {
+      logger.info('Removed doc ', docUuid, ' from memory');
+      const operationsManager = OperationsManager.getInstance();
+      operationsManager.clearOperations(docUuid);
+      this.documents.delete(docUuid);
+    }
+    return Promise.resolve(true);
+  };
+
+  isDocInMemory = (docUuid) => {
+    return this.documents.has(docUuid);
   };
 
   removeDocs(docUuids) {

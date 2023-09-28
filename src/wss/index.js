@@ -143,7 +143,7 @@ class IOServer {
         await documentManager.saveDoc(docUuid, savedBySocket);
       }
     });
-    
+
   }
 
 }

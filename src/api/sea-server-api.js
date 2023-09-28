@@ -8,19 +8,22 @@ axios.defaults.timeout = 60 * 1000;
 
 class SeaServerAPI {
 
-  generateJwtToken = (docUuid) => {
+  generateJwtToken = (docUuid, username) => {
     // TODO: update file_uuid to doc_uuid
-    const payload = {
+    let payload = {
       exp: Math.floor(Date.now() / 1000) + (5 * 60),
       permission: 'rw',
       file_uuid: docUuid,
     };
+    if (username) {
+      payload.username = username;
+    }
     const token = jwt.sign(payload, SEADOC_PRIVATE_KEY);
     return token;
   };
 
-  getConfig = (docUuid) => {
-    const accessToken = this.generateJwtToken(docUuid);
+  getConfig = (docUuid, username) => {
+    const accessToken = this.generateJwtToken(docUuid, username);
     const config = {
       baseURL: SEAHUB_SERVER,
       headers: { 'Authorization': 'Token ' + accessToken },

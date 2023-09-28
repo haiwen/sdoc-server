@@ -23,7 +23,7 @@ class IOHelper {
   sendMessageToRoom = (socket, roomId, params) => {
     socket.to(roomId).emit('update-document', {...params});
   };
-  
+
   sendCursorMessageToRoom = (socket, roomId, params) => {
     socket.to(roomId).emit('update-cursor', {...params});
   };
@@ -38,6 +38,10 @@ class IOHelper {
   
   sendMessageToPrivate = (sid, params) => {
     this.io.to(sid).emit('message', `${params.name} has join room`);
+  };
+
+  sendMessageToAllInRoom = (roomId, message) => {
+    this.io.to(roomId).emit(message);
   };
 
 }
