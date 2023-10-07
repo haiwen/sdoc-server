@@ -107,7 +107,7 @@ class DocumentController {
     const { file_uuid: docUuid } = req.payload;
     const documentManager = DocumentManager.getInstance();
     const docContent = await documentManager.getDocFromMemory(docUuid);
-    res.status(200).send(docContent ? docContent : '');
+    res.status(200).send(docContent ? JSON.stringify(docContent) : '');
     return;
   }
 
