@@ -103,6 +103,14 @@ class DocumentController {
     }
   }
 
+  async getDocContent(req, res) {
+    const { file_uuid: docUuid } = req.payload;
+    const documentManager = DocumentManager.getInstance();
+    const docContent = await documentManager.getDocFromMemory(docUuid);
+    res.status(200).send(docContent ? docContent : '');
+    return;
+  }
+
   async saveDoc(req, res) {
     const { doc_uuid: docUuid } = req.params;
     const { username } = req.payload;
