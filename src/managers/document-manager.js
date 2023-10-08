@@ -113,11 +113,6 @@ class DocumentManager {
     return doc.toJson();
   };
 
-  getDocFromMemory = async (docUuid) => {
-    const document = this.documents.get(docUuid);
-    return document ? document.toJson() : '';
-  };
-
   saveDoc = async (docUuid, savedBySocket = false) => {
     const document = this.documents.get(docUuid);
     // The save function is an asynchronous function, which does not affect the normal execution of other programs,
