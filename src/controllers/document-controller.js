@@ -12,6 +12,12 @@ class DocumentController {
     try {
       const documentManager = DocumentManager.getInstance();
       const docContent = await documentManager.getDoc(docUuid, docName);
+
+      // There is no username when seahub get the sdoc content
+      if (!username) {
+        res.status(200).send(docContent);
+        return;
+      }
       const newDocContent = resetDocContentCursors(docContent, username);
       res.set('Cache-control', 'no-store');
       res.send(newDocContent);
@@ -98,32 +104,6 @@ class DocumentController {
         logger.error('Request timed out, please try again later');
       }
       logger.error(`Remove ${docUuid} doc in memory error`);
-      res.status(500).send({'error_msg': 'Internal Server Error'});
-      return;
-    }
-  }
-
-  async getDocContent(req, res) {
-    const { file_uuid: docUuid, filename: docName } = req.payload;
-    try {
-      const documentManager = DocumentManager.getInstance();
-      const docContent = await documentManager.getDoc(docUuid, docName);
-      res.status(200).send(JSON.stringify(docContent));
-      return;
-    } catch(err) {
-      logger.error(err.message);
-      if (isRequestTimeout(err)) {
-        logger.error('Request timed out, please try again later');
-      }
-      if (err.error_type === 'content_invalid') {
-        logger.error(err.message);
-        res.status(500).send({
-          'error_type': 'content_invalid',
-          'error_msg': err.message
-        });
-        return;
-      }
-      logger.error(`get ${docName}(${docUuid}) doc content error`);
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;
     }

@@ -13,7 +13,6 @@ router.get(`${BASE_URL_VERSION1}/:doc_uuid/normalize-sdoc`, documentController.n
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/save/`, multipartMiddleware, documentController.saveDoc);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/publish/`, multipartMiddleware, documentController.publishDoc);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/replace/`, multipartMiddleware, documentController.reloadDoc);
-router.get(`${BASE_URL_VERSION1}/:doc_uuid/content/`, documentController.getDocContent);
 
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/collaborators`, userController.getCollaborators);
 
