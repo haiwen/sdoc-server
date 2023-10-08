@@ -104,11 +104,29 @@ class DocumentController {
   }
 
   async getDocContent(req, res) {
-    const { file_uuid: docUuid } = req.payload;
-    const documentManager = DocumentManager.getInstance();
-    const docContent = await documentManager.getDocFromMemory(docUuid);
-    res.status(200).send(docContent ? JSON.stringify(docContent) : '');
-    return;
+    const { file_uuid: docUuid, filename: docName } = req.payload;
+    try {
+      const documentManager = DocumentManager.getInstance();
+      const docContent = await documentManager.getDoc(docUuid, docName);
+      res.status(200).send(JSON.stringify(docContent));
+      return;
+    } catch(err) {
+      logger.error(err.message);
+      if (isRequestTimeout(err)) {
+        logger.error('Request timed out, please try again later');
+      }
+      if (err.error_type === 'content_invalid') {
+        logger.error(err.message);
+        res.status(500).send({
+          'error_type': 'content_invalid',
+          'error_msg': err.message
+        });
+        return;
+      }
+      logger.error(`get ${docName}(${docUuid}) doc content error`);
+      res.status(500).send({'error_msg': 'Internal Server Error'});
+      return;
+    }
   }
 
   async saveDoc(req, res) {
