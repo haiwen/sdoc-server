@@ -12,6 +12,12 @@ class DocumentController {
     try {
       const documentManager = DocumentManager.getInstance();
       const docContent = await documentManager.getDoc(docUuid, docName);
+
+      // There is no username when seahub get the sdoc content
+      if (!username) {
+        res.status(200).send(docContent);
+        return;
+      }
       const newDocContent = resetDocContentCursors(docContent, username);
       res.set('Cache-control', 'no-store');
       res.send(newDocContent);
