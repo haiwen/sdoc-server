@@ -21,6 +21,7 @@ const BLOCKQUOTE_CHILDREN_TYPES = [
   'header4',
   'header5',
   'header6',
+  'paragraph',
 ];
 export const FIRST_LEVEL_ELEMENT_TYPES = [
   'blockquote',
