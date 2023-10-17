@@ -56,9 +56,9 @@ const subtitle = {
     fileLink,
   ]
 };
-const header = { 
-  id: 'header', 
-  type: 'header',
+const header1 = { 
+  id: 'header1', 
+  type: 'header1',
   children: [
     text,
     link,
@@ -183,7 +183,9 @@ export const withInlineElement = [
   image,
   link,
   blockquote,
-  codeBlock
+  codeBlock,
+  header1,
+  checkListItem,
 ];
 
 export const expectChildren1 = [
@@ -193,6 +195,8 @@ export const expectChildren1 = [
   table,
   blockquote,
   codeBlock,
+  header1,
+  checkListItem,
 ];
 
 export const withSecondLevelElement = [
