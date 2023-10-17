@@ -1,6 +1,7 @@
 import { Transforms, Text } from "@seafile/slate";
 import deepCopy from 'deep-copy';
 import logger from "../loggers";
+import { FIRST_LEVEL_ELEMENT_TYPES } from "../models/normalize-element";
 
 export const calculateAffectedBlocks = (operations) => {
   let blocks = [];
@@ -38,7 +39,13 @@ export const calculateAffectedBlocks = (operations) => {
   return [...new Set(blocks)].sort((a, b) => a - b);
 };
 
-export const isNodeChildrenValid = (node) => {
+export const isNodeChildrenValid = (node, isTop = false) => {
+  // The type of the first-level sub-element must exist and must be a top-level element
+  if (isTop) {
+    if (!node.type) return false;
+    if (!FIRST_LEVEL_ELEMENT_TYPES.includes(node.type)) return false;
+  }
+
   if (Text.isText(node)) return true;
 
   if (!node.children) return false;
@@ -105,7 +112,7 @@ export const applyOperations = (document, operations, user) => {
   let isNodeChildrenInvalid = false;
   const newNodeValues = blocks.map(block => {
     const node = editor.children[block];
-    if (node && !isNodeChildrenInvalid && !isNodeChildrenValid(node)) {
+    if (node && !isNodeChildrenInvalid && !isNodeChildrenValid(node, true)) {
       isNodeChildrenInvalid = true;
     }
     return {
