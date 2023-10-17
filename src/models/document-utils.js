@@ -1,12 +1,16 @@
 import { v4 } from "uuid";
-
-const isHasProperty = (obj, prop) => {
-  if (!obj) return false;
-  return Object.prototype.hasOwnProperty.call(obj, prop);
-};
+import { FIRST_LEVEL_ELEMENT_TYPES, normalizeElement } from "./normalize-element";
 
 const generateDefaultText = (text = '') => {
   return { id: v4(), text };
+};
+
+export const generateDefaultParagraph = () => {
+  return {
+    id: v4(),
+    type: 'paragraph',
+    children: [generateDefaultText()]
+  };
 };
 
 export const generateDefaultDocContent = (docName) => {
@@ -49,18 +53,13 @@ export function resetDocContentCursors(docContent, username) {
 }
 
 export const normalizeChildren = (children) => {
-  // text
-  if (!Array.isArray(children)) return children;
+  if (!children || !Array.isArray(children) || children.length === 0) return [generateDefaultDocContent()];
 
-  // element 
-  if (Array.isArray(children) && children.length === 0) return [generateDefaultText()];
-  return children.map(child => {
-    // child is text
-    if (isHasProperty(child, 'text') && !isHasProperty(child, 'children')) {
-      return child;
-    }
-    // child is element
-    child.children = normalizeChildren(child.children);
-    return child;
+  // The type of the first-level sub-element must exist. If it does not exist, delete it.
+  const newChildren = children.filter(item => {
+    return item.type && FIRST_LEVEL_ELEMENT_TYPES.includes(item.type);
   });
+  if (newChildren.length === 0) return [generateDefaultParagraph()];
+
+  return newChildren.map(child => normalizeElement(child));
 };
