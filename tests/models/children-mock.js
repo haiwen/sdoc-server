@@ -1,14 +1,14 @@
-const text = { 
+export const text = { 
   id: 'text', 
   text: '' 
 };
-const link = {
+export const link = {
   id: 'link',
   type: 'link',
   title: 'seafile',
   children: [text],
 };
-const sdocLink = {
+export const sdocLink = {
   id: 'sdoc_link',
   type: 'sdoc_link',
   "doc_uuid": "c24cee20-88c2-4dba-beb9-4032c5e2c3e1",
@@ -16,14 +16,14 @@ const sdocLink = {
   "display_type": "text_link",
   "children": [text]
 };
-const fileLink = {
+export const fileLink = {
   id: 'file_link',
   type: 'file_link',
   "title": "aaa.sdoc",
   "display_type": "text_link",
   "children": [text]
 };
-const image = {
+export const image = {
   "id": "EtrJP32cQaqDMkRObR54OQ",
   "type": "image",
   "children": [{
@@ -36,7 +36,7 @@ const image = {
   }
 };
 
-const title = { 
+export const title = { 
   id: 'title', 
   type: 'title',
   children: [
@@ -46,7 +46,7 @@ const title = {
     fileLink,
   ]
 };
-const subtitle = { 
+export const subtitle = { 
   id: 'subtitle', 
   type: 'subtitle',
   children: [
@@ -56,7 +56,7 @@ const subtitle = {
     fileLink,
   ]
 };
-const header1 = { 
+export const header1 = { 
   id: 'header1', 
   type: 'header1',
   children: [
@@ -66,7 +66,7 @@ const header1 = {
     fileLink,
   ]
 };
-const listLic = { 
+export const listLic = { 
   id: 'list_lic', 
   type: 'list_lic',
   children: [
@@ -76,14 +76,34 @@ const listLic = {
     image
   ]
 };
-const listItem = { 
+
+export const emptyListLic = { 
+  id: 'list_lic', 
+  type: 'list_lic',
+  children: [
+    {
+      id: 'text',
+      text: '',
+    }
+  ]
+};
+export const listItem = { 
   id: 'list_item', 
   type: 'list_item',
   children: [
     listLic
   ]
 };
-const list = { 
+
+export const emptyListItem = { 
+  id: 'list_item', 
+  type: 'list_item',
+  children: [
+    emptyListLic
+  ]
+};
+
+export const list = { 
   id: 'unordered_list', 
   type: 'unordered_list',
   children: [
@@ -92,7 +112,7 @@ const list = {
     listItem,
   ]
 };
-const checkListItem = { 
+export const checkListItem = { 
   id: 'check_list_item', 
   type: 'check_list_item',
   children: [
@@ -101,7 +121,7 @@ const checkListItem = {
     fileLink,
   ]
 };
-const codeLine = { 
+export const codeLine = { 
   id: 'code_line', 
   type: 'code_line',
   children: [
@@ -111,7 +131,15 @@ const codeLine = {
   ]
 };
 
-const codeBlock = { 
+export const emptyCodeLine = {
+  id: 'code_line', 
+  type: 'code_line',
+  children: [
+    text,
+  ]
+};
+
+export const codeBlock = { 
   id: 'code_block', 
   type: 'code_block',
   children: [
@@ -120,7 +148,7 @@ const codeBlock = {
   ]
 };
 
-const tableCell = {
+export const tableCell = {
   "id": "table_cell",
   "type": "table_cell",
   "children": [{
@@ -129,7 +157,16 @@ const tableCell = {
   }]
 };
 
-const tableRow = {
+export const emptyTableCell = {
+  "id": "table_cell",
+  "type": "table_cell",
+  "children": [{
+      "text": "",
+      "id": "DKNygilkQU-kOGROH__2Aw"
+  }]
+};
+
+export const tableRow = {
   id: 'table_row',
   type: 'table_row',
   children: [
@@ -139,7 +176,15 @@ const tableRow = {
   ]
 };
 
-const table = {
+export const emptyTableRow = {
+  id: 'table_row',
+  type: 'table_row',
+  children: [
+    emptyTableCell
+  ]
+};
+
+export const table = {
   id: 'table',
   type: 'table',
   children: [
@@ -149,7 +194,7 @@ const table = {
   ]
 };
 
-const blockquote = {
+export const blockquote = {
   id: 'blockquote',
   type: 'blockquote',
   children: [
@@ -159,7 +204,7 @@ const blockquote = {
   ]
 };
 
-const paragraph = {
+export const paragraph = {
   id: 'paragraph',
   type: 'paragraph',
   children: [

@@ -81,7 +81,7 @@ const formatElementChildrenWithTypes = (children, types) => {
     if (types && types.length !== 0 && types.includes(item.type)) return true;
     return false;
   });
-  return children.length === 0 ? defaultChildren : newChildren;
+  return newChildren.length === 0 ? defaultChildren : newChildren;
 };
 
 export const normalizeElement = (element) => {
