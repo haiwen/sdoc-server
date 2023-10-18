@@ -39,7 +39,7 @@ export const calculateAffectedBlocks = (operations) => {
   return [...new Set(blocks)].sort((a, b) => a - b);
 };
 
-export const isNodeChildrenValid = (node, isTop = false) => {
+export const isNodeValid = (node, isTop = false) => {
   // The type of the first-level sub-element must exist and must be a top-level element
   if (isTop) {
     if (!node.type) return false;
@@ -52,7 +52,7 @@ export const isNodeChildrenValid = (node, isTop = false) => {
   if (!Array.isArray(node.children)) return false;
   if (node.children.length === 0) return false; // node.children is empty array
 
-  const isValid = node.children.every(child => isNodeChildrenValid(child));
+  const isValid = node.children.every(child => isNodeValid(child));
   return isValid;
 };
 
@@ -109,11 +109,11 @@ export const applyOperations = (document, operations, user) => {
   }
 
   // Calculate whether the relevant block after executing the operations
-  let isNodeChildrenInvalid = false;
+  let isAffectedBlocksInvalid = false;
   const newNodeValues = blocks.map(block => {
     const node = editor.children[block];
-    if (node && !isNodeChildrenInvalid && !isNodeChildrenValid(node, true)) {
-      isNodeChildrenInvalid = true;
+    if (node && !isAffectedBlocksInvalid && !isNodeValid(node, true)) {
+      isAffectedBlocksInvalid = true;
     }
     return {
       path: [block],
@@ -121,7 +121,7 @@ export const applyOperations = (document, operations, user) => {
     };
   });
 
-  if (isNodeChildrenInvalid) {
+  if (isAffectedBlocksInvalid) {
     logger.error('Old node message: ', JSON.stringify(oldNodeValues));
     logger.error('Executed operations: ', JSON.stringify(operations));
     logger.error('New node message: ', JSON.stringify(newNodeValues));
