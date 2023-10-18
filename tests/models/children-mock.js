@@ -76,6 +76,17 @@ export const listLic = {
     image
   ]
 };
+
+export const emptyListLic = { 
+  id: 'list_lic', 
+  type: 'list_lic',
+  children: [
+    {
+      id: 'text',
+      text: '',
+    }
+  ]
+};
 export const listItem = { 
   id: 'list_item', 
   type: 'list_item',
@@ -83,6 +94,15 @@ export const listItem = {
     listLic
   ]
 };
+
+export const emptyListItem = { 
+  id: 'list_item', 
+  type: 'list_item',
+  children: [
+    emptyListLic
+  ]
+};
+
 export const list = { 
   id: 'unordered_list', 
   type: 'unordered_list',
@@ -111,6 +131,14 @@ export const codeLine = {
   ]
 };
 
+export const emptyCodeLine = {
+  id: 'code_line', 
+  type: 'code_line',
+  children: [
+    text,
+  ]
+};
+
 export const codeBlock = { 
   id: 'code_block', 
   type: 'code_block',
@@ -129,6 +157,15 @@ export const tableCell = {
   }]
 };
 
+export const emptyTableCell = {
+  "id": "table_cell",
+  "type": "table_cell",
+  "children": [{
+      "text": "",
+      "id": "DKNygilkQU-kOGROH__2Aw"
+  }]
+};
+
 export const tableRow = {
   id: 'table_row',
   type: 'table_row',
@@ -136,6 +173,14 @@ export const tableRow = {
     tableCell,
     tableCell,
     tableCell,
+  ]
+};
+
+export const emptyTableRow = {
+  id: 'table_row',
+  type: 'table_row',
+  children: [
+    emptyTableCell
   ]
 };
 
