@@ -10,6 +10,8 @@ import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
+import UsersManager from './users-manager';
+import { SAVE_STATUS } from '../constants';
 
 class DocumentManager {
 
@@ -135,8 +137,11 @@ class DocumentManager {
     let saveFlag = false;
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
+    const usersManager = UsersManager.getInstance();
+    const users = usersManager.getDocUsers(docUuid);
+    const status = users.length > 0 ? SAVE_STATUS.HAS_ACCESS : SAVE_STATUS.NO_ACCESS;
     try {
-      await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
+      await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user, status);
       saveFlag = true;
       logger.info(`${savedBySocket ? 'Socket: ' : ''}${docUuid} saved`);
     } catch(err) {

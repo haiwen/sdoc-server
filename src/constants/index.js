@@ -10,3 +10,10 @@ export const MESSAGE = {
   DOC_REMOVED: 'doc-removed',
   DOC_PUBLISHED: 'doc-published',
 };
+
+export const SAVE_STATUS = {
+  NO_ACCESS: 0,
+  NO_UPDATE: 1,
+  HAS_UPDATE: 2,
+  HAS_ACCESS: 4,
+};
