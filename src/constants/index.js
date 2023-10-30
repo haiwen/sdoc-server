@@ -12,8 +12,8 @@ export const MESSAGE = {
 };
 
 export const SAVE_STATUS = {
-  NO_ACCESS: 0,
-  NO_UPDATE: 1,
-  HAS_UPDATE: 2,
-  HAS_ACCESS: 4,
+  BEING_EDITED: 1,
+  READY_SAVING: 2,
+  CLOSED_STATE: 4,
+  SAVED_EDITED: 6,
 };

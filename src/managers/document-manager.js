@@ -130,9 +130,14 @@ class DocumentManager {
     
     const usersManager = UsersManager.getInstance();
     const users = usersManager.getDocUsers(docUuid);
-    const status = users.length > 0 ? SAVE_STATUS.HAS_ACCESS : SAVE_STATUS.NO_ACCESS;
+    let status = SAVE_STATUS.CLOSED_STATE;
+    if (users.length > 0) {
+      status = !meta.need_save ? SAVE_STATUS.BEING_EDITED : SAVE_STATUS.SAVED_EDITED;
+    } else {
+      status = !meta.need_save ? SAVE_STATUS.CLOSED_STATE : SAVE_STATUS.READY_SAVING;
+    }
     // The documentation has not been modified and is currently being accessed
-    if (!meta.need_save && status !== SAVE_STATUS.NO_ACCESS) {
+    if (status === SAVE_STATUS.BEING_EDITED) {
       return Promise.resolve(true);
     }
   
