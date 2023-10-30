@@ -124,7 +124,14 @@ class DocumentManager {
       return Promise.resolve(false);
     }
     const meta = document.getMeta();
-    if (meta.is_saving || !meta.need_save) { // is saving or no need save
+    if (meta.is_saving || !meta.need_save) { // is saving
+      return Promise.resolve(true);
+    }
+    
+    const usersManager = UsersManager.getInstance();
+    const users = usersManager.getDocUsers(docUuid);
+    const status = users.length > 0 ? SAVE_STATUS.HAS_ACCESS : SAVE_STATUS.NO_ACCESS;
+    if (!meta.need_save && status !== SAVE_STATUS.NO_ACCESS) {  // not need save and 
       return Promise.resolve(true);
     }
   
@@ -137,9 +144,7 @@ class DocumentManager {
     let saveFlag = false;
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
-    const usersManager = UsersManager.getInstance();
-    const users = usersManager.getDocUsers(docUuid);
-    const status = users.length > 0 ? SAVE_STATUS.HAS_ACCESS : SAVE_STATUS.NO_ACCESS;
+
     try {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user, status);
       saveFlag = true;
