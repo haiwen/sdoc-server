@@ -124,7 +124,7 @@ class DocumentManager {
       return Promise.resolve(false);
     }
     const meta = document.getMeta();
-    if (meta.is_saving || !meta.need_save) { // is saving
+    if (meta.is_saving) { // is saving
       return Promise.resolve(true);
     }
     
@@ -139,7 +139,7 @@ class DocumentManager {
     document.setMeta({is_saving: true});
 
     // Get save info
-    const { version, format_version, children, docName, last_modify_user } = document;
+    const { version, format_version, children, docName, last_modify_user = '' } = document;
     const docContent = { version, format_version, children, last_modify_user };
 
     let saveFlag = false;
