@@ -131,7 +131,8 @@ class DocumentManager {
     const usersManager = UsersManager.getInstance();
     const users = usersManager.getDocUsers(docUuid);
     const status = users.length > 0 ? SAVE_STATUS.HAS_ACCESS : SAVE_STATUS.NO_ACCESS;
-    if (!meta.need_save && status !== SAVE_STATUS.NO_ACCESS) {  // not need save and 
+    // The documentation has not been modified and is currently being accessed
+    if (!meta.need_save && status !== SAVE_STATUS.NO_ACCESS) {
       return Promise.resolve(true);
     }
   
