@@ -120,7 +120,7 @@ class SeaServerAPI {
   };
 
   editorStatusCallback = (docUuid, status) => {
-    const url = '/api/v2.1/seadoc/' + docUuid + '/editor-status-callback/';
+    const url = '/api/v2.1/seadoc/editor-status-callback/' + docUuid + '/';
 
     const formData = new FormData();
     formData.append("status", status);
