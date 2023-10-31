@@ -11,7 +11,6 @@ import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
 import UsersManager from './users-manager';
-import { SAVE_STATUS } from '../constants';
 
 class DocumentManager {
 
@@ -130,20 +129,15 @@ class DocumentManager {
     
     const usersManager = UsersManager.getInstance();
     const users = usersManager.getDocUsers(docUuid);
-    let status = SAVE_STATUS.CLOSED_STATE;
-    if (users.length > 0) {
-      status = !meta.need_save ? SAVE_STATUS.BEING_EDITED : SAVE_STATUS.SAVED_EDITED;
-    } else {
-      status = !meta.need_save ? SAVE_STATUS.CLOSED_STATE : SAVE_STATUS.READY_SAVING;
-    }
+
     // The documentation has not been modified and is currently being accessed
-    if (status === SAVE_STATUS.BEING_EDITED) {
+    if (!meta.need_save && users.length > 0) {
       return Promise.resolve(true);
     }
     
-    if (status === SAVE_STATUS.CLOSED_STATE) {
-      const currentStatus = 'no_write';
-      await seaServerAPI.editorStatusCallback(docUuid, currentStatus);
+    if (!meta.need_save && users.length === 0) {
+      const status = 'no_write';
+      await seaServerAPI.editorStatusCallback(docUuid, status);
       return Promise.resolve(true);
     }
   
@@ -156,12 +150,11 @@ class DocumentManager {
     let saveFlag = false;
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
-
     try {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
-      if (status === SAVE_STATUS.READY_SAVING) {
-        const currentStatus = 'no_write';
-        await seaServerAPI.editorStatusCallback(docUuid, currentStatus);
+      if (users.length === 0) {
+        const status = 'no_write';
+        await seaServerAPI.editorStatusCallback(docUuid, status);
       }
       saveFlag = true;
       logger.info(`${savedBySocket ? 'Socket: ' : ''}${docUuid} saved`);

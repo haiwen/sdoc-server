@@ -10,10 +10,3 @@ export const MESSAGE = {
   DOC_REMOVED: 'doc-removed',
   DOC_PUBLISHED: 'doc-published',
 };
-
-export const SAVE_STATUS = {
-  BEING_EDITED: 1,
-  READY_SAVING: 2,
-  CLOSED_STATE: 4,
-  SAVED_EDITED: 6,
-};
