@@ -50,13 +50,12 @@ class SeaServerAPI {
     });
   };
     
-  saveDocContent = (docUuid, docData, lastModifyUser, status) => {   
+  saveDocContent = (docUuid, docData, lastModifyUser) => {   
     const uploadLink = '/api/v2.1/seadoc/upload-file/' + docUuid + '/';
 
     const formData = new FormData();
     formData.append("file", fs.createReadStream(docData.path));
     formData.append("last_modify_user", lastModifyUser);
-    formData.append("status", status);
     
     const config = this.getConfig(docUuid);
     return axios.post(uploadLink, formData, config);
@@ -118,6 +117,17 @@ class SeaServerAPI {
     const data = reply;
     const config = this.getConfig(docUuid);
     return axios.put(uploadLink, data, config);
+  };
+
+  editorStatusCallback = (docUuid, status) => {
+    const url = '/api/v2.1/seadoc/editor-status-callback/';
+    
+    const data = {
+      doc_uuid: docUuid,
+      status: status,
+    };
+    const config = this.getConfig(docUuid);
+    return axios.delete(url, data, config);
   };
 
 }

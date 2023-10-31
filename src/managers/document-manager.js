@@ -140,6 +140,12 @@ class DocumentManager {
     if (status === SAVE_STATUS.BEING_EDITED) {
       return Promise.resolve(true);
     }
+    
+    if (status === SAVE_STATUS.CLOSED_STATE) {
+      const currentStatus = 'no_write';
+      await seaServerAPI.editorStatusCallback(docUuid, currentStatus);
+      return Promise.resolve(true);
+    }
   
     document.setMeta({is_saving: true});
 
@@ -152,7 +158,11 @@ class DocumentManager {
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
 
     try {
-      await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user, status);
+      await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
+      if (status === SAVE_STATUS.READY_SAVING) {
+        const currentStatus = 'no_write';
+        await seaServerAPI.editorStatusCallback(docUuid, currentStatus);
+      }
       saveFlag = true;
       logger.info(`${savedBySocket ? 'Socket: ' : ''}${docUuid} saved`);
     } catch(err) {
