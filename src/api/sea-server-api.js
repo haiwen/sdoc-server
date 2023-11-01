@@ -119,6 +119,16 @@ class SeaServerAPI {
     return axios.put(uploadLink, data, config);
   };
 
+  editorStatusCallback = (docUuid, status) => {
+    const url = '/api/v2.1/seadoc/editor-status-callback/' + docUuid + '/';
+
+    const formData = new FormData();
+    formData.append("status", status);
+    
+    const config = this.getConfig(docUuid);
+    return axios.post(url, formData, config);
+  };
+
 }
 
 const seaServerAPI = new SeaServerAPI;

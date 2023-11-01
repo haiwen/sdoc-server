@@ -10,6 +10,7 @@ import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
+import UsersManager from './users-manager';
 
 class DocumentManager {
 
@@ -122,14 +123,28 @@ class DocumentManager {
       return Promise.resolve(false);
     }
     const meta = document.getMeta();
-    if (meta.is_saving || !meta.need_save) { // is saving or no need save
+    if (meta.is_saving) { // is saving
+      return Promise.resolve(true);
+    }
+    
+    const usersManager = UsersManager.getInstance();
+    const users = usersManager.getDocUsers(docUuid);
+
+    // The documentation has not been modified and is currently being accessed
+    if (!meta.need_save && users.length > 0) {
+      return Promise.resolve(true);
+    }
+    
+    if (!meta.need_save && users.length === 0) {
+      const status = 'no_write';
+      seaServerAPI.editorStatusCallback(docUuid, status);
       return Promise.resolve(true);
     }
   
     document.setMeta({is_saving: true});
 
     // Get save info
-    const { version, format_version, children, docName, last_modify_user } = document;
+    const { version, format_version, children, docName, last_modify_user = '' } = document;
     const docContent = { version, format_version, children, last_modify_user };
 
     let saveFlag = false;
@@ -137,6 +152,10 @@ class DocumentManager {
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
+      if (users.length === 0) {
+        const status = 'no_write';
+        seaServerAPI.editorStatusCallback(docUuid, status);
+      }
       saveFlag = true;
       logger.info(`${savedBySocket ? 'Socket: ' : ''}${docUuid} saved`);
     } catch(err) {
