@@ -137,7 +137,7 @@ class DocumentManager {
     
     if (!meta.need_save && users.length === 0) {
       const status = 'no_write';
-      await seaServerAPI.editorStatusCallback(docUuid, status);
+      seaServerAPI.editorStatusCallback(docUuid, status);
       return Promise.resolve(true);
     }
   
@@ -154,7 +154,7 @@ class DocumentManager {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
       if (users.length === 0) {
         const status = 'no_write';
-        await seaServerAPI.editorStatusCallback(docUuid, status);
+        seaServerAPI.editorStatusCallback(docUuid, status);
       }
       saveFlag = true;
       logger.info(`${savedBySocket ? 'Socket: ' : ''}${docUuid} saved`);
