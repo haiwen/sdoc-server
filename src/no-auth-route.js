@@ -3,7 +3,8 @@ import express from 'express';
 const noAuthRouter = express.Router();
 
 noAuthRouter.get('/', (req, res) => {
-    res.send('Welcome to sdoc-server. Please create a new sdoc file in seafile and hope you enjoy using it.');
+    const version = process.env.server_version || 'dev'; 
+    res.send(`Welcome to sdoc-server. The current version is ${version}`);
 });
 
 noAuthRouter.get('/ping', (req, res) => {
