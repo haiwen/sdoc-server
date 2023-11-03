@@ -1,10 +1,11 @@
 import { OPERATIONS_CACHE_LIMIT } from '../constants';
-import { listPendingOperationsByDoc, recordOperations } from '../dao/operation-log';
+import { listPendingOperationsByDoc, recordOperations, queryOperationCount } from '../dao/operation-log';
 
 class OperationsManager {
 
   constructor() {
     this.instance = null;
+    this.operationCountSinceUp = 0;
     this.operationListMap = new Map();
   }
 
@@ -19,6 +20,7 @@ class OperationsManager {
   addOperations = async (docUuid, operations, version, user) => {
     // Save current operations into database
     await recordOperations(docUuid, operations, version, user);
+    this.operationCountSinceUp++;
 
     // Record current operations into memory
     let operationList = this.operationListMap.get(docUuid) || [];
@@ -55,6 +57,11 @@ class OperationsManager {
 
   clearOperations = (docUuid) => {
     this.operationListMap.delete(docUuid);
+  };
+
+  getOperationCount = async (interval) => {
+    let count = await queryOperationCount(interval);
+    return count[0].count;
   };
 
 }

@@ -12,3 +12,9 @@ export const listPendingOperationsByDoc = (docUuid, version) => {
     doc_uuid='${docUuid}' AND op_id>${version} ORDER BY op_id`;
   return DBHelper(sql);
 };
+
+export const queryOperationCount = (interval) => {
+  const lastTimeStamp = interval !== -1 ? Date.now() - interval : -1;
+  const sql = `SELECT count(1) AS count FROM operation_log WHERE op_time>=${lastTimeStamp}`;
+  return DBHelper(sql);
+};
