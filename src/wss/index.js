@@ -65,8 +65,7 @@ class IOServer {
       const documentManager = DocumentManager.getInstance();
       user && documentManager.deleteCursor(docUuid, user);
       if (usersCount === 0) {
-        const savedBySocket = true;
-        await documentManager.saveDoc(docUuid, savedBySocket);
+        await documentManager.saveDocBySocket(docUuid);
       }
     });
     
@@ -139,8 +138,7 @@ class IOServer {
       const documentManager = DocumentManager.getInstance();
       user && documentManager.deleteCursor(docUuid, user);
       if (usersCount === 0) {
-        const savedBySocket = true;
-        await documentManager.saveDoc(docUuid, savedBySocket);
+        await documentManager.saveDocBySocket(docUuid);
       }
     });
 
