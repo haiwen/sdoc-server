@@ -142,7 +142,7 @@ class DocumentManager {
       seaServerAPI.editorStatusCallback(docUuid, status)
         .then(() => {})
         .catch(err => {
-          logger.error(`${docName}(${docUuid}) unlocked failed`);
+          logger.error(`${document.docName}(${docUuid}) unlocked failed`);
           if (err && err.response) {
             const { data } = err.response;
             logger.error(`${JSON.stringify(data)}`);
