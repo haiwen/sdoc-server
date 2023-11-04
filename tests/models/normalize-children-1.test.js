@@ -7,7 +7,7 @@ import {
   expectChildren2,
   withEmptyChildElement, 
   expectChildren3, 
-} from "./children-mock";
+} from "./children-mock-1";
 
 describe('normalize children content', () => {
 
