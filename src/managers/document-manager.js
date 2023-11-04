@@ -158,31 +158,39 @@ class DocumentManager {
     } catch(err) {
       saveFlag = false;
       logger.error(`${savedBySocket ? 'Socket:' : ''}${docName}(${docUuid}) save failed`);
-      logger.error(err);
+      if (err && err.response) {
+        const { status, data } = err.response;
+        logger.error(`error_stats: ${status}; ${JSON.stringify(data)}`);
+        if (status === 404) {
+          // sdoc may have been deleted by the user. Remove the file from the sdoc-server memory.
+          await this.removeDoc(docUuid);
+        }
+      }
     } finally {
       deleteDir(tempPath);
     }
 
     if (users.length === 0) {
-      this.sendMessageToSeahubWithNoUserAccess(docUuid, docName);
+      await this.sendMessageToSeahubWithNoUserAccess(docUuid, docName);
     }
 
     document.setMeta({is_saving: false, need_save: false});
     return Promise.resolve(saveFlag);
   };
 
-  sendMessageToSeahubWithNoUserAccess = (docUuid, docName) => {
+  sendMessageToSeahubWithNoUserAccess = async (docUuid, docName) => {
+    await this.removeDoc(docUuid);
     const status = 'no_write';
-    seaServerAPI.editorStatusCallback(docUuid, status)
-      .then(() => {})
-      .catch(err => {
+    seaServerAPI.editorStatusCallback(docUuid, status).then(
+      () => {}, 
+      (err) => {
         logger.error(`${docName}(${docUuid}) unlocked failed`);
         if (err && err.response) {
           const { data } = err.response;
           logger.error(`${JSON.stringify(data)}`);
         }
-      });
-    this.removeDoc(docUuid);
+      }
+    );
   };
 
   removeDoc = async (docUuid) => {
