@@ -187,7 +187,7 @@ class DocumentManager {
         logger.error(`${docName}(${docUuid}) unlocked failed`);
         if (err && err.response) {
           const { data } = err.response;
-          logger.error(`${JSON.stringify(data)}`);
+          logger.error(`error_stats: ${status}; ${JSON.stringify(data)}`);
         }
       }
     );
