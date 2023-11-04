@@ -108,6 +108,7 @@ class DocumentManager {
     // apply pending operations
     const results = await listPendingOperationsByDoc(docUuid, doc.version);
     if (results.length) {
+      logger.info(`doc ${docName}(${docUuid}) re-execute ${results.length} pending operations`);
       this.applyPendingOperations(doc, results);
     }
 
