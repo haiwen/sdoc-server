@@ -148,8 +148,8 @@ class DocumentManager {
       saveFlag = await this.saveDocumentContent(docUuid, true);
     }
 
-    const status = 'no_write';
     try {
+      const status = 'no_write';
       await seaServerAPI.editorStatusCallback(docUuid, status);
       logger.info(`${document.docName}(${docUuid}) unlocked success`);
     } catch(error) {
@@ -166,31 +166,30 @@ class DocumentManager {
     return Promise.resolve(saveFlag);
   };
 
-  saveDocument = async (docUuid, saveBySocket = false) => {
-    let saveFlag = false;
-
+  saveDocument = async (docUuid, savedBySocket = false) => {
     const document = this.documents.get(docUuid);
     document.setMeta({is_saving: true});
-  
+    
     // Get save info
     const { version, format_version, children, docName, last_modify_user = '' } = document;
     const docContent = { version, format_version, children, last_modify_user };
-
+    
+    let saveFlag = false;
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
       saveFlag = true;
-      logger.info(`${saveBySocket ? 'Socket: ': ''}${docName}(${docUuid}) saved`);
+      logger.info(`${savedBySocket ? 'Socket: ': ''}${docName}(${docUuid}) saved`);
     } catch(err) {
       saveFlag = false;
       const message = getErrorMessage(err);
       if (message.status && message.status === 404) {
-        logger.info(`${saveBySocket ? 'Socket: ': ''}${docName}(${docUuid}) failed`);
+        logger.info(`${savedBySocket ? 'Socket: ': ''}${docName}(${docUuid}) failed`);
         logger.info(JSON.stringify(message));
         await this.removeDoc(docUuid);
       } else {
-        logger.error(`${saveBySocket ? 'Socket: ': ''}${docName}(${docUuid}) failed`);
+        logger.error(`${savedBySocket ? 'Socket: ': ''}${docName}(${docUuid}) failed`);
         logger.error(JSON.stringify(message));
       }
     } finally {
