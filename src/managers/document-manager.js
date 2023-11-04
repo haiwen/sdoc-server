@@ -101,13 +101,14 @@ class DocumentManager {
       const error = new Error('The content of the document does not conform to the sdoc specification');
       error.error_type = 'content_invalid';
       throw error;
-      
+
     }
     const doc = new Document(docUuid, docName, docContent);
 
     // apply pending operations
     const results = await listPendingOperationsByDoc(docUuid, doc.version);
     if (results.length) {
+      logger.info(`doc ${docName}(${docUuid}) re-execute ${results.length} pending operations`);
       this.applyPendingOperations(doc, results);
     }
 
@@ -125,7 +126,7 @@ class DocumentManager {
     }
     const meta = document.getMeta();
     if (meta.is_saving) { // is saving
-      return Promise.resolve(true);
+      return Promise.resolve(false);
     }
     
     const usersManager = UsersManager.getInstance();
@@ -133,7 +134,7 @@ class DocumentManager {
 
     // The documentation has not been modified and is currently being accessed
     if (!meta.need_save && users.length > 0) {
-      return Promise.resolve(true);
+      return Promise.resolve(false);
     }
     
     if (!meta.need_save && users.length === 0) {
@@ -147,7 +148,7 @@ class DocumentManager {
             logger.error(`${JSON.stringify(data)}`);
           }
         });
-      return Promise.resolve(true);
+      return Promise.resolve(false);
     }
   
     document.setMeta({is_saving: true});
