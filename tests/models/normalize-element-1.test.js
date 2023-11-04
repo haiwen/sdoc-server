@@ -158,12 +158,12 @@ describe('normalize element: format empty element to normal element', () => {
               id: 'list_lic',
               type: 'list_lic',
               children: [
-                {
-                  id: 'unordered_list',
-                  type: 'unordered_list',
-                  children: [],
-                }
               ]
+            },
+            {
+              id: 'unordered_list',
+              type: 'unordered_list',
+              children: [],
             }
           ]
         }
@@ -181,21 +181,22 @@ describe('normalize element: format empty element to normal element', () => {
               id: 'list_lic',
               type: 'list_lic',
               children: [
+                {id: 'text', text: ''}
+              ]
+            },
+            {
+              id: 'unordered_list',
+              type: 'unordered_list',
+              children: [
                 {
-                  id: 'unordered_list',
-                  type: 'unordered_list',
+                  id: 'list_item',
+                  type: 'list_item',
                   children: [
                     {
-                      id: 'list_item',
-                      type: 'list_item',
+                      id: 'list_lic',
+                      type: 'list_lic',
                       children: [
-                        {
-                          id: 'list_lic',
-                          type: 'list_lic',
-                          children: [
-                            {id: 'text', text: ''}
-                          ]
-                        }
+                        {id: 'text', text: ''}
                       ]
                     }
                   ]

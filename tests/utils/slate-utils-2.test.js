@@ -1,4 +1,4 @@
-import { isNodeChildrenValid } from '../../src/utils/slate-utils';
+import { isNodeValid } from '../../src/utils/slate-utils';
 
 describe('test is node children valid function', () => {
   it('valid no children node, node is text', () => {
@@ -8,8 +8,8 @@ describe('test is node children valid function', () => {
     const node2 = {
     };
 
-    const exp1 = isNodeChildrenValid(node1);
-    const exp2 = isNodeChildrenValid(node2);
+    const exp1 = isNodeValid(node1);
+    const exp2 = isNodeValid(node2);
 
     expect(exp1).toBe(true);
     expect(exp2).toBe(false);
@@ -31,8 +31,8 @@ describe('test is node children valid function', () => {
       ]
     };
 
-    const exp1 = isNodeChildrenValid(node1);
-    const exp2 = isNodeChildrenValid(node2);
+    const exp1 = isNodeValid(node1);
+    const exp2 = isNodeValid(node2);
 
     expect(exp1).toBe(true);
     expect(exp2).toBe(false);
@@ -72,8 +72,8 @@ describe('test is node children valid function', () => {
       ]
     };
 
-    const exp1 = isNodeChildrenValid(node1);
-    const exp2 = isNodeChildrenValid(node2);
+    const exp1 = isNodeValid(node1);
+    const exp2 = isNodeValid(node2);
 
     expect(exp1).toBe(true);
     expect(exp2).toBe(false);
@@ -155,8 +155,8 @@ describe('test is node children valid function', () => {
       ]
     };
 
-    const exp1 = isNodeChildrenValid(node1);
-    const exp2 = isNodeChildrenValid(node2);
+    const exp1 = isNodeValid(node1);
+    const exp2 = isNodeValid(node2);
 
     expect(exp1).toBe(true);
     expect(exp2).toBe(false);

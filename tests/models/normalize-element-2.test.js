@@ -1,6 +1,6 @@
 import { normalizeElement } from "../../src/models/normalize-element";
 import { formatChildren } from "../core";
-import { blockquote, checkListItem, codeBlock, emptyCodeLine, emptyListItem, emptyTableRow, fileLink, header1, image, link, list, paragraph, sdocLink, table, text, title } from "./children-mock";
+import { blockquote, checkListItem, codeBlock, emptyCodeLine, emptyListItem, emptyTableRow, fileLink, header1, image, link, list, paragraph, sdocLink, table, text, title } from "./children-mock-1";
 
 describe('normalize element: paragraph', () => {
   it('paragraph', () => {
