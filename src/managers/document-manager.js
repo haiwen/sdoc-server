@@ -138,16 +138,7 @@ class DocumentManager {
     }
     
     if (!meta.need_save && users.length === 0) {
-      const status = 'no_write';
-      seaServerAPI.editorStatusCallback(docUuid, status)
-        .then(() => {})
-        .catch(err => {
-          logger.error(`${document.docName}(${docUuid}) unlocked failed`);
-          if (err && err.response) {
-            const { data } = err.response;
-            logger.error(`${JSON.stringify(data)}`);
-          }
-        });
+      this.sendMessageToSeahubWithNoUserAccess(docUuid, document.docName);
       return Promise.resolve(false);
     }
   
@@ -173,20 +164,25 @@ class DocumentManager {
     }
 
     if (users.length === 0) {
-      const status = 'no_write';
-      seaServerAPI.editorStatusCallback(docUuid, status)
-        .then(() => {})
-        .catch(err => {
-          logger.error(`${docName}(${docUuid}) unlocked failed`);
-          if (err && err.response) {
-            const { data } = err.response;
-            logger.error(`${JSON.stringify(data)}`);
-          }
-        });
+      this.sendMessageToSeahubWithNoUserAccess(docUuid, docName);
     }
 
     document.setMeta({is_saving: false, need_save: false});
     return Promise.resolve(saveFlag);
+  };
+
+  sendMessageToSeahubWithNoUserAccess = (docUuid, docName) => {
+    const status = 'no_write';
+    seaServerAPI.editorStatusCallback(docUuid, status)
+      .then(() => {})
+      .catch(err => {
+        logger.error(`${docName}(${docUuid}) unlocked failed`);
+        if (err && err.response) {
+          const { data } = err.response;
+          logger.error(`${JSON.stringify(data)}`);
+        }
+      });
+    this.removeDoc(docUuid);
   };
 
   removeDoc = async (docUuid) => {
