@@ -149,17 +149,19 @@ class DocumentManager {
     }
 
     const status = 'no_write';
-    seaServerAPI.editorStatusCallback(docUuid, status)
-      .then(() => {})
-      .catch(err => {
-        logger.error(`${document.docName}(${docUuid}) unlocked failed`);
-        const message = getErrorMessage(err);
-        if (message.status && message.status === 404) {
-          logger.info(JSON.stringify(message));
-        } else {
-          logger.error(JSON.stringify(message));
-        }
-      });
+    try {
+      await seaServerAPI.editorStatusCallback(docUuid, status);
+      logger.info(`${document.docName}(${docUuid}) unlocked success`);
+    } catch(error) {
+      logger.error(`${document.docName}(${docUuid}) unlocked failed`);
+      const message = getErrorMessage(error);
+      if (message.status && message.status === 404) {
+        logger.info(JSON.stringify(message));
+        await this.removeDoc(docUuid);
+      } else {
+        logger.error(JSON.stringify(message));
+      }
+    }
 
     return Promise.resolve(saveFlag);
   };
@@ -186,6 +188,7 @@ class DocumentManager {
       if (message.status && message.status === 404) {
         logger.info(`${saveBySocket ? 'Socket: ': ''}${docName}(${docUuid}) failed`);
         logger.info(JSON.stringify(message));
+        await this.removeDoc(docUuid);
       } else {
         logger.error(`${saveBySocket ? 'Socket: ': ''}${docName}(${docUuid}) failed`);
         logger.error(JSON.stringify(message));
