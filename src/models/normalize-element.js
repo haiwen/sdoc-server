@@ -115,12 +115,12 @@ export const normalizeElement = (element) => {
       break;
     }
     case 'list_item': {
-      const validChildren = formatElementChildren(children, 'list_lic');
+      const validChildren = formatElementChildrenWithTypes(children, ['list_lic', 'unordered_list', 'ordered_list']);
       element.children = validChildren.map(element => normalizeElement(element));
       break;
     }
     case 'list_lic': {
-      const supportTypes = [...INLINE_TYPES_WITHOUT_IMAGE, 'ordered_list', 'unordered_list'];
+      const supportTypes = [...INLINE_TYPES_WITHOUT_IMAGE];
       const validChildren = formatElementChildrenWithTypes(children, supportTypes);
       element.children = validChildren.map(element => normalizeElement(element));
       break;
