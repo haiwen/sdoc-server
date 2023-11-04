@@ -101,6 +101,7 @@ class DocumentManager {
       const error = new Error('The content of the document does not conform to the sdoc specification');
       error.error_type = 'content_invalid';
       throw error;
+      
     }
     const doc = new Document(docUuid, docName, docContent);
 
