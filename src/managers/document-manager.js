@@ -137,7 +137,15 @@ class DocumentManager {
     
     if (!meta.need_save && users.length === 0) {
       const status = 'no_write';
-      seaServerAPI.editorStatusCallback(docUuid, status);
+      seaServerAPI.editorStatusCallback(docUuid, status)
+        .then(() => {})
+        .catch(err => {
+          logger.error(`${docName}(${docUuid}) unlocked failed`);
+          if (err && err.response) {
+            const { data } = err.response;
+            logger.error(`${JSON.stringify(data)}`);
+          }
+        });
       return Promise.resolve(true);
     }
   
@@ -152,10 +160,6 @@ class DocumentManager {
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
-      if (users.length === 0) {
-        const status = 'no_write';
-        seaServerAPI.editorStatusCallback(docUuid, status);
-      }
       saveFlag = true;
       logger.info(`${savedBySocket ? 'Socket: ' : ''}${docUuid} saved`);
     } catch(err) {
@@ -164,6 +168,19 @@ class DocumentManager {
       logger.error(err);
     } finally {
       deleteDir(tempPath);
+    }
+
+    if (users.length === 0) {
+      const status = 'no_write';
+      seaServerAPI.editorStatusCallback(docUuid, status)
+        .then(() => {})
+        .catch(err => {
+          logger.error(`${docName}(${docUuid}) unlocked failed`);
+          if (err && err.response) {
+            const { data } = err.response;
+            logger.error(`${JSON.stringify(data)}`);
+          }
+        });
     }
 
     document.setMeta({is_saving: false, need_save: false});
