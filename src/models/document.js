@@ -45,6 +45,7 @@ class Document {
   };
 
   toJson = () => {
+    this.setMeta({last_access: new Date().getTime()});
     return {
       version: this.version,
       format_version: this.format_version,

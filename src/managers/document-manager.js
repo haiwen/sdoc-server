@@ -5,11 +5,13 @@ import seaServerAPI from "../api/sea-server-api";
 import { deleteDir, getErrorMessage } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
+import { DOC_CACHE_TIME } from '../constants';
 import Document from '../models/document';
 import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
+import UsersManager from './users-manager';
 
 class DocumentManager {
 
@@ -55,6 +57,7 @@ class DocumentManager {
     this.isSaving = true;
 
     let savedDocs = [];
+    let unsavedDocs = [];
     const startTime = Date.now();
     const docUuids = this.documents.keys();
     for (let docUuid of docUuids) {
@@ -62,6 +65,8 @@ class DocumentManager {
       const saveFlag = await this.saveDoc(docUuid);
       if (saveFlag) {
         savedDocs.push(docUuid);
+      } else {
+        unsavedDocs.push(docUuid);
       }
     }
     // record saving message
@@ -72,6 +77,8 @@ class DocumentManager {
     this.lastSavingInfo.count = count;
     this.lastSavingInfo.startTime = startTime;
     this.lastSavingInfo.endTime = Date.now();
+
+    this.removeDocsWithNoAccess(unsavedDocs);
   };
 
   reloadDoc = async (docUuid, docName) => {
@@ -185,6 +192,27 @@ class DocumentManager {
         logger.info('Removed doc ', docUuid, ' from memory');
         this.documents.delete(docUuid);
       }
+    }
+  }
+
+  removeDocsWithNoAccess(docUUids) {
+    const usersManager = UsersManager.getInstance();
+    for (let i = 0; i < docUUids; i++) {
+      const docUuid = docUUids[i];
+      const users = usersManager.getDocUsers(docUuid);
+      if (users.length > 0) {
+        continue;
+      }
+      const document = this.documents.get(docUuid);
+      if (!document) {
+        continue;
+      }
+      const meta = document.getMeta();
+      const currentTime = new Date().getTime();
+      if (currentTime - meta.last_access > DOC_CACHE_TIME) {
+        this.removeDoc(docUuid);
+        logger.info(`Regularly clear files that no one has accessed: ${docUuid}`);
+      } 
     }
   }
 
