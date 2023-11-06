@@ -10,7 +10,6 @@ import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
-import UsersManager from './users-manager';
 
 class DocumentManager {
 
@@ -116,7 +115,7 @@ class DocumentManager {
     return doc.toJson();
   };
 
-  saveDoc = async (docUuid, savedBySocket = false) => {
+  saveDoc = async (docUuid) => {
     const document = this.documents.get(docUuid);
     // The save function is an asynchronous function, which does not affect the normal execution of other programs,
     // and there is a possibility that the file has been deleted when the next file is saved
@@ -141,10 +140,10 @@ class DocumentManager {
     try {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
       saveFlag = true;
-      logger.info(`${savedBySocket ? 'Socket: ' : ''}${docUuid} saved`);
+      logger.info(`${docName}(${docUuid}) saved`);
     } catch(err) {
       saveFlag = false;
-      logger.error(`${savedBySocket ? 'Socket:' : ''}${docName}(${docUuid}) save failed`);
+      logger.error(`${docName}(${docUuid}) save failed`);
       logger.error(err);
     } finally {
       deleteDir(tempPath);
