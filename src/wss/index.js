@@ -1,8 +1,10 @@
+import seaServerAPI from "../api/sea-server-api";
 import { OPERATIONS_CACHE_LIMIT } from "../constants";
 import logger from "../loggers";
 import DocumentManager from "../managers/document-manager";
 import OperationsManager from "../managers/operations-manager";
 import UsersManager from "../managers/users-manager";
+import { getErrorMessage } from "../utils";
 import auth from "./auth";
 import IOHelper from "./io-helper";
 
@@ -50,24 +52,6 @@ class IOServer {
 
       const { version } = docContent;
       callback && callback({success: 1, version});
-    });
-    
-    socket.on('leave-room', async () => {
-      const { docUuid } = socket;
-      const usersManager = UsersManager.getInstance();
-      const user = usersManager.getUser(docUuid, socket.id);
-      if (user) {
-        this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
-      }
-      
-      // delete current user from memory
-      const usersCount = usersManager.deleteUser(docUuid, socket.id);
-      const documentManager = DocumentManager.getInstance();
-      user && documentManager.deleteCursor(docUuid, user);
-      if (usersCount === 0) {
-        const savedBySocket = true;
-        await documentManager.saveDoc(docUuid, savedBySocket);
-      }
     });
     
     socket.on('update-document', async (params, callback) => {
@@ -125,26 +109,50 @@ class IOServer {
     socket.on('server-error', (params) => {
       this.ioHelper.broadcastMessage(params);
     });
+
+    socket.on('leave-room', async () => {
+      await this.handleDisconnect(socket);
+    });
     
     socket.on('disconnect', async () => {
-      const { docUuid } = socket;
-      const usersManager = UsersManager.getInstance();
-      const user = usersManager.getUser(docUuid, socket.id);
-      if (user) {
-        this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
-      }
-      
-      // delete current user from memory
-      const usersCount = usersManager.deleteUser(docUuid, socket.id);
-      const documentManager = DocumentManager.getInstance();
-      user && documentManager.deleteCursor(docUuid, user);
-      if (usersCount === 0) {
-        const savedBySocket = true;
-        await documentManager.saveDoc(docUuid, savedBySocket);
-      }
+      await this.handleDisconnect(socket);
     });
-
+      
   }
+
+  handleDisconnect = async (socket) => {
+    const { docUuid, docName } = socket;
+    const usersManager = UsersManager.getInstance();
+    const user = usersManager.getUser(docUuid, socket.id);
+    if (user) {
+      this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
+    }
+    
+    // delete current user from memory
+    const usersCount = usersManager.deleteUser(docUuid, socket.id);
+    const documentManager = DocumentManager.getInstance();
+    user && documentManager.deleteCursor(docUuid, user);
+    if (usersCount === 0) {
+      // save document first
+      await documentManager.saveDoc(docUuid);
+
+      // send no_write message to seahub
+      const status = 'no_write';
+      seaServerAPI.editorStatusCallback(docUuid, status)
+        .then(() => {
+          logger.info(`${docName}(${docUuid}) unlocked success`);
+        }).catch(err => {
+          const message = getErrorMessage(err);
+          if (message.status && message.status === 404) {
+            logger.info(`${docName}(${docUuid}) unlocked failed`);
+            logger.info(JSON.stringify(message));
+          } else {
+            logger.error(`${docName}(${docUuid}) unlocked failed`);
+            logger.error(JSON.stringify(message));
+          }
+        });
+    }
+  };
 
 }
 

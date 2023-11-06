@@ -87,6 +87,15 @@ export const isRequestTimeout = (err) => {
   return false;
 };
 
+export const getErrorMessage = (err) => {
+  let message = { status: 500, error_msg: `Internal Server Error` };
+  if (err && err.response) {
+    const { status, data } = err.response;
+    message = { status, ...data };
+  }
+  return message;
+};
+
 export const isObject = (obj) => {
   if (!obj) return false;
   return Object.prototype.toString.call(obj) === '[object Object]';

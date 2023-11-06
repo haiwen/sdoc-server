@@ -2,7 +2,7 @@ import fs from 'fs';
 import { v4 } from "uuid";
 import deepCopy from 'deep-copy';
 import seaServerAPI from "../api/sea-server-api";
-import { deleteDir } from "../utils";
+import { deleteDir, getErrorMessage } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
@@ -10,7 +10,6 @@ import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
-import UsersManager from './users-manager';
 
 class DocumentManager {
 
@@ -116,7 +115,7 @@ class DocumentManager {
     return doc.toJson();
   };
 
-  saveDoc = async (docUuid, savedBySocket = false) => {
+  saveDoc = async (docUuid) => {
     const document = this.documents.get(docUuid);
     // The save function is an asynchronous function, which does not affect the normal execution of other programs,
     // and there is a possibility that the file has been deleted when the next file is saved
@@ -125,29 +124,7 @@ class DocumentManager {
       return Promise.resolve(false);
     }
     const meta = document.getMeta();
-    if (meta.is_saving) { // is saving
-      return Promise.resolve(false);
-    }
-    
-    const usersManager = UsersManager.getInstance();
-    const users = usersManager.getDocUsers(docUuid);
-
-    // The documentation has not been modified and is currently being accessed
-    if (!meta.need_save && users.length > 0) {
-      return Promise.resolve(false);
-    }
-    
-    if (!meta.need_save && users.length === 0) {
-      const status = 'no_write';
-      seaServerAPI.editorStatusCallback(docUuid, status)
-        .then(() => {})
-        .catch(err => {
-          logger.error(`${document.docName}(${docUuid}) unlocked failed`);
-          if (err && err.response) {
-            const { data } = err.response;
-            logger.error(`${JSON.stringify(data)}`);
-          }
-        });
+    if (meta.is_saving || !meta.need_save) { // is saving
       return Promise.resolve(false);
     }
   
@@ -163,26 +140,20 @@ class DocumentManager {
     try {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
       saveFlag = true;
-      logger.info(`${savedBySocket ? 'Socket: ' : ''}${docUuid} saved`);
+      logger.info(`${docName}(${docUuid}) saved`);
     } catch(err) {
       saveFlag = false;
-      logger.error(`${savedBySocket ? 'Socket:' : ''}${docName}(${docUuid}) save failed`);
-      logger.error(err);
+      const message = getErrorMessage(err);
+      if (message.status && message.status === 404) {
+        logger.info(`${docName}(${docUuid}) save failed`);
+        logger.info(JSON.stringify(message));
+        await this.removeDoc(docUuid);
+      } else {
+        logger.error(`${docName}(${docUuid}) save failed`);
+        logger.error(JSON.stringify(message));
+      }
     } finally {
       deleteDir(tempPath);
-    }
-
-    if (users.length === 0) {
-      const status = 'no_write';
-      seaServerAPI.editorStatusCallback(docUuid, status)
-        .then(() => {})
-        .catch(err => {
-          logger.error(`${docName}(${docUuid}) unlocked failed`);
-          if (err && err.response) {
-            const { data } = err.response;
-            logger.error(`${JSON.stringify(data)}`);
-          }
-        });
     }
 
     document.setMeta({is_saving: false, need_save: false});
