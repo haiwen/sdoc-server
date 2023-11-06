@@ -18,7 +18,7 @@ class IOHelper {
 
   getConnectedSocketsCount = () => {
     return this.io.sockets.sockets.size;
-  }
+  };
 
   broadcastMessage = () => {
     this.io.emit('message', `server error`);

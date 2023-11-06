@@ -10,3 +10,5 @@ export const MESSAGE = {
   DOC_REMOVED: 'doc-removed',
   DOC_PUBLISHED: 'doc-published',
 };
+
+export const DOC_CACHE_TIME = 24 * 60 * 60 * 1000;
