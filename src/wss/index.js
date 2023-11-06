@@ -121,7 +121,7 @@ class IOServer {
   }
 
   handleDisconnect = async (socket) => {
-    const { docUuid } = socket;
+    const { docUuid, docName } = socket;
     const usersManager = UsersManager.getInstance();
     const user = usersManager.getUser(docUuid, socket.id);
     if (user) {
@@ -143,10 +143,10 @@ class IOServer {
         .catch(err => {
           const message = getErrorMessage(err);
           if (message.status && message.status === 404) {
-            logger.info(`${document.docName}(${docUuid}) unlocked failed`);
+            logger.info(`${docName}(${docUuid}) unlocked failed`);
             logger.info(JSON.stringify(message));
           } else {
-            logger.error(`${document.docName}(${docUuid}) unlocked failed`);
+            logger.error(`${docName}(${docUuid}) unlocked failed`);
             logger.error(JSON.stringify(message));
           }
         });
