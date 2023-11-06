@@ -139,8 +139,9 @@ class IOServer {
       // send no_write message to seahub
       const status = 'no_write';
       seaServerAPI.editorStatusCallback(docUuid, status)
-        .then(() => {})
-        .catch(err => {
+        .then(() => {
+          logger.info(`${docName}(${docUuid}) unlocked success`);
+        }).catch(err => {
           const message = getErrorMessage(err);
           if (message.status && message.status === 404) {
             logger.info(`${docName}(${docUuid}) unlocked failed`);
