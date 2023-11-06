@@ -125,29 +125,7 @@ class DocumentManager {
       return Promise.resolve(false);
     }
     const meta = document.getMeta();
-    if (meta.is_saving) { // is saving
-      return Promise.resolve(false);
-    }
-    
-    const usersManager = UsersManager.getInstance();
-    const users = usersManager.getDocUsers(docUuid);
-
-    // The documentation has not been modified and is currently being accessed
-    if (!meta.need_save && users.length > 0) {
-      return Promise.resolve(false);
-    }
-    
-    if (!meta.need_save && users.length === 0) {
-      const status = 'no_write';
-      seaServerAPI.editorStatusCallback(docUuid, status)
-        .then(() => {})
-        .catch(err => {
-          logger.error(`${document.docName}(${docUuid}) unlocked failed`);
-          if (err && err.response) {
-            const { data } = err.response;
-            logger.error(`${JSON.stringify(data)}`);
-          }
-        });
+    if (meta.is_saving || !meta.need_save) { // is saving
       return Promise.resolve(false);
     }
   
@@ -170,19 +148,6 @@ class DocumentManager {
       logger.error(err);
     } finally {
       deleteDir(tempPath);
-    }
-
-    if (users.length === 0) {
-      const status = 'no_write';
-      seaServerAPI.editorStatusCallback(docUuid, status)
-        .then(() => {})
-        .catch(err => {
-          logger.error(`${docName}(${docUuid}) unlocked failed`);
-          if (err && err.response) {
-            const { data } = err.response;
-            logger.error(`${JSON.stringify(data)}`);
-          }
-        });
     }
 
     document.setMeta({is_saving: false, need_save: false});
