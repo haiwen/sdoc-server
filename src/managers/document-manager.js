@@ -197,7 +197,7 @@ class DocumentManager {
 
   removeDocsWithNoAccess(docUUids) {
     const usersManager = UsersManager.getInstance();
-    for (let i = 0; i < docUUids; i++) {
+    for (let i = 0; i < docUUids.length; i++) {
       const docUuid = docUUids[i];
       const users = usersManager.getDocUsers(docUuid);
       if (users.length > 0) {
