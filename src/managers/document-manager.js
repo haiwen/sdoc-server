@@ -143,7 +143,6 @@ class DocumentManager {
       logger.info(`${docName}(${docUuid}) saved`);
     } catch(err) {
       saveFlag = false;
-      logger.error(`${docName}(${docUuid}) save failed`);
       const message = getErrorMessage(err);
       if (message.status && message.status === 404) {
         logger.info(`${docName}(${docUuid}) save failed`);
