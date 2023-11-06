@@ -2,7 +2,7 @@ import fs from 'fs';
 import { v4 } from "uuid";
 import deepCopy from 'deep-copy';
 import seaServerAPI from "../api/sea-server-api";
-import { deleteDir } from "../utils";
+import { deleteDir, getErrorMessage } from "../utils";
 import logger from "../loggers";
 import { SAVE_INTERVAL } from "../config/config";
 import Document from '../models/document';
@@ -145,6 +145,15 @@ class DocumentManager {
       saveFlag = false;
       logger.error(`${docName}(${docUuid}) save failed`);
       logger.error(err);
+      const message = getErrorMessage(err);
+      if (message.status && message.status === 404) {
+        logger.info(`${docName}(${docUuid}) save failed`);
+        logger.info(JSON.stringify(message));
+        await this.removeDoc(docUuid);
+      } else {
+        logger.error(`${docName}(${docUuid}) save failed`);
+        logger.error(JSON.stringify(message));
+      }
     } finally {
       deleteDir(tempPath);
     }
