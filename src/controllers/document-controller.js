@@ -111,15 +111,13 @@ class DocumentController {
 
   async saveDoc(req, res) {
     const { doc_uuid: docUuid } = req.params;
-    const { username } = req.payload;
     const documentManager = DocumentManager.getInstance();
-    const saveFlag = await documentManager.saveDoc(docUuid, username, true);
-    if (saveFlag) {
+    try {
+      await documentManager.saveDoc(docUuid);
       res.status(200).send({'success': true});
-      return;
+    } catch {
+      res.status(500).send({'error_msg': 'Doc save failed'});
     }
-    res.status(500).send({'error_msg': 'Doc save failed'});
-    return;
   }
 
   async publishDoc(req, res) {
