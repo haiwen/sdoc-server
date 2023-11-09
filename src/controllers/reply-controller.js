@@ -2,6 +2,7 @@ import seaServerAPI from "../api/sea-server-api";
 import logger from "../loggers";
 import { isRequestTimeout } from "../utils";
 import { internalServerError, paramIsRequired } from "../utils/resp-message-utils";
+import NotificationManager from "../managers/notification-manager";
 
 class ReplyController {
 
@@ -45,6 +46,14 @@ class ReplyController {
       const result = await seaServerAPI.insertReply(docUuid, commentId, { type, reply, author });
       const _reply = result.data;
       res.send({reply: _reply});
+      const notification = result.data.notification;
+      const toUsers = notification.to_users;
+      if (toUsers.length > 0) {
+        const notificationManager = NotificationManager.getInstance();
+        for (let username of toUsers) {
+          notificationManager.sendNotificationToUser(docUuid, username, notification)
+        }
+      }
       return;
     } catch(err) {
       logger.error(err.message);

@@ -69,6 +69,26 @@ class UsersManager {
     return Object.values(users);
   };
 
+  getSocketIds = (docUuid) => {
+    if (this.users.has(docUuid)) {
+      const docUsers = this.users.get(docUuid);
+      return docUsers.keys();
+    }
+    return [];
+  };
+
+  getSocketId = (docUuid, username) => {
+    if (this.users.has(docUuid)) {
+      const docUsers = this.users.get(docUuid);
+      for (let [socketId, userInfo] of docUsers) {
+        if (userInfo.username === username) {
+          return socketId;
+        }
+      }
+    }
+    return null;
+  };
+
 }
 
 export default UsersManager;
