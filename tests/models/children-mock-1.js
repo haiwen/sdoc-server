@@ -67,8 +67,8 @@ export const header1 = {
   ]
 };
 export const listLic = { 
-  id: 'list_lic', 
-  type: 'list_lic',
+  id: 'paragraph', 
+  type: 'paragraph',
   children: [
     text,
     sdocLink,
@@ -78,8 +78,8 @@ export const listLic = {
 };
 
 export const emptyListLic = { 
-  id: 'list_lic', 
-  type: 'list_lic',
+  id: 'paragraph', 
+  type: 'paragraph',
   children: [
     {
       id: 'text',
@@ -283,8 +283,8 @@ export const expectChildren3 = [
         type: 'list_item',
         children: [
           {
-            id: 'list_lic',
-            type: 'list_lic',
+            id: 'paragraph',
+            type: 'paragraph',
             children: [text]
           }
         ]

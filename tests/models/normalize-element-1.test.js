@@ -53,12 +53,12 @@ describe('normalize element: format empty element to normal element', () => {
 
   it('list_lic', () => {
     const element = {
-      id: 'list_lic',
-      type: 'list_lic',
+      id: 'paragraph',
+      type: 'paragraph',
     };
     const expectElement = {
-      id: 'list_lic',
-      type: 'list_lic',
+      id: 'paragraph',
+      type: 'paragraph',
       children: [
         {id: 'text', text: ''}
       ]
@@ -77,8 +77,8 @@ describe('normalize element: format empty element to normal element', () => {
       type: 'list_item',
       children: [
         {
-          id: 'list_lic',
-          type: 'list_lic',
+          id: 'paragraph',
+          type: 'paragraph',
           children: [
             {id: 'text', text: ''}
           ]
@@ -103,8 +103,8 @@ describe('normalize element: format empty element to normal element', () => {
           type: 'list_item',
           children: [
             {
-              id: 'list_lic',
-              type: 'list_lic',
+              id: 'paragraph',
+              type: 'paragraph',
               children: [
                 {id: 'text', text: ''}
               ]
@@ -131,8 +131,8 @@ describe('normalize element: format empty element to normal element', () => {
           type: 'list_item',
           children: [
             {
-              id: 'list_lic',
-              type: 'list_lic',
+              id: 'paragraph',
+              type: 'paragraph',
               children: [
                 {id: 'text', text: ''}
               ]
@@ -155,8 +155,8 @@ describe('normalize element: format empty element to normal element', () => {
           type: 'list_item',
           children: [
             {
-              id: 'list_lic',
-              type: 'list_lic',
+              id: 'paragraph',
+              type: 'paragraph',
               children: [
               ]
             },
@@ -178,8 +178,8 @@ describe('normalize element: format empty element to normal element', () => {
           type: 'list_item',
           children: [
             {
-              id: 'list_lic',
-              type: 'list_lic',
+              id: 'paragraph',
+              type: 'paragraph',
               children: [
                 {id: 'text', text: ''}
               ]
@@ -193,8 +193,8 @@ describe('normalize element: format empty element to normal element', () => {
                   type: 'list_item',
                   children: [
                     {
-                      id: 'list_lic',
-                      type: 'list_lic',
+                      id: 'paragraph',
+                      type: 'paragraph',
                       children: [
                         {id: 'text', text: ''}
                       ]

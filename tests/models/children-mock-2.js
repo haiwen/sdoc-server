@@ -9,7 +9,7 @@ export const children = [
         "children": [
           {
             "id": "Mba8Qj6ESMqcLuiUqYYN5g",
-            "type": "list_lic",
+            "type": "paragraph",
             "children": [
               {
                 "id": "Hw6PAspmRaKu0VaP1pfnrQ",
@@ -25,7 +25,7 @@ export const children = [
         "children": [
           {
             "id": "LOCfc5iZR6WR9fv7vXM8eg",
-            "type": "list_lic",
+            "type": "paragraph",
             "children": [
               {
                 "id": "VLogRKEZQ8qSQXqqOVtxTw",
@@ -43,7 +43,7 @@ export const children = [
                 "children": [
                   {
                     "id": "f7-o-IH3SOedoutqWa-zKg",
-                    "type": "list_lic",
+                    "type": "paragraph",
                     "children": [
                       {
                         "id": "VwjfVGD6TH-yvzT-tLoKRg",
@@ -59,7 +59,7 @@ export const children = [
                 "children": [
                   {
                     "id": "cPSFoKBtSdSBn3-RmzK0Aw",
-                    "type": "list_lic",
+                    "type": "paragraph",
                     "children": [
                       {
                         "id": "LheSrzJWRhaE0B9c-FTsIw",
@@ -75,7 +75,7 @@ export const children = [
                 "children": [
                   {
                     "id": "ICEq7srPQsyfnG7hUR2u1Q",
-                    "type": "list_lic",
+                    "type": "paragraph",
                     "children": [
                       {
                         "id": "HKNdpFquSJ6fUExOUoB9EA",
@@ -93,7 +93,7 @@ export const children = [
                         "children": [
                           {
                             "id": "VaLqA2hxT7KNaNq2kW1A_Q",
-                            "type": "list_lic",
+                            "type": "paragraph",
                             "children": [
                               {
                                 "id": "QYE2khvgScOU_PwlbfLQyg",
@@ -109,7 +109,7 @@ export const children = [
                         "children": [
                           {
                             "id": "aj0b5LQUTmSM6GZYIk0pfw",
-                            "type": "list_lic",
+                            "type": "paragraph",
                             "children": [
                               {
                                 "id": "KJbYIDwKRSaOgIGDULL8ag",
@@ -142,7 +142,7 @@ export const expectChildren = [
         "children": [
           {
             "id": "Mba8Qj6ESMqcLuiUqYYN5g",
-            "type": "list_lic",
+            "type": "paragraph",
             "children": [
               {
                 "id": "Hw6PAspmRaKu0VaP1pfnrQ",
@@ -158,7 +158,7 @@ export const expectChildren = [
         "children": [
           {
             "id": "LOCfc5iZR6WR9fv7vXM8eg",
-            "type": "list_lic",
+            "type": "paragraph",
             "children": [
               {
                 "id": "VLogRKEZQ8qSQXqqOVtxTw",
@@ -176,7 +176,7 @@ export const expectChildren = [
                 "children": [
                   {
                     "id": "f7-o-IH3SOedoutqWa-zKg",
-                    "type": "list_lic",
+                    "type": "paragraph",
                     "children": [
                       {
                         "id": "VwjfVGD6TH-yvzT-tLoKRg",
@@ -192,7 +192,7 @@ export const expectChildren = [
                 "children": [
                   {
                     "id": "cPSFoKBtSdSBn3-RmzK0Aw",
-                    "type": "list_lic",
+                    "type": "paragraph",
                     "children": [
                       {
                         "id": "LheSrzJWRhaE0B9c-FTsIw",
@@ -208,7 +208,7 @@ export const expectChildren = [
                 "children": [
                   {
                     "id": "ICEq7srPQsyfnG7hUR2u1Q",
-                    "type": "list_lic",
+                    "type": "paragraph",
                     "children": [
                       {
                         "id": "HKNdpFquSJ6fUExOUoB9EA",
@@ -226,7 +226,7 @@ export const expectChildren = [
                         "children": [
                           {
                             "id": "VaLqA2hxT7KNaNq2kW1A_Q",
-                            "type": "list_lic",
+                            "type": "paragraph",
                             "children": [
                               {
                                 "id": "QYE2khvgScOU_PwlbfLQyg",
@@ -242,7 +242,7 @@ export const expectChildren = [
                         "children": [
                           {
                             "id": "aj0b5LQUTmSM6GZYIk0pfw",
-                            "type": "list_lic",
+                            "type": "paragraph",
                             "children": [
                               {
                                 "id": "KJbYIDwKRSaOgIGDULL8ag",

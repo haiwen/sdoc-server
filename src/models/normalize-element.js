@@ -63,13 +63,13 @@ const formatElementChildren = (children, childType) => {
 const formatListItemChildren = (children) => {
   const defaultChildren = [{
     id: v4(),
-    type: 'list_lic',
+    type: 'paragraph',
     children: []
   }];
   if (!children || !Array.isArray(children) || children.length === 0) {
     return defaultChildren;
   }
-  const types = ['list_lic', 'unordered_list', 'ordered_list'];
+  const types = ['paragraph', 'unordered_list', 'ordered_list'];
   const newChildren = children.filter(item => item.type && types.includes(item.type));
   return newChildren.length === 0 ? defaultChildren : newChildren;
 };
@@ -130,12 +130,6 @@ export const normalizeElement = (element) => {
     }
     case 'list_item': {
       const validChildren = formatListItemChildren(children);
-      element.children = validChildren.map(element => normalizeElement(element));
-      break;
-    }
-    case 'list_lic': {
-      const supportTypes = [...INLINE_TYPES_WITHOUT_IMAGE];
-      const validChildren = formatElementChildrenWithTypes(children, supportTypes);
       element.children = validChildren.map(element => normalizeElement(element));
       break;
     }
