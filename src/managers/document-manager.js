@@ -119,6 +119,11 @@ class DocumentManager {
     }
 
     this.documents.set(docUuid, doc);
+    // save doc when content is empty
+    if (!result.data) {
+      doc.setMeta({need_save: true});
+      await this.saveDoc(docUuid);
+    }
     return doc.toJson();
   };
 
