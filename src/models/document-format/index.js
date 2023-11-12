@@ -30,7 +30,7 @@ const formatDocContentToNewVersion = (docContent) => {
     newDocContent = formatContentToVersion2(docContent);
   }
 
-  if (format_version === 2) {
+  if (newDocContent.format_version === 2) {
     newDocContent = formatContentToVersion3(docContent);
   }
 
