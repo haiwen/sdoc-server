@@ -21,7 +21,7 @@ export const generateDefaultDocContent = (docName) => {
       {id: v4(), type: 'title', children: [generateDefaultText(titleText)]},
       {id: v4(), type: 'paragraph', children: [generateDefaultText()]}
     ],
-    format_version: 1,
+    format_version: 3,
   };
   return defaultValue;
 };
