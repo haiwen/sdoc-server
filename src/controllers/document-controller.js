@@ -11,7 +11,7 @@ class DocumentController {
     const { file_uuid: docUuid, filename: docName, username } = req.payload;
     try {
       const documentManager = DocumentManager.getInstance();
-      const docContent = await documentManager.getDoc(docUuid, docName);
+      const docContent = await documentManager.getDoc(docUuid, docName, username);
 
       // There is no username when seahub get the sdoc content
       if (!username) {

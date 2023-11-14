@@ -96,13 +96,13 @@ class DocumentManager {
     return doc.toJson();
   };
 
-  getDoc = async (docUuid, docName) => {
+  getDoc = async (docUuid, docName, username) => {
     const document = this.documents.get(docUuid);
     if (document) {
       return document.toJson();
     }
     const result = await seaServerAPI.getDocContent(docUuid);
-    const docContent = result.data ? result.data : generateDefaultDocContent(docName);
+    const docContent = result.data ? result.data : generateDefaultDocContent(docName, username);
     if (!isSdocContentValid(docContent)) {
       const error = new Error('The content of the document does not conform to the sdoc specification');
       error.error_type = 'content_invalid';

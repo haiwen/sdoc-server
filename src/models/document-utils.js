@@ -13,7 +13,7 @@ export const generateDefaultParagraph = () => {
   };
 };
 
-export const generateDefaultDocContent = (docName) => {
+export const generateDefaultDocContent = (docName, username) => {
   const titleText = docName ? docName.split('.')[0] : '';
   const defaultValue = {
     version: 0,
@@ -22,6 +22,7 @@ export const generateDefaultDocContent = (docName) => {
       {id: v4(), type: 'paragraph', children: [generateDefaultText()]}
     ],
     format_version: 3,
+    last_modify_user: username,
   };
   return defaultValue;
 };
@@ -53,7 +54,10 @@ export function resetDocContentCursors(docContent, username) {
 }
 
 export const normalizeChildren = (children) => {
-  if (!children || !Array.isArray(children) || children.length === 0) return [generateDefaultDocContent()];
+  if (!children || !Array.isArray(children) || children.length === 0) {
+    const doc = generateDefaultDocContent();
+    return doc.children;
+  }
 
   // The type of the first-level sub-element must exist. If it does not exist, delete it.
   const newChildren = children.filter(item => {
