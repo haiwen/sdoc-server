@@ -39,6 +39,7 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'paragraph',
   'code_block',
   'table',
+  'callout',
 ];
 
 /**
