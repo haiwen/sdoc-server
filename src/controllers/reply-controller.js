@@ -51,7 +51,7 @@ class ReplyController {
       if (toUsers.length > 0) {
         const notificationManager = NotificationManager.getInstance();
         for (let username of toUsers) {
-          notificationManager.sendNotificationToUser(docUuid, username, notification)
+          notificationManager.sendNotificationToUser(docUuid, username, notification);
         }
       }
       return;

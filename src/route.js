@@ -1,7 +1,7 @@
 import express from 'express';
 import multipart from 'connect-multiparty';
 import { BASE_URL_VERSION1 } from './constants';
-import { commentController, documentController, replyController, userController, systemController } from './controllers';
+import { commentController, documentController, replyController, userController, systemController, participantController } from './controllers';
 
 const router = express.Router();
 const multipartMiddleware = multipart();
@@ -30,5 +30,9 @@ router.put(`${BASE_URL_VERSION1}/:doc_uuid/comment/:comment_id/replies/:reply_id
 
 //system
 router.get(`${BASE_URL_VERSION1}/system/info/`, systemController.getInfo);
+
+// participant
+router.post(`${BASE_URL_VERSION1}/:doc_uuid/participants/`, participantController.addParticipants);
+router.delete(`${BASE_URL_VERSION1}/:doc_uuid/participants/`, participantController.removeParticipant);
 
 export default router;

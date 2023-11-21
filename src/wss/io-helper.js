@@ -51,6 +51,11 @@ class IOHelper {
   sendNotificationToPrivate = (sid, notification) => {
     this.io.to(sid).emit('new-notification', notification);
   };
+
+  sendParticipantsChanges = (sid, key, value) => {
+    this.io.to(sid).emit(key, value);
+  };
+
 }
 
 export default IOHelper;

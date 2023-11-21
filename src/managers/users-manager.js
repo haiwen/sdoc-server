@@ -70,11 +70,14 @@ class UsersManager {
   };
 
   getSocketIds = (docUuid) => {
+    let socketIds = [];
     if (this.users.has(docUuid)) {
       const docUsers = this.users.get(docUuid);
-      return docUsers.keys();
+      for (let [socketId] of docUsers) {
+        socketIds.push(socketId);
+      }
     }
-    return [];
+    return socketIds;
   };
 
   getSocketId = (docUuid, username) => {

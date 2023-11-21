@@ -9,6 +9,8 @@ export const MESSAGE = {
   DOC_REPLACED: 'doc-replaced',
   DOC_REMOVED: 'doc-removed',
   DOC_PUBLISHED: 'doc-published',
+  PARTICIPANT_ADDED: 'participant-added',
+  PARTICIPANT_REMOVED: 'participant-removed',
 };
 
 export const DOC_CACHE_TIME = 24 * 60 * 60 * 1000;
