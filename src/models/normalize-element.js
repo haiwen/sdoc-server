@@ -40,6 +40,7 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'code_block',
   'table',
   'callout',
+  'image_block'
 ];
 
 /**
