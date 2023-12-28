@@ -14,7 +14,7 @@ export const generateDefaultParagraph = () => {
 };
 
 export const generateDefaultDocContent = (docName, username) => {
-  const titleText = docName ? docName.split('.')[0] : '';
+  const titleText = docName ? docName.substring(0, docName.lastIndexOf('.')) : '';
   const defaultValue = {
     version: 0,
     children: [
