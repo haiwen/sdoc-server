@@ -9,7 +9,6 @@ const isHasProperty = (obj, prop) => {
 const INLINE_TYPES = ['link', 'sdoc_link', 'file_link', 'image'];
 const INLINE_TYPES_WITHOUT_IMAGE = ['link', 'sdoc_link', 'file_link'];
 const BLOCKQUOTE_CHILDREN_TYPES = [
-  ...INLINE_TYPES,
   'ordered_list',
   'unordered_list',
   'check_list_item',
@@ -109,8 +108,25 @@ export const normalizeElement = (element) => {
 
   switch(type) {
     case 'blockquote': {
-      const validChildren = formatElementChildrenWithTypes(children, BLOCKQUOTE_CHILDREN_TYPES);
-      element.children = validChildren.map(element => normalizeElement(element));
+      const validChildren = formatElementChildrenWithTypes(children, [...INLINE_TYPES, ...BLOCKQUOTE_CHILDREN_TYPES]);
+      element.children = validChildren.map(element => {
+        if (BLOCKQUOTE_CHILDREN_TYPES.includes(element.type)) {
+          return normalizeElement(element);
+        }
+        // Patch: Convert inline nodes to paragraphs
+        if (INLINE_TYPES.includes(element.type)) {
+          return {
+            id: v4(),
+            type: 'paragraph',
+            children: formatElementChildrenWithTypes(children, INLINE_TYPES),
+          };
+        }
+        return {
+          id: v4(),
+          type: 'paragraph',
+          children: [element],
+        };
+      });
       break;
     }
     case 'title':
