@@ -114,13 +114,6 @@ export const normalizeElement = (element) => {
           return normalizeElement(element);
         }
         // Patch: Convert inline nodes to paragraphs
-        if (INLINE_TYPES.includes(element.type)) {
-          return {
-            id: v4(),
-            type: 'paragraph',
-            children: formatElementChildrenWithTypes(children, INLINE_TYPES),
-          };
-        }
         return {
           id: v4(),
           type: 'paragraph',

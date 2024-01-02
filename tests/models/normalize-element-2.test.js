@@ -625,7 +625,11 @@ describe('normalize element: blockquote', () => {
       id: 'blockquote',
       type: 'blockquote',
       children: [
-        {id: 'text', text: ''}
+        {
+          id: 'paragraph',
+          type: 'paragraph',
+          children: [{id: 'text', text: ''}],
+        },
       ]
     };
     const newContent = normalizeElement(element);
@@ -647,10 +651,30 @@ describe('normalize element: blockquote', () => {
       id: 'blockquote',
       type: 'blockquote',
       children: [
-        image,
-        sdocLink,
-        fileLink,
-        link,
+        {
+          id: 'paragraph',
+          type: 'paragraph',
+          children: [image],
+        },
+        {
+          id: 'paragraph',
+          type: 'paragraph',
+          children: [
+            sdocLink,
+          ],
+        },
+        {
+          id: 'paragraph',
+          type: 'paragraph',
+          children: [
+            fileLink
+          ],
+        },
+        {
+          id: 'paragraph',
+          type: 'paragraph',
+          children: [link],
+        }
       ]
     };
     const newContent = normalizeElement(element);
@@ -669,7 +693,11 @@ describe('normalize element: blockquote', () => {
       id: 'blockquote',
       type: 'blockquote',
       children: [
-        {id: 'text', text: ''}
+        { 
+          id: 'paragraph',
+          type: 'paragraph',
+          children: [{id: 'text', text: ''}]
+        }
       ]
     };
     const newContent = normalizeElement(element);

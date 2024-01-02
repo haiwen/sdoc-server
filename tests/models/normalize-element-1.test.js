@@ -12,7 +12,11 @@ describe('normalize element: format empty element to normal element', () => {
       id: 'blockquote',
       type: 'blockquote',
       children: [
-        {id: 'text', text: ''}
+        {
+          id: 'paragraph',
+          type: 'paragraph',
+          children: [{id: 'text', text: ''}],
+        },
       ]
     };
     const newContent = normalizeElement(element);

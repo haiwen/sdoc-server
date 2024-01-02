@@ -204,6 +204,28 @@ export const blockquote = {
   ]
 };
 
+export const expectBlockquote = {
+  id: 'blockquote',
+  type: 'blockquote',
+  children: [
+    {
+      id: 'paragraph',
+      type: 'paragraph',
+      children: [text],
+    },
+    {
+      id: 'paragraph',
+      type: 'paragraph',
+      children: [text],
+    },
+    {
+      id: 'paragraph',
+      type: 'paragraph',
+      children: [text],
+    }
+  ]
+};
+
 export const paragraph = {
   id: 'paragraph',
   type: 'paragraph',
