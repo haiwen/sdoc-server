@@ -27,6 +27,23 @@ class DocumentController {
       if (isRequestTimeout(err)) {
         logger.error('Request timed out, please try again later');
       }
+    
+      if (err.error_type === 'get_doc_download_link_error') {
+        logger.error(`Get doc download link error. request url is: ${err.from_url}`);
+        return res.status(500).send({
+          'error_type': 'get_doc_download_link_error',
+          'error_msg': 'Internal Server Error'
+        });
+      }
+
+      if (err.error_type === 'content_load_invalid') {
+        logger.error(`Load ${docName}(${docUuid}) from ${err.from_url} error`);
+        return res.status(500).send({
+          'error_type': 'content_load_invalid',
+          'error_msg': 'Internal Server Error'
+        });
+      }
+    
       if (err.error_type === 'content_invalid') {
         logger.error(err.message);
         return res.status(500).send({
@@ -147,6 +164,7 @@ class DocumentController {
       res.status(200).send({'success': true});
       return;
     } catch(err) {
+      logger.error(err.message);
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;
     }
@@ -171,6 +189,7 @@ class DocumentController {
       res.status(200).send({'success': true});
       return;
     } catch(err) {
+      logger.error(err.message);
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;
     }

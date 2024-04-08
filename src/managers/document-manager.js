@@ -4,7 +4,7 @@ import deepCopy from 'deep-copy';
 import seaServerAPI from "../api/sea-server-api";
 import { deleteDir, getErrorMessage } from "../utils";
 import logger from "../loggers";
-import { SAVE_INTERVAL } from "../config/config";
+import { SAVE_INTERVAL, SEAHUB_SERVER } from "../config/config";
 import { DOC_CACHE_TIME } from '../constants';
 import Document from '../models/document';
 import { applyOperations } from '../utils/slate-utils';
@@ -83,7 +83,28 @@ class DocumentManager {
 
   reloadDoc = async (docUuid, docName) => {
     this.removeDocFromMemory(docUuid);
-    const result = await seaServerAPI.getDocContent(docUuid);
+    
+    let downloadLink = '';
+    try {
+      const res = await seaServerAPI.getDocDownloadLink(docUuid);
+      downloadLink = res.data.download_link;
+    } catch (e) {
+      const error = new Error('Get doc download link error');
+      error.error_type = 'get_doc_download_link_error';
+      error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/download-link/${docUuid}/`;
+      throw error;
+    }
+
+    let result = null;
+    try {
+      result = await seaServerAPI.getDocContent(downloadLink);
+    } catch (e) {
+      const error = new Error('The content of the document loaded error');
+      error.error_type = 'content_load_invalid';
+      error.from_url = downloadLink;
+      throw error;
+    }
+
     const docContent = result.data ? result.data : generateDefaultDocContent(docName);
     if (!isSdocContentValid(docContent)) {
       const error = new Error('The content of the document does not conform to the sdoc specification');
@@ -101,7 +122,28 @@ class DocumentManager {
     if (document) {
       return document.toJson();
     }
-    const result = await seaServerAPI.getDocContent(docUuid);
+
+    let downloadLink = '';
+    try {
+      const res = await seaServerAPI.getDocDownloadLink(docUuid);
+      downloadLink = res.data.download_link;
+    } catch (e) {
+      const error = new Error('Get doc download link error');
+      error.error_type = 'get_doc_download_link_error';
+      error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/download-link/${docUuid}/`;
+      throw error;
+    }
+
+    let result = null;
+    try {
+      result = await seaServerAPI.getDocContent(downloadLink);
+    } catch (e) {
+      const error = new Error('The content of the document loaded error');
+      error.error_type = 'content_load_invalid';
+      error.from_url = downloadLink;
+      throw error;
+    }
+
     const docContent = result.data ? result.data : generateDefaultDocContent(docName, username);
     if (!isSdocContentValid(docContent)) {
       const error = new Error('The content of the document does not conform to the sdoc specification');
