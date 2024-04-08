@@ -43,11 +43,8 @@ class SeaServerAPI {
     return axios.get(url, config);
   };
 
-  getDocContent = (docUuid) => {
-    return this.getDocDownloadLink(docUuid).then(res => {
-      const { download_link: downloadLink } = res.data;
-      return axios.get(downloadLink);
-    });
+  getDocContent = (downloadLink) => {
+    return axios.get(downloadLink);
   };
     
   saveDocContent = (docUuid, docData, lastModifyUser) => {   
