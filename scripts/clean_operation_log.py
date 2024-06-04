@@ -4,6 +4,7 @@ import os
 import pymysql
 import logging
 from datetime import datetime
+from logging import handlers
 
 
 def setup_logger(log_name, log_dir):
@@ -11,7 +12,7 @@ def setup_logger(log_name, log_dir):
     setup logger
     """
     log_file = os.path.join(log_dir, log_name)
-    handler = logging.FileHandler(log_file)
+    handler = handlers.TimedRotatingFileHandler(log_file, when='D', interval=1, backupCount=7)
     formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
     handler.setFormatter(formatter)
     logging.root.setLevel(logging.INFO)
