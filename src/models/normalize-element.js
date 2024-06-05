@@ -21,6 +21,7 @@ const BLOCKQUOTE_CHILDREN_TYPES = [
   'header5',
   'header6',
   'paragraph',
+  'group',
 ];
 export const FIRST_LEVEL_ELEMENT_TYPES = [
   'blockquote',
@@ -44,6 +45,7 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'seatable_table',
   'multi_column',
   'column',
+  'group',
 ];
 
 const isElementNeedChildrenAttributes = (element) => {
@@ -207,6 +209,9 @@ export const normalizeElement = (element) => {
       }
       // default
       break;
+    }
+    case 'group': {
+      element.children = element.children.map(element => normalizeElement(element));
     }
   }
 
