@@ -39,7 +39,8 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'code_block',
   'table',
   'callout',
-  'image_block'
+  'image_block',
+  'seatable_view'
 ];
 
 /**
