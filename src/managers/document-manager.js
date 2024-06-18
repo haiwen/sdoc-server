@@ -117,7 +117,7 @@ class DocumentManager {
     return doc.toJson();
   };
 
-  getDoc = async (docUuid, docName, username) => {
+  getDoc = async (docUuid, docName, docTitle, username) => {
     const document = this.documents.get(docUuid);
     if (document) {
       return document.toJson();
@@ -144,7 +144,7 @@ class DocumentManager {
       throw error;
     }
 
-    const docContent = result.data ? result.data : generateDefaultDocContent(docName, username);
+    const docContent = result.data ? result.data : generateDefaultDocContent(docTitle, username);
     if (!isSdocContentValid(docContent)) {
       const error = new Error('The content of the document does not conform to the sdoc specification');
       error.error_type = 'content_invalid';
