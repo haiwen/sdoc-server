@@ -13,8 +13,21 @@ export const generateDefaultParagraph = () => {
   };
 };
 
-export const generateDefaultDocContent = (docName, username) => {
-  const titleText = docName ? docName.substring(0, docName.lastIndexOf('.')) : '';
+export const generateDefaultDocContent = (docTitle, username) => {
+  // wiki
+  if (!docTitle) {
+    const defaultValue = {
+      version: 0,
+      children: [
+        {id: v4(), type: 'paragraph', children: [generateDefaultText()]}
+      ],
+      format_version: 3,
+      last_modify_user: username,
+    };
+    return defaultValue;
+  }
+  // sdoc | document plugin
+  const titleText = docTitle.replace('.sdoc', ''); 
   const defaultValue = {
     version: 0,
     children: [

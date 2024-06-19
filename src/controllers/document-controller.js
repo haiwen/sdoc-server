@@ -8,10 +8,10 @@ import { MESSAGE } from '../constants';
 class DocumentController {
 
   async loadDocContent(req, res) {
-    const { file_uuid: docUuid, filename: docName, username } = req.payload;
+    const { file_uuid: docUuid, filename: docName, username, default_title: docTitle } = req.payload;
     try {
       const documentManager = DocumentManager.getInstance();
-      const docContent = await documentManager.getDoc(docUuid, docName, username);
+      const docContent = await documentManager.getDoc(docUuid, docName, docTitle, username);
 
       // There is no username when seahub get the sdoc content
       if (!username) {
