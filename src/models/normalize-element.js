@@ -40,7 +40,7 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'table',
   'callout',
   'image_block',
-  'seatable_view'
+  'seatable_table'
 ];
 
 /**
