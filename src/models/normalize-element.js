@@ -112,6 +112,11 @@ export const normalizeElement = (element) => {
     return element;
   }
 
+  if (element.text) {
+    delete element.text;
+  }
+
+
   switch(type) {
     case 'blockquote': {
       const validChildren = formatElementChildrenWithTypes(children, [...INLINE_TYPES, ...BLOCKQUOTE_CHILDREN_TYPES]);
