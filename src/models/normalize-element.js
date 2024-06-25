@@ -113,7 +113,7 @@ export const normalizeElement = (element) => {
   }
 
   // After the data structure is wrong, the element containing the children attribute may have an extra text attribute,
-  // which needs to be cleaned up to ensure the consistency of the data structure and avoid unnecessary bugs.
+  // which needs to be cleaned up to ensure the consistency of the data structure and avoid other bugs.
   if (element.text) {
     delete element.text;
   }
