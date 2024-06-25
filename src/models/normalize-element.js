@@ -43,6 +43,11 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'seatable_table'
 ];
 
+const isElementNeedChildrenAttributes = (element) => {
+  const types = [...FIRST_LEVEL_ELEMENT_TYPES, ...INLINE_TYPES];
+  return types.includes(element.type);
+};
+
 /**
  * format element's children, every element child is block
  * @param {*} children element's children
@@ -103,7 +108,7 @@ const formatElementChildrenWithTypes = (children, types) => {
 export const normalizeElement = (element) => {
   const { type, children } = element;
   // child is text
-  if (isHasProperty(element, 'text') && !isHasProperty(element, 'children')) {
+  if (isHasProperty(element, 'text') && !isElementNeedChildrenAttributes(element)) {
     return element;
   }
 
