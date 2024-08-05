@@ -6,7 +6,7 @@ const isHasProperty = (obj, prop) => {
 };
 
 // child types: image | link | sdoc_link | file_link | text
-const INLINE_TYPES = ['link', 'sdoc_link', 'file_link', 'image'];
+const INLINE_TYPES = ['link', 'sdoc_link', 'file_link', 'image', 'column'];
 const INLINE_TYPES_WITHOUT_IMAGE = ['link', 'sdoc_link', 'file_link'];
 const BLOCKQUOTE_CHILDREN_TYPES = [
   'ordered_list',
