@@ -60,6 +60,7 @@ const isElementNeedChildrenAttributes = (element) => {
  * @returns 
  */
 const formatElementChildren = (children, childType) => {
+  const validChildrenTypes = [childType, 'group'];
   const defaultChildren = [{
     id: v4(),
     type: childType,
@@ -68,7 +69,7 @@ const formatElementChildren = (children, childType) => {
   if (!children || !Array.isArray(children) || children.length === 0) {
     return defaultChildren;
   }
-  const newChildren = children.filter(item => item.type && item.type === childType);
+  const newChildren = children.filter(item => item.type && validChildrenTypes.includes(item.type));
   return newChildren.length === 0 ? defaultChildren : newChildren;
 };
 
@@ -81,7 +82,7 @@ const formatListItemChildren = (children) => {
   if (!children || !Array.isArray(children) || children.length === 0) {
     return defaultChildren;
   }
-  const types = ['paragraph', 'unordered_list', 'ordered_list'];
+  const types = ['paragraph', 'unordered_list', 'ordered_list', 'group'];
   const newChildren = children.filter(item => item.type && types.includes(item.type));
   return newChildren.length === 0 ? defaultChildren : newChildren;
 };
