@@ -193,6 +193,18 @@ export const normalizeElement = (element) => {
       element.children = validChildren.map(element => normalizeElement(element));
       break;
     }
+    case 'image_block': {
+      // patch
+      if (children.length === 1 && isHasProperty(children[0], 'text')) {
+        element = {
+          ...element,
+          type: 'paragraph',
+        };
+        break;
+      }
+      // default
+      break;
+    }
   }
 
   return element;
