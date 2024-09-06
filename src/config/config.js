@@ -1,9 +1,9 @@
 import fs from 'fs';
 
 let db_host = 'localhost';
-let db_user = 'seafile';
+let db_user = '';
 let db_password = '';
-let db_database = 'seahub_db';
+let db_database = '';
 let db_port = 3306;
 let connection_limit = 5;
 
@@ -48,7 +48,7 @@ if (filePath && fs.existsSync(filePath)) {
 export const MYSQL_CONFIG = {
   host: process.env.DB_HOST || db_host,
   user: process.env.DB_USER || db_user,
-  password: process.env.DB_PASSWD || db_password,
+  password: process.env.DB_PASSWORD || db_password,
   database: process.env.DB_NAME || db_database,
   port: Number(process.env.DB_PORT || db_port),
   connectionLimit: Number(process.env.CONNECTION_LIMIT || connection_limit),
