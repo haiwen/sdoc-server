@@ -143,7 +143,10 @@ export const isEmptyNode = (node) => {
   const isSingleChild = nodeChildren.length === 1;
   const firstChild = nodeChildren[0];
   const isText = Text.isText(firstChild);
-  const isEmptyContent = Node.string(firstChild) === '';
+  let isEmptyContent = false;
+  if (isText) {
+    isEmptyContent = firstChild.text === '';
+  } 
 
   let isEmpty = isSingleChild && isText && isEmptyContent;
   return isEmpty;
