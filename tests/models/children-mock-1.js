@@ -239,6 +239,14 @@ export const paragraph = {
   ]
 };
 
+export const emptyParagraph =   { 
+  id: 'paragraph', 
+  type: 'paragraph',
+  children: [
+    text,
+  ]
+};
+
 export const withInlineElement = [
   title,
   subtitle,
@@ -253,6 +261,7 @@ export const withInlineElement = [
   codeBlock,
   header1,
   checkListItem,
+  emptyParagraph,
 ];
 
 export const expectChildren1 = [
@@ -264,6 +273,7 @@ export const expectChildren1 = [
   codeBlock,
   header1,
   checkListItem,
+  emptyParagraph,
 ];
 
 export const withSecondLevelElement = [
@@ -272,12 +282,14 @@ export const withSecondLevelElement = [
   codeBlock,
   listItem,
   list,
+  emptyParagraph,
 ];
 
 export const expectChildren2 = [
   title,
   codeBlock,
   list,
+  emptyParagraph,
 ];
 
 export const withEmptyChildElement = [
@@ -291,7 +303,8 @@ export const withEmptyChildElement = [
     id: 'code_block',
     type: 'code_block',
     children: [],
-  }
+  },
+  emptyParagraph
 ];
 
 export const expectChildren3 = [
@@ -321,7 +334,8 @@ export const expectChildren3 = [
       type: 'code_line',
       children: [text]
     }],
-  }
+  },
+  emptyParagraph,
 ];
 
 

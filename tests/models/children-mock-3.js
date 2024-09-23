@@ -1,3 +1,5 @@
+import { emptyParagraph } from "./children-mock-1";
+
 export const children2 = [
   {
     "id": "Ty43y0J7SvS0WxoBbrENjw",
@@ -128,7 +130,8 @@ export const children2 = [
             ]
         }
     ]
-  }
+  },
+  emptyParagraph,
 ];
 
 export const expectChildren2 = [
@@ -261,5 +264,6 @@ export const expectChildren2 = [
             ]
         }
     ]
-  }
+  },
+  emptyParagraph,
 ];

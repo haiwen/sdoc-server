@@ -1,5 +1,6 @@
 import { v4 } from "uuid";
 import { FIRST_LEVEL_ELEMENT_TYPES, normalizeElement } from "./normalize-element";
+import { isEmptyNode } from "../utils/slate-utils";
 
 const generateDefaultText = (text = '') => {
   return { id: v4(), text };
@@ -73,10 +74,17 @@ export const normalizeChildren = (children) => {
   }
 
   // The type of the first-level sub-element must exist. If it does not exist, delete it.
-  const newChildren = children.filter(item => {
+  let newChildren = children.filter(item => {
     return item.type && FIRST_LEVEL_ELEMENT_TYPES.includes(item.type);
   });
   if (newChildren.length === 0) return [generateDefaultParagraph()];
 
-  return newChildren.map(child => normalizeElement(child));
+  newChildren = newChildren.map(child => normalizeElement(child));
+
+  const lastChild = newChildren[newChildren.length - 1];
+  if (!isEmptyNode(lastChild)) {
+    newChildren.push(generateDefaultParagraph());
+  }
+  
+  return newChildren;
 };
