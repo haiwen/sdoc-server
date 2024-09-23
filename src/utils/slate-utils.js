@@ -1,4 +1,4 @@
-import { Transforms, Text } from "@seafile/slate";
+import { Transforms, Text, Node } from "@seafile/slate";
 import deepCopy from 'deep-copy';
 import logger from "../loggers";
 import { FIRST_LEVEL_ELEMENT_TYPES } from "../models/normalize-element";
@@ -136,4 +136,15 @@ export const applyOperations = (document, operations, user) => {
   document.setLastModifyUser(user);
   document.setValue(editor.children, newVersion);
   return true;
+};
+
+export const isEmptyNode = (node) => {
+  const nodeChildren = node.children;
+  const isSingleChild = nodeChildren.length === 1;
+  const firstChild = nodeChildren[0];
+  const isText = Text.isText(firstChild);
+  const isEmptyContent = Node.string(firstChild) === '';
+
+  let isEmpty = isSingleChild && isText && isEmptyContent;
+  return isEmpty;
 };
