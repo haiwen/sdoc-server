@@ -14,3 +14,5 @@ export const MESSAGE = {
 };
 
 export const DOC_CACHE_TIME = 24 * 60 * 60 * 1000;
+
+export const DOC_FORMAT_VERSION = 4;

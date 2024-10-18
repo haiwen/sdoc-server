@@ -23,16 +23,28 @@ const formatContentToVersion3 = (docContent) => {
   };
 };
 
+const formatContentToVersion4 = (docContent) => {
+  const { children } = docContent;
+  return {
+    ...docContent,
+    elements: children,
+    format_version: 4,
+  };
+};
+
 const formatDocContentToNewVersion = (docContent) => {
   let newDocContent = docContent;
   const { format_version = 1 } = newDocContent;
   if (format_version === 1) {
     newDocContent = formatContentToVersion2(docContent);
   }
-  
 
   if (newDocContent.format_version === 2) {
     newDocContent = formatContentToVersion3(newDocContent);
+  }
+  
+  if (newDocContent.format_version === 3) {
+    newDocContent = formatContentToVersion4(newDocContent);
   }
 
   return newDocContent;

@@ -78,8 +78,8 @@ export const validExecuteOp = (op) => {
 };
 
 export const applyOperations = (document, operations, user) => {
-  const { version, children } = document;
-  const editor = { children };  
+  const { version, elements } = document;
+  const editor = { children: elements };  
   let isExecuteError = false;
   // Calculate the top-level block associated with operations
   const blocks = calculateAffectedBlocks(operations);

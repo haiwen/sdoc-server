@@ -185,8 +185,8 @@ class DocumentManager {
     document.setMeta({is_saving: true});
 
     // Get save info
-    const { version, format_version, children, docName, last_modify_user = '' } = document;
-    const docContent = { version, format_version, children, last_modify_user };
+    const { version, format_version, elements, docName, last_modify_user = '' } = document;
+    const docContent = { version, format_version, elements, last_modify_user };
 
     let saveFlag = false;
     const tempPath = `/tmp/` + v4();
@@ -265,7 +265,7 @@ class DocumentManager {
 
   normalizeSdoc = (docUuid) => {
     const document = this.documents.get(docUuid);
-    document.children = normalizeChildren(document.children);
+    document.elements = normalizeChildren(document.elements);
   };
 
   execOperationsBySocket = async (params, docName) => {
