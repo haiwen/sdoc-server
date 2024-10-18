@@ -11,7 +11,7 @@ class Document {
     const newDocContent = formatDocContentToNewVersion(docContent);
     this.version = newDocContent.version;
     this.format_version = newDocContent.format_version;
-    this.children = normalizeChildren(newDocContent.children);
+    this.elements = normalizeChildren(newDocContent.elements);
     this.last_modify_user = newDocContent.last_modify_user;
     this.cursors = {};  // default is empty object
     this.meta = {
@@ -24,9 +24,9 @@ class Document {
     };
   }
 
-  setValue = (value, version) => {
+  setValue = (elements, version) => {
     let last_access = new Date().getTime();
-    this.children = value;
+    this.elements = elements;
     this.version = version;
     let need_save = true;
     this.setMeta({last_access, need_save});
@@ -49,7 +49,7 @@ class Document {
     return {
       version: this.version,
       format_version: this.format_version,
-      children: this.children,
+      elements: this.elements,
       cursors: this.cursors,
       last_modify_user: this.last_modify_user,
     };

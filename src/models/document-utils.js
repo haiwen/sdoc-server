@@ -1,6 +1,7 @@
 import { v4 } from "uuid";
 import { FIRST_LEVEL_ELEMENT_TYPES, normalizeElement } from "./normalize-element";
 import { isEmptyNode } from "../utils/slate-utils";
+import { DOC_FORMAT_VERSION } from "../constants";
 
 const generateDefaultText = (text = '') => {
   return { id: v4(), text };
@@ -19,10 +20,10 @@ export const generateDefaultDocContent = (docTitle, username) => {
   if (!docTitle) {
     const defaultValue = {
       version: 0,
-      children: [
+      elements: [
         {id: v4(), type: 'paragraph', children: [generateDefaultText()]}
       ],
-      format_version: 3,
+      format_version: DOC_FORMAT_VERSION,
       last_modify_user: username,
     };
     return defaultValue;
@@ -31,21 +32,22 @@ export const generateDefaultDocContent = (docTitle, username) => {
   const titleText = docTitle.replace('.sdoc', ''); 
   const defaultValue = {
     version: 0,
-    children: [
+    elements: [
       {id: v4(), type: 'title', children: [generateDefaultText(titleText)]},
       {id: v4(), type: 'paragraph', children: [generateDefaultText()]}
     ],
-    format_version: 3,
+    format_version: DOC_FORMAT_VERSION,
     last_modify_user: username,
   };
   return defaultValue;
 };
 
 export const isSdocContentValid = (content) => {
-  if (!content['children'] || (!content['version'] && content['version'] !== 0)) {
+  const sdocValue = content.elements || content.children;
+  if (!sdocValue || (!content['version'] && content['version'] !== 0)) {
     return false;
   }
-  if (!Array.isArray(content['children'])) {
+  if (!Array.isArray(sdocValue)) {
     return false;
   }
   return true;
@@ -70,7 +72,7 @@ export function resetDocContentCursors(docContent, username) {
 export const normalizeChildren = (children) => {
   if (!children || !Array.isArray(children) || children.length === 0) {
     const doc = generateDefaultDocContent();
-    return doc.children;
+    return doc.elements;
   }
 
   // The type of the first-level sub-element must exist. If it does not exist, delete it.
