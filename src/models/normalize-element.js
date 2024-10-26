@@ -40,7 +40,9 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'table',
   'callout',
   'image_block',
-  'seatable_table'
+  'seatable_table',
+  'multi_column',
+  'columns',
 ];
 
 const isElementNeedChildrenAttributes = (element) => {
