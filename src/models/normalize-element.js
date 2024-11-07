@@ -42,7 +42,7 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'image_block',
   'seatable_table',
   'multi_column',
-  'columns',
+  'column',
 ];
 
 const isElementNeedChildrenAttributes = (element) => {
