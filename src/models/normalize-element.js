@@ -40,6 +40,7 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'table',
   'callout',
   'image_block',
+  'video_block',
   'seatable_table',
   'multi_column',
   'column',
