@@ -15,6 +15,7 @@ export default function(socket, next) {
       avatar_url: decoded.avatar_url
     };
     socket.payload = decoded;
+    socket.authToken = token;
   } catch (err) {
     logger.debug(err.message);
     next(err);

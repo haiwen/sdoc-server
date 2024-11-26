@@ -7,6 +7,7 @@ import UsersManager from "../managers/users-manager";
 import { getErrorMessage } from "../utils";
 import auth from "./auth";
 import IOHelper from "./io-helper";
+import isPermissionValid from "./is-permission-valid";
 
 class IOServer {
 
@@ -55,6 +56,15 @@ class IOServer {
     });
     
     socket.on('update-document', async (params, callback) => {
+      const isValid = isPermissionValid(socket);
+      if (!isValid) {
+        const result = {
+          success: false,
+          error_type: 'token_expired',
+        };
+        callback && callback(result);
+        return;
+      }
       const { docName } = socket;
       const { doc_uuid: docUuid, operations, user, selection, cursor_data } = params;
       const documentManager = DocumentManager.getInstance();
