@@ -44,6 +44,7 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'seatable_table',
   'multi_column',
   'column',
+  'whiteboard',
 ];
 
 const isElementNeedChildrenAttributes = (element) => {
