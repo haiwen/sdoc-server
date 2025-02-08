@@ -84,7 +84,7 @@ def clean_operation_log():
                     sys.stderr.write(
                         '[%s] Failed to clean operation_log records, error: %s.' % (datetime.now(), e))
                     return
-            connection.commit()
+                connection.commit()
 
             logger.info('Successfully cleaned operation_log records.')
 
