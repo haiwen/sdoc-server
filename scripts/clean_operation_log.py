@@ -3,27 +3,42 @@ import sys
 import os
 import pymysql
 import logging
+import argparse
 from datetime import datetime
 from logging import handlers
 
-
-def setup_logger(log_name, log_dir):
-    """
-    setup logger
-    """
-    log_file = os.path.join(log_dir, log_name)
-    handler = handlers.TimedRotatingFileHandler(log_file, when='D', interval=1, backupCount=7)
-    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-    handler.setFormatter(formatter)
-    logging.root.setLevel(logging.INFO)
-    logging.root.addHandler(handler)
-
-    return logging.getLogger(log_name)
+logger = logging.getLogger(__name__)
 
 
-log_file = 'operation-log-cleaner.log '
-log_dir = os.environ.get('LOG_DIR', '')
-logger = setup_logger(log_file, log_dir)
+def init_logging(args):
+    level = args.loglevel
+
+    if level == 'debug':
+        level = logging.DEBUG
+    elif level == 'info':
+        level = logging.INFO
+    elif level == 'warning':
+        level = logging.WARNING
+    else:
+        level = logging.INFO
+
+    if args.logfile == sys.stdout:
+        kw = {
+            'format': '%(asctime)s [%(levelname)s] %(name)s:%(lineno)s: %(message)s',
+            'level': level,
+            'stream': args.logfile
+        }
+
+        logging.basicConfig(**kw)
+    else:
+        log_file = str(args.logfile.name)
+        handler = logging.handlers.TimedRotatingFileHandler(log_file, when='W0', interval=1, backupCount=3)
+        handler.setLevel(level)
+        formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(name)s:%(lineno)s: %(message)s', datefmt='%m/%d/%Y %H:%M:%S')
+        handler.setFormatter(formatter)
+
+        logging.root.setLevel(level)
+        logging.root.addHandler(handler)
 
 
 def load_config():
@@ -46,12 +61,10 @@ def clean_operation_log():
                                    op_time < UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 3 DAY))*1000"""
             try:
                 logger.info('Start count need to be cleaned up records.')
-                print('[%s] Start count need to be cleaned up records.' % datetime.now())
                 cursor.execute(count_sql)
                 count = int(cursor.fetchone()[0])
 
                 logger.info('The number of that need to be cleaned up records: %s' % count)
-                print('[%s] The number of that need to be cleaned up records: %s' % (datetime.now(), count))
             except Exception as e:
                 logger.error('Failed to count operation_log records, error: %s.' % e)
                 sys.stderr.write('[%s] Failed to count operation_log records, error: %s.' % (datetime.now(), e))
@@ -59,7 +72,6 @@ def clean_operation_log():
 
             # clean operation_log records
             logger.info('Cleaning up operation_log records...')
-            print('[%s] Cleaning up operation_log records...' % datetime.now())
             step = 10000
             for i in range(0, count, step):
                 clean_sql = f"""DELETE FROM `operation_log` WHERE
@@ -75,8 +87,27 @@ def clean_operation_log():
             connection.commit()
 
             logger.info('Successfully cleaned operation_log records.')
-            print('[%s] Successfully cleaned operation_log records.' % datetime.now())
+
+
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '--logfile',
+        default=sys.stdout,
+        type=argparse.FileType('a'),
+        help='log file')
+
+    parser.add_argument(
+        '--loglevel',
+        default='info',
+        help='log level')
+
+    args = parser.parse_args()
+    init_logging(args)
+
+    clean_operation_log()
 
 
 if __name__ == '__main__':
-    clean_operation_log()
+    main()
