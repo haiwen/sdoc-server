@@ -21,6 +21,7 @@ const BLOCKQUOTE_CHILDREN_TYPES = [
   'header5',
   'header6',
   'paragraph',
+  'group',
 ];
 export const FIRST_LEVEL_ELEMENT_TYPES = [
   'blockquote',
@@ -44,6 +45,7 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'seatable_table',
   'multi_column',
   'column',
+  'group',
 ];
 
 const isElementNeedChildrenAttributes = (element) => {
@@ -58,6 +60,7 @@ const isElementNeedChildrenAttributes = (element) => {
  * @returns 
  */
 const formatElementChildren = (children, childType) => {
+  const validChildrenTypes = [childType, 'group'];
   const defaultChildren = [{
     id: v4(),
     type: childType,
@@ -66,7 +69,7 @@ const formatElementChildren = (children, childType) => {
   if (!children || !Array.isArray(children) || children.length === 0) {
     return defaultChildren;
   }
-  const newChildren = children.filter(item => item.type && item.type === childType);
+  const newChildren = children.filter(item => item.type && validChildrenTypes.includes(item.type));
   return newChildren.length === 0 ? defaultChildren : newChildren;
 };
 
@@ -79,7 +82,7 @@ const formatListItemChildren = (children) => {
   if (!children || !Array.isArray(children) || children.length === 0) {
     return defaultChildren;
   }
-  const types = ['paragraph', 'unordered_list', 'ordered_list'];
+  const types = ['paragraph', 'unordered_list', 'ordered_list', 'group'];
   const newChildren = children.filter(item => item.type && types.includes(item.type));
   return newChildren.length === 0 ? defaultChildren : newChildren;
 };
@@ -207,6 +210,9 @@ export const normalizeElement = (element) => {
       }
       // default
       break;
+    }
+    case 'group': {
+      element.children = element.children.map(element => normalizeElement(element));
     }
   }
 
