@@ -57,7 +57,7 @@ def clean_operation_log():
     connection = pymysql.connect(user=user, password=password, database=database, host=host)
     with connection:
         with connection.cursor() as cursor:
-            count_sql = """SELECT COUNT(1) FROM `operation_log` WHERE
+            count_sql = """SELECT COUNT(1) FROM `sdoc_operation_log` WHERE
                                    op_time < UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 3 DAY))*1000"""
             try:
                 logger.info('Start count need to be cleaned up records.')
@@ -74,7 +74,7 @@ def clean_operation_log():
             logger.info('Cleaning up operation_log records...')
             step = 10000
             for i in range(0, count, step):
-                clean_sql = f"""DELETE FROM `operation_log` WHERE
+                clean_sql = f"""DELETE FROM `sdoc_operation_log` WHERE
                                    op_time < UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 3 DAY))*1000 LIMIT {step}"""
 
                 try:
