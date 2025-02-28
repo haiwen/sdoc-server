@@ -46,6 +46,7 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'multi_column',
   'column',
   'group',
+  'chart'
 ];
 
 const isElementNeedChildrenAttributes = (element) => {
