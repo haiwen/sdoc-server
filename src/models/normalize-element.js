@@ -6,7 +6,7 @@ const isHasProperty = (obj, prop) => {
 };
 
 // child types: image | link | sdoc_link | file_link | text
-const INLINE_TYPES = ['link', 'sdoc_link', 'file_link', 'image', 'column', 'wiki_link'];
+const INLINE_TYPES = ['link', 'sdoc_link', 'file_link', 'image', 'seatable_column', 'wiki_link'];
 const INLINE_TYPES_WITHOUT_IMAGE = ['link', 'sdoc_link', 'file_link', 'wiki_link'];
 const BLOCKQUOTE_CHILDREN_TYPES = [
   'ordered_list',
@@ -59,7 +59,7 @@ const isElementNeedChildrenAttributes = (element) => {
  * format element's children, every element child is block
  * @param {*} children element's children
  * @param {*} childType child type
- * @returns 
+ * @returns
  */
 const formatElementChildren = (children, childType) => {
   const validChildrenTypes = [childType, 'group'];
@@ -93,7 +93,7 @@ const formatListItemChildren = (children) => {
  * format element's children, every element child are block or inline
  * @param {*} children element's children
  * @param {*} types child support types
- * @returns 
+ * @returns
  */
 const formatElementChildrenWithTypes = (children, types) => {
   const defaultChildren = [{
@@ -192,9 +192,9 @@ export const normalizeElement = (element) => {
     }
     case 'table_cell': {
       const supportTypes = [
-        ...INLINE_TYPES, 
+        ...INLINE_TYPES,
         'check_list_item',
-        'ordered_list', 
+        'ordered_list',
         'unordered_list',
       ];
       const validChildren = formatElementChildrenWithTypes(children, supportTypes);

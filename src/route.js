@@ -16,7 +16,7 @@ router.post(`${BASE_URL_VERSION1}/:doc_uuid/replace/`, multipartMiddleware, docu
 
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/collaborators`, userController.getCollaborators);
 
-// comment 
+// comment
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/comment/`, commentController.listComments);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/comment/`, commentController.insertComment);
 router.delete(`${BASE_URL_VERSION1}/:doc_uuid/comment/:comment_id/`, commentController.deleteComment);

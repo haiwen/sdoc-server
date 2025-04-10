@@ -83,7 +83,7 @@ class DocumentManager {
 
   reloadDoc = async (docUuid, docName) => {
     this.removeDocFromMemory(docUuid);
-    
+
     let downloadLink = '';
     try {
       const res = await seaServerAPI.getDocDownloadLink(docUuid);
@@ -181,7 +181,7 @@ class DocumentManager {
     if (meta.is_saving || !meta.need_save) { // is saving
       return Promise.resolve(false);
     }
-  
+
     document.setMeta({is_saving: true});
 
     // Get save info
@@ -259,7 +259,7 @@ class DocumentManager {
       if (currentTime - meta.last_access > DOC_CACHE_TIME) {
         this.removeDoc(docUuid);
         logger.info(`Regularly clear files that no one has accessed: ${docUuid}`);
-      } 
+      }
     }
   }
 
@@ -288,7 +288,7 @@ class DocumentManager {
 
     const { version: serverVersion } = document;
     if (serverVersion !== clientVersion) {
-      const operationsManager = OperationsManager.getInstance(); 
+      const operationsManager = OperationsManager.getInstance();
       const loseOperations = await operationsManager.getLoseOperationList(doc_uuid, clientVersion);
       const result = {
         success: false,
@@ -310,7 +310,7 @@ class DocumentManager {
       logger.error('apply operations failed.', document.docUuid, operations);
       isExecuteSuccess = false;
     }
-    
+
     // execute operations failed
     if (!isExecuteSuccess) {
       const result = {
@@ -356,7 +356,7 @@ class DocumentManager {
         logger.error('apply pending operations failed.', document.docUuid, version, operations);
         isExecuteSuccess = false;
       }
-      
+
       if (isExecuteSuccess) {
         document.version = version;
         document.meta.need_save = true;

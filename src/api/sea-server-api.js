@@ -46,40 +46,40 @@ class SeaServerAPI {
   getDocContent = (downloadLink) => {
     return axios.get(downloadLink);
   };
-    
-  saveDocContent = (docUuid, docData, lastModifyUser) => {   
+
+  saveDocContent = (docUuid, docData, lastModifyUser) => {
     const uploadLink = '/api/v2.1/seadoc/upload-file/' + docUuid + '/';
 
     const formData = new FormData();
     formData.append("file", fs.createReadStream(docData.path));
     formData.append("last_modify_user", lastModifyUser);
-    
+
     const config = this.getConfig(docUuid);
     return axios.post(uploadLink, formData, config);
   };
-  
+
   listComments = (docUuid) => {
     const uploadLink = '/api/v2.1/seadoc/comments/' + docUuid + '/';
-  
+
     const config = this.getConfig(docUuid);
     return axios.get(uploadLink, config);
   };
-  
+
   insertComment = (docUuid, comment) => {
     const uploadLink = '/api/v2.1/seadoc/comments/' + docUuid + '/';
     const data = comment;
-    
+
     const config = this.getConfig(docUuid);
     return axios.post(uploadLink, data, config);
   };
-  
+
   deleteComment = (docUuid, commentId) => {
     const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/';
-    
+
     const config = this.getConfig(docUuid);
     return axios.delete(uploadLink, config);
   };
-  
+
   updateComment = (docUuid, commentId, comment) => {
     const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/';
     const data = comment;
@@ -89,26 +89,26 @@ class SeaServerAPI {
 
   listReplies = (docUuid, commentId) => {
     const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/';
-  
+
     const config = this.getConfig(docUuid);
     return axios.get(uploadLink, config);
   };
-  
+
   insertReply = (docUuid, commentId, reply) => {
     const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/';
     const data = reply;
-    
+
     const config = this.getConfig(docUuid);
     return axios.post(uploadLink, data, config);
   };
-  
+
   deleteReply = (docUuid, commentId, replyId) => {
     const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/' + replyId + '/';
-    
+
     const config = this.getConfig(docUuid);
     return axios.delete(uploadLink, config);
   };
-  
+
   updateReply = (docUuid, commentId, replyId, reply) => {
     const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/' + replyId + '/';
     const data = reply;
@@ -121,7 +121,7 @@ class SeaServerAPI {
 
     const formData = new FormData();
     formData.append("status", status);
-    
+
     const config = this.getConfig(docUuid);
     return axios.post(url, formData, config);
   };
