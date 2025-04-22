@@ -1,4 +1,4 @@
-import { normalizeChildren } from "../../src/models/document-utils";
+import { normalizeChildren } from "../../src/modules/sdoc/models/document-utils";
 import { formatChildren } from "../core";
 import { children, expectChildren } from "./children-mock-2";
 import { children2, expectChildren2 } from "./children-mock-3";

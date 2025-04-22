@@ -1,4 +1,4 @@
-import { formatContentToVersion3, formatSlateNodeToVersion3 } from '../../src/models/document-format';
+import { formatContentToVersion3, formatSlateNodeToVersion3 } from '../../src/modules/sdoc/models/document-format';
 import { docContent, expectDocContent, expectOrderedList, oldOrderedList } from './content-mock-3';
 
 describe('simple:test format slate node', () => {

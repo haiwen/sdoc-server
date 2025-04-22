@@ -1,5 +1,5 @@
-import { applyOperations } from '../../src/utils/slate-utils';
-import Document from '../../src/models/document';
+import { applyOperations } from '../../src/modules/sdoc/utils/slate-utils';
+import Document from '../../src/modules/sdoc/models/document';
 
 let document = null;
 let user = null;
@@ -56,5 +56,5 @@ describe('calculateAffectedBlocks', () => {
     const isExecuteSuccess = applyOperations(document, operations, user);
     expect(isExecuteSuccess).toBe(false);
   });
-  
+
 });

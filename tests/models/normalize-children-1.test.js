@@ -1,12 +1,12 @@
-import { normalizeChildren } from "../../src/models/document-utils";
+import { normalizeChildren } from "../../src/modules/sdoc/models/document-utils";
 import { formatChildren } from "../core";
-import { 
-  withInlineElement, 
-  expectChildren1, 
+import {
+  withInlineElement,
+  expectChildren1,
   withSecondLevelElement,
   expectChildren2,
-  withEmptyChildElement, 
-  expectChildren3, 
+  withEmptyChildElement,
+  expectChildren3,
 } from "./children-mock-1";
 
 describe('normalize children content', () => {
