@@ -1,6 +1,6 @@
-import IOHelper from '../wss/io-helper';
-import UsersManager from './users-manager';
+import IOHelper from '../wio/io-helper';
 import { MESSAGE } from '../constants';
+import UsersManager from './users-manager';
 
 class ParticipantManager {
 

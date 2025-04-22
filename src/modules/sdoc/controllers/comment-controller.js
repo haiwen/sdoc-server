@@ -1,7 +1,7 @@
+import logger from "../../../loggers";
+import { isObject, isRequestTimeout } from "../../../utils";
+import { internalServerError, paramIsError, paramIsRequired } from "../../../utils/resp-message-utils";
 import seaServerAPI from "../api/sea-server-api";
-import logger from "../loggers";
-import { isObject, isRequestTimeout } from "../utils";
-import { internalServerError, paramIsError, paramIsRequired } from "../utils/resp-message-utils";
 import NotificationManager from "../managers/notification-manager";
 
 class CommentController {
@@ -27,17 +27,17 @@ class CommentController {
 
   async insertComment(req, res) {
     const { doc_uuid: docUuid } = req.params;
-    
+
     const { comment, detail, author, updated_at } = req.body;
 
     if (!comment) {
       return res.status(400).send(paramIsRequired('comment'));
     }
-    
+
     if (!detail) {
       return res.status(400).send(paramIsRequired('detail'));
     }
-    
+
     if (!isObject(detail) || !detail.element_id) {
       return res.status(400).send(paramIsError('detail'));
     }
@@ -107,15 +107,15 @@ class CommentController {
       if (!comment) {
         return res.status(400).send(paramIsRequired('comment'));
       }
-      
+
       if (!detail) {
         return res.status(400).send(paramIsRequired('detail'));
       }
-      
+
       if (!isObject(detail) || !detail.element_id) {
         return res.status(400).send(paramIsError('detail'));
       }
-  
+
       if (!updated_at) {
         return res.status(400).send(paramIsRequired('updated_at'));
       }
@@ -142,7 +142,7 @@ class CommentController {
       return;
     }
   }
-  
+
 }
 
 const commentController = new CommentController();

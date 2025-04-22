@@ -44,7 +44,7 @@ class UsersManager {
     }
     return null;
   };
-  
+
   deleteUser = (docUuid, socketId) => {
     let usersCount = 0;
     if (this.users.has(docUuid)) {
@@ -62,6 +62,7 @@ class UsersManager {
     let users = {};
     if (this.users.has(docUuid)) {
       const docUsers = this.users.get(docUuid);
+      // eslint-disable-next-line no-unused-vars
       docUsers.forEach((user, socketId) => {
         users[user.username] = user;
       });

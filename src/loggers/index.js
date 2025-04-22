@@ -19,18 +19,18 @@ const codeLayout = {
 };
 
 log4js.configure({
-  appenders: { 
-    logger: { 
-      type: 'dateFile', 
+  appenders: {
+    logger: {
+      type: 'dateFile',
       filename: logFile,
       pattern: "yyyy-MM-dd",
       keepFileExt: true,
       layout: codeLayout,
     },
   },
-  categories: { 
-    default: {  
-      appenders: ['logger'], 
+  categories: {
+    default: {
+      appenders: ['logger'],
       level: logLevel,
       enableCallStack: true,
     },
