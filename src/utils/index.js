@@ -54,12 +54,12 @@ export const formatTimeToMillisecond = (time) => {
   if (type.indexOf('h') > -1) {
     return time = value * 60 * 60 * 1000;
   }
-  
+
   // minute | min | m
   if (type.indexOf('m') > -1) {
     return time = value * 60 * 1000;
   }
-  
+
   // second | s
   if (type.indexOf('s') > -1) {
     return time = value * 1000;

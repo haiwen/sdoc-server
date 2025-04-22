@@ -1,6 +1,6 @@
-import { Transforms, Text, Node } from "@seafile/slate";
+import { Transforms, Text } from "@seafile/slate";
 import deepCopy from 'deep-copy';
-import logger from "../loggers";
+import logger from "../../../loggers";
 import { FIRST_LEVEL_ELEMENT_TYPES } from "../models/normalize-element";
 
 export const calculateAffectedBlocks = (operations) => {
@@ -79,7 +79,7 @@ export const validExecuteOp = (op) => {
 
 export const applyOperations = (document, operations, user) => {
   const { version, elements } = document;
-  const editor = { children: elements };  
+  const editor = { children: elements };
   let isExecuteError = false;
   // Calculate the top-level block associated with operations
   const blocks = calculateAffectedBlocks(operations);
@@ -131,7 +131,7 @@ export const applyOperations = (document, operations, user) => {
   if (isExecuteError) {
     return false;
   }
-  
+
   const newVersion = version + 1;
   document.setLastModifyUser(user);
   document.setValue(editor.children, newVersion);
@@ -146,7 +146,7 @@ export const isEmptyNode = (node) => {
   let isEmptyContent = false;
   if (isText) {
     isEmptyContent = firstChild.text === '';
-  } 
+  }
 
   let isEmpty = isSingleChild && isText && isEmptyContent;
   return isEmpty;

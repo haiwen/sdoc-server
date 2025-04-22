@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { SEADOC_PRIVATE_KEY } from '../config/config';
+import { SEADOC_PRIVATE_KEY } from '../../../config/config';
 
 function checkPermission(socket) {
   try {

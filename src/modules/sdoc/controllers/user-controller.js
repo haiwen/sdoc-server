@@ -1,6 +1,6 @@
-import logger from "../loggers";
+import logger from "../../../loggers";
+import { isRequestTimeout } from "../../../utils";
 import UsersManager from '../managers/users-manager';
-import { isRequestTimeout } from "../utils";
 
 class UserController {
 
@@ -22,7 +22,7 @@ class UserController {
       return;
     }
   }
-  
+
 }
 
 const userController = new UserController();
