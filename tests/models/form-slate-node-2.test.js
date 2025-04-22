@@ -1,4 +1,4 @@
-import { formatContentToVersion2, formatSlateNodeToVersion2 } from '../../src/modules/sdoc/models/document-format';
+import { formatContentToVersion2, formatSlateNodeToVersion2 } from '../../src/models/document-format';
 import { docContent, expectBlockquote, expectCheckListItem, expectCodeBlock, expectDocContent, expectFileLink, expectHeader, expectImage, expectLink, expectOrderedList, expectSdocLink, expectTable, expectText, expectTitle, oldBlockquote, oldCheckListItem, oldCodeBlock, oldFileLink, oldHeader, oldImage, oldLink, oldOrderedList, oldSdocLink, oldTable, oldText, oldTitle } from './content-mock-2';
 
 describe('simple:test format slate node', () => {
@@ -46,7 +46,7 @@ describe('simple:test format slate node', () => {
     const newContent = formatSlateNodeToVersion2(oldOrderedList);
     expect(newContent).toEqual(expectOrderedList);
   });
-
+  
   it('format check-list-item', () => {
     const newContent = formatSlateNodeToVersion2(oldCheckListItem);
     expect(newContent).toEqual(expectCheckListItem);

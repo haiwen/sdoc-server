@@ -42,7 +42,7 @@ const formatDocContentToNewVersion = (docContent) => {
   if (newDocContent.format_version === 2) {
     newDocContent = formatContentToVersion3(newDocContent);
   }
-
+  
   if (newDocContent.format_version === 3) {
     newDocContent = formatContentToVersion4(newDocContent);
   }

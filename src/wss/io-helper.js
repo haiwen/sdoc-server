@@ -31,7 +31,7 @@ class IOHelper {
   sendCursorMessageToRoom = (socket, roomId, params) => {
     socket.to(roomId).emit('update-cursor', {...params});
   };
-
+  
   sendJoinRoomMessage = (socket, roomId, userInfo) => {
     socket.to(roomId).emit('join-room', userInfo);
   };
@@ -39,7 +39,7 @@ class IOHelper {
   sendLeaveRoomMessage = (socket, roomId, username) => {
     socket.to(roomId).emit('leave-room', username);
   };
-
+  
   sendMessageToPrivate = (sid, params) => {
     this.io.to(sid).emit('message', `${params.name} has join room`);
   };

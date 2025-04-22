@@ -1,4 +1,4 @@
-import { normalizeElement } from "../../src/modules/sdoc/models/normalize-element";
+import { normalizeElement } from "../../src/models/normalize-element";
 import { formatChildren } from "../core";
 
 describe('normalize element: format empty element to normal element', () => {
@@ -230,7 +230,7 @@ describe('normalize element: format empty element to normal element', () => {
     const newContent = normalizeElement(element);
     expect(formatChildren(newContent)).toEqual(formatChildren(expectElement));
   });
-
+  
   it('code_block', () => {
     const element = {
       id: 'code_block',

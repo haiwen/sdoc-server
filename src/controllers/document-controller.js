@@ -1,9 +1,9 @@
-import logger from "../../../loggers";
-import { isRequestTimeout } from "../../../utils";
+import logger from "../loggers";
 import DocumentManager from '../managers/document-manager';
 import { resetDocContentCursors } from "../models/document-utils";
+import { isRequestTimeout } from "../utils";
+import IOHelper from "../wss/io-helper";
 import { MESSAGE } from '../constants';
-import IOHelper from "../wio/io-helper";
 
 class DocumentController {
 
@@ -27,7 +27,7 @@ class DocumentController {
       if (isRequestTimeout(err)) {
         logger.error('Request timed out, please try again later');
       }
-
+    
       if (err.error_type === 'get_doc_download_link_error') {
         logger.error(`Get doc download link error. request url is: ${err.from_url}`);
         return res.status(500).send({
@@ -43,7 +43,7 @@ class DocumentController {
           'error_msg': 'Internal Server Error'
         });
       }
-
+    
       if (err.error_type === 'content_invalid') {
         logger.error(err.message);
         return res.status(500).send({
@@ -56,7 +56,7 @@ class DocumentController {
       return;
     }
   }
-
+  
   async saveDocContent(req, res) {
 
     const { file_uuid: docUuid, filename: docName } = req.payload;
@@ -66,9 +66,9 @@ class DocumentController {
       res.status(400).send({"error_msg": `Param 'doc_content' is required`});
       return;
     }
-
+    
     let content = null;
-
+    
     try {
       // Form api: need parse string content to object content
       content = JSON.parse(docContent);

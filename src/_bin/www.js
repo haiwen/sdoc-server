@@ -4,7 +4,7 @@ import { SERVER_PORT } from '../config/config';
 import logger from '../loggers';
 import app from "../app";
 import IOServer from '../wss';
-import DocumentManager from '../modules/sdoc/managers/document-manager';
+import DocumentManager from '../managers/document-manager';
 
 const server = http.createServer(app);
 

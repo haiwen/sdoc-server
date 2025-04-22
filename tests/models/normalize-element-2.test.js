@@ -1,4 +1,4 @@
-import { normalizeElement } from "../../src/modules/sdoc/models/normalize-element";
+import { normalizeElement } from "../../src/models/normalize-element";
 import { formatChildren } from "../core";
 import { blockquote, checkListItem, codeBlock, emptyCodeLine, emptyListItem, emptyTableRow, fileLink, header1, image, link, list, paragraph, sdocLink, table, text, title } from "./children-mock-1";
 
@@ -693,7 +693,7 @@ describe('normalize element: blockquote', () => {
       id: 'blockquote',
       type: 'blockquote',
       children: [
-        {
+        { 
           id: 'paragraph',
           type: 'paragraph',
           children: [{id: 'text', text: ''}]

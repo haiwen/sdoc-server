@@ -12,7 +12,7 @@ const formatElementNode = (node) => {
   if (type === 'ordered_list' || type === 'unordered_list') {
     return { ...node, children: formatElementNodeChildren(children)};
   }
-
+  
   if (type === 'list_item') {
     return { ...node, children: formatElementNodeChildren(children)};
   }

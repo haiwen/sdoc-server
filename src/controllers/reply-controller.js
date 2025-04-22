@@ -1,7 +1,7 @@
-import logger from "../../../loggers";
-import { isRequestTimeout } from "../../../utils";
-import { internalServerError, paramIsRequired } from "../../../utils/resp-message-utils";
 import seaServerAPI from "../api/sea-server-api";
+import logger from "../loggers";
+import { isRequestTimeout } from "../utils";
+import { internalServerError, paramIsRequired } from "../utils/resp-message-utils";
 import NotificationManager from "../managers/notification-manager";
 
 class ReplyController {
@@ -27,7 +27,7 @@ class ReplyController {
 
   async insertReply(req, res) {
     const { doc_uuid: docUuid, comment_id: commentId } = req.params;
-
+    
     const { type, reply, author } = req.body;
 
     if (!type) {
@@ -106,7 +106,7 @@ class ReplyController {
       return;
     }
   }
-
+  
 }
 
 const replyController = new ReplyController();

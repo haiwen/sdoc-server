@@ -1,16 +1,16 @@
 import fs from 'fs';
 import { v4 } from "uuid";
 import deepCopy from 'deep-copy';
-import { SAVE_INTERVAL, SEAHUB_SERVER } from "../../../config/config";
-import logger from "../../../loggers";
-import { deleteDir, getErrorMessage } from "../../../utils";
 import seaServerAPI from "../api/sea-server-api";
+import { deleteDir, getErrorMessage } from "../utils";
+import logger from "../loggers";
+import { SAVE_INTERVAL, SEAHUB_SERVER } from "../config/config";
 import { DOC_CACHE_TIME } from '../constants';
 import Document from '../models/document';
-import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
 import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
+import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
 import UsersManager from './users-manager';
 
 class DocumentManager {

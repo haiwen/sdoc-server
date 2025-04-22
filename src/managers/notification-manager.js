@@ -1,4 +1,4 @@
-import IOHelper from "../wio/io-helper";
+import IOHelper from "../wss/io-helper";
 import UsersManager from "./users-manager";
 
 class NotificationManager {

@@ -1,9 +1,9 @@
 import express from 'express';
+import route from './route';
 import noAuthRouter from './no-auth-route';
 import bodyParser from 'body-parser';
 import cors from './middleware/cors';
 import auth from './middleware/auth';
-import route from './modules/sdoc/route';
 
 const app = express();
 

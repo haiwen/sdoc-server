@@ -12,7 +12,7 @@ const formatElementNode = (node) => {
   if (type === 'blockquote') {
     return { ...node, children: formatElementNodeChildren(children) };
   }
-
+  
   if (type === 'title' || type === 'subtitle') {
     return { ...node, children: formatElementNodeChildren(children) };
   }
@@ -26,7 +26,7 @@ const formatElementNode = (node) => {
   if (type === 'ordered_list' || type === 'unordered_list') {
     return { ...node, children: formatElementNodeChildren(children)};
   }
-
+  
   // list-item -> list_item
   if (type === 'list-item') {
     return { ...node, type: 'list_item', children: formatElementNodeChildren(children)};
@@ -36,31 +36,31 @@ const formatElementNode = (node) => {
   if (type === 'list-lic') {
     return { ...node, type: 'list_lic', children: formatElementNodeChildren(children)};
   }
-
+  
   // check-list-item -> check_list_item
   if (type === 'check-list-item') {
     return { ...node, type: 'check_list_item', children: formatElementNodeChildren(children)};
   }
-
+  
   if (type === 'paragraph') {
     return { ...node, children: formatElementNodeChildren(children)};
   }
-
+  
   // code-block -> code_block
   if (type === 'code-block') {
     return { ...node, type: 'code_block', children: formatElementNodeChildren(children)};
   }
-
+  
   // code-line -> code_line
   if (type === 'code-line') {
     return { ...node, type: 'code_line', children: formatElementNodeChildren(children)};
   }
-
-
+  
+  
   if (type === 'table') {
     return { ...node, children: formatElementNodeChildren(children)};
   }
-
+  
   // table-row -> table_row
   if (type === 'table-row') {
     // format table-row's style
@@ -73,7 +73,7 @@ const formatElementNode = (node) => {
     }
     return { ...node, type: 'table_row', children: formatElementNodeChildren(children)};
   }
-
+  
   // table-cell -> table-cell
   if (type === 'table-cell') {
     // format table-cell's style
@@ -97,11 +97,11 @@ const formatElementNode = (node) => {
   if (type === 'sdoc-link') {
     return { ...node, type: 'sdoc_link', children: formatElementNodeChildren(children)};
   }
-
+  
   if (type === 'file_link') {
     return { ...node, children: formatElementNodeChildren(children)};
   }
-
+  
   if (type === 'image') {
     return { ...node, children: formatElementNodeChildren(children)};
   }

@@ -1,4 +1,4 @@
-import DBHelper from "../../../db-helper";
+import DBHelper from "../db-helper";
 
 export const recordOperations = (docUuid, operations, version, user) => {
   const sql = 'INSERT INTO `sdoc_operation_log` \

@@ -29,7 +29,7 @@ export const generateDefaultDocContent = (docTitle, username) => {
     return defaultValue;
   }
   // sdoc | document plugin
-  const titleText = docTitle.replace('.sdoc', '');
+  const titleText = docTitle.replace('.sdoc', ''); 
   const defaultValue = {
     version: 0,
     elements: [
@@ -55,9 +55,9 @@ export const isSdocContentValid = (content) => {
 
 /**
  * delete current user's cursor from returned value
- * @param {*} docContent
- * @param {*} username
- * @returns
+ * @param {*} docContent 
+ * @param {*} username 
+ * @returns 
  */
 export function resetDocContentCursors(docContent, username) {
   const { cursors = {}  } = docContent;
@@ -87,6 +87,6 @@ export const normalizeChildren = (children) => {
   if (!isEmptyNode(lastChild)) {
     newChildren.push(generateDefaultParagraph());
   }
-
+  
   return newChildren;
 };

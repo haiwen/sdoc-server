@@ -23,7 +23,7 @@ const formatTextNode = (node) => {
     const newKey = convertKeys[key];
     newNode[newKey] = node[key];
   });
-
+  
   return newNode;
 };
 

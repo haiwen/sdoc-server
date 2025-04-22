@@ -1,4 +1,4 @@
-import UsersManager from "../../src/modules/sdoc/managers/users-manager";
+import UsersManager from "../../src/managers/users-manager";
 
 let usersManager = null;
 beforeEach(() => {
@@ -18,16 +18,16 @@ describe('user manager test', () => {
     const user = usersManager.getUser('555555', 'eeeeee1');
     expect(user.username).toBe('eee1');
   });
-
+  
   it('delete user test', () => {
     const users1 = usersManager.getDocUsers('111111');
     expect(users1.length).toBe(2);
-
+    
     usersManager.deleteUser('111111', 'aaaaaa1');
     const users2 = usersManager.getDocUsers('111111');
     expect(users2.length).toBe(1);
   });
-
+  
   it('get doc users', () => {
     const users2 = usersManager.getDocUsers('111111');
     expect(users2.length).toBe(2);

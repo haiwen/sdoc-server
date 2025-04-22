@@ -1,4 +1,4 @@
-import { calculateAffectedBlocks } from '../../src/modules/sdoc/utils/slate-utils';
+import { calculateAffectedBlocks } from '../../src/utils/slate-utils';
 
 describe('calculateAffectedBlocks', () => {
   it('insert_text: ui operation, Press the alphanumeric key', () => {

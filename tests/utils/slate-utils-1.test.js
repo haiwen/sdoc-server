@@ -1,4 +1,4 @@
-import { isNodeIdValid } from '../../src/modules/sdoc/utils/slate-utils';
+import { isNodeIdValid } from '../../src/utils/slate-utils';
 
 describe('test valid node function', () => {
   it('valid no children node', () => {

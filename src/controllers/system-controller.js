@@ -1,8 +1,8 @@
-import logger from "../../../loggers";
-import { isRequestTimeout } from "../../../utils";
+import logger from "../loggers";
+import { isRequestTimeout } from "../utils";
 import DocumentManager from '../managers/document-manager';
 import OperationsManager from '../managers/operations-manager';
-import IOHelper from '../wio/io-helper';
+import IOHelper from '../wss/io-helper';
 
 class SystemController {
 
@@ -14,7 +14,7 @@ class SystemController {
     }
 
     try {
-      const version = process.env.server_version || 'dev';
+      const version = process.env.server_version || 'dev'; 
       const documentManager = DocumentManager.getInstance();
       const operationsManager = OperationsManager.getInstance();
       const ioHelper = IOHelper.getInstance();
