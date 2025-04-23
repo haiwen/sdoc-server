@@ -30,7 +30,6 @@ class IOHandler {
     // todo permission check
 
     socket.on('join-room', async (callback) => {
-
       let docContent = null;
       const { docUuid, docName } = socket;
       try {
