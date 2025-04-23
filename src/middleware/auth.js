@@ -39,7 +39,7 @@ const auth = (req, res, next) => {
         res.status(403).send({"error_msg": 'You don\'t have permission to access.'});
         return;
       }
-  
+
       // write jwt token to the req object
       req.payload = decoded;
       next();

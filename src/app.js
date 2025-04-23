@@ -12,9 +12,9 @@ app.use(bodyParser.json({ limit: '100mb' }));
 app.use(bodyParser.urlencoded({ limit: '100mb', extended: false }));
 app.all("*", cors); // Access-Control-Allow-Origin
 app.use(noAuthRouter);
-app.use(exdrawRoute);
 app.use(auth);
 app.use(route);
+app.use(exdrawRoute);
 
 // eslint-disable-next-line
 app.use((err, req, res, next) => {
