@@ -4,6 +4,7 @@ import bodyParser from 'body-parser';
 import cors from './middleware/cors';
 import auth from './middleware/auth';
 import route from './modules/sdoc/route';
+import exdrawRoute from './modules/exdraw/route';
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.all("*", cors); // Access-Control-Allow-Origin
 app.use(noAuthRouter);
 app.use(auth);
 app.use(route);
+app.use(exdrawRoute);
 
 // eslint-disable-next-line
 app.use((err, req, res, next) => {
