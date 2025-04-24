@@ -5,7 +5,7 @@ const roomId = 'demo001';
 class ExdrawIOHandler {
 
   constructor(io) {
-    this.ioHelper = new IOHelper(io);
+    this.ioHelper = IOHelper.getInstance(io);
     this.instance = null;
   }
 

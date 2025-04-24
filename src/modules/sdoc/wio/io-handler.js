@@ -11,7 +11,7 @@ import isPermissionValid from "./is-permission-valid";
 class IOHandler {
 
   constructor(io) {
-    this.ioHelper = new IOHelper(io);
+    this.ioHelper = IOHelper.getInstance(io);
     this.instance = null;
   }
 
