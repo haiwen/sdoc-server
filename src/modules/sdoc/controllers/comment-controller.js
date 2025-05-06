@@ -37,8 +37,8 @@ class CommentController {
     if (!detail) {
       return res.status(400).send(paramIsRequired('detail'));
     }
-
-    if (!isObject(detail) || !detail.element_id) {
+    
+    if (!isObject(detail) || (!detail.element_id && detail.elements.length === 0)) {
       return res.status(400).send(paramIsError('detail'));
     }
 
@@ -111,8 +111,7 @@ class CommentController {
       if (!detail) {
         return res.status(400).send(paramIsRequired('detail'));
       }
-
-      if (!isObject(detail) || !detail.element_id) {
+      if (!isObject(detail) || (!detail.element_id && detail.elements.length === 0)) {
         return res.status(400).send(paramIsError('detail'));
       }
 
