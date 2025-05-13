@@ -12,7 +12,7 @@
   "server_port": 7070,
   "save_interval": 10000,
   "private_key": "M@O8VWUb81YvmtWLHGB2I_V7di5-@0p(MF*GrE!sIws23F",
-  "host": "localhost",
+  "host": "db",
   "user": "root",
   "password": "db_dev",
   "database": "seahub",
