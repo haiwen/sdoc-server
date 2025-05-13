@@ -1,5 +1,6 @@
-import mysql from 'mysql';
 import { MYSQL_CONFIG } from '../config/config';
+
+var mysql = require('mysql2')
 
 const mysql_config = {
   host: MYSQL_CONFIG.host,
