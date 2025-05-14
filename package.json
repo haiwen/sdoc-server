@@ -26,6 +26,7 @@
     "body-parser": "^1.20.2",
     "connect-multiparty": "^2.2.0",
     "deep-copy": "1.4.2",
+    "dmdb": "^1.0.36002",
     "express": "^4.18.2",
     "form-data": "^4.0.0",
     "jsonwebtoken": "9.0.0",
