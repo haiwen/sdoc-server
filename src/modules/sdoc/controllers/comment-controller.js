@@ -38,7 +38,7 @@ class CommentController {
       return res.status(400).send(paramIsRequired('detail'));
     }
     
-    if (!isObject(detail) || (!detail.element_id && detail.elements.length === 0)) {
+    if (!isObject(detail) || (!detail.element_id && detail.element_id_list.length === 0)) {
       return res.status(400).send(paramIsError('detail'));
     }
 
@@ -111,7 +111,8 @@ class CommentController {
       if (!detail) {
         return res.status(400).send(paramIsRequired('detail'));
       }
-      if (!isObject(detail) || (!detail.element_id && detail.elements.length === 0)) {
+
+      if (!isObject(detail) || (!detail.element_id && detail.element_id_list.length === 0)) {
         return res.status(400).send(paramIsError('detail'));
       }
 
