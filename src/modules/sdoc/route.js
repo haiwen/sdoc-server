@@ -1,18 +1,17 @@
 import express from 'express';
-import multipart from 'connect-multiparty';
 import { BASE_URL_VERSION1 } from './constants';
 import { commentController, documentController, replyController, userController, systemController, participantController } from './controllers';
+import formdata from '../../middleware/formdata';
 
 const router = express.Router();
-const multipartMiddleware = multipart();
 
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/`, documentController.loadDocContent);
-router.post(`${BASE_URL_VERSION1}/:doc_uuid/`, multipartMiddleware, documentController.saveDocContent);
+router.post(`${BASE_URL_VERSION1}/:doc_uuid/`, formdata.single('doc_content'), documentController.saveDocContent);
 router.delete(`${BASE_URL_VERSION1}/:doc_uuid/`, documentController.removeContent);
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/normalize-sdoc`, documentController.normalizeSdoc);
-router.post(`${BASE_URL_VERSION1}/:doc_uuid/save/`, multipartMiddleware, documentController.saveDoc);
-router.post(`${BASE_URL_VERSION1}/:doc_uuid/publish/`, multipartMiddleware, documentController.publishDoc);
-router.post(`${BASE_URL_VERSION1}/:doc_uuid/replace/`, multipartMiddleware, documentController.reloadDoc);
+router.post(`${BASE_URL_VERSION1}/:doc_uuid/save/`, formdata.none(), documentController.saveDoc);
+router.post(`${BASE_URL_VERSION1}/:doc_uuid/publish/`, formdata.fields([{name: 'origin_doc_uuid', maxCount: 1}, {name: 'origin_doc_name', maxCount: 1}]), documentController.publishDoc);
+router.post(`${BASE_URL_VERSION1}/:doc_uuid/replace/`, formdata.single('doc_name'), documentController.reloadDoc);
 
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/collaborators`, userController.getCollaborators);
 
