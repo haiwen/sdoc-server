@@ -21,7 +21,7 @@ router.post(`${BASE_URL_VERSION1}/:doc_uuid/comment/`, commentController.insertC
 router.delete(`${BASE_URL_VERSION1}/:doc_uuid/comment/:comment_id/`, commentController.deleteComment);
 router.put(`${BASE_URL_VERSION1}/:doc_uuid/comment/:comment_id/`, commentController.updateComment);
 
-// repay
+// reply
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/comment/:comment_id/replies/`, replyController.listReplies);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/comment/:comment_id/replies/`, replyController.insertReply);
 router.delete(`${BASE_URL_VERSION1}/:doc_uuid/comment/:comment_id/replies/:reply_id/`, replyController.deleteReply);
