@@ -51,6 +51,15 @@ class DocumentController {
           'error_msg': err.message
         });
       }
+
+      if (err.error_type === 'database_error') {
+        logger.error(err.message);
+        return res.status(500).send({
+          'error_type': 'content_invalid',
+          'error_msg': err.message
+        });
+      }
+
       logger.error(`Load ${docName}(${docUuid}) doc content error`);
       res.status(500).send({'error_msg': 'Internal Server Error'});
       return;
