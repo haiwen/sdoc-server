@@ -18,11 +18,15 @@ const DBHelper = function (sql, values) {
   return new Promise((resolve, reject) => {
     pool.getConnection(function (err, connection) {
       if (err) {
-        reject(err);
+        const error = new Error('Error connecting to Database');
+        error.error_type = 'database_error';
+        reject(error);
       } else {
         connection.query(sql, values, (err, rows) => {
           if (err) {
-            reject(err);
+            const error = new Error('Query data from Database error');
+            error.error_type = 'database_error';
+            reject(error);
           } else {
             resolve(rows);
           }
