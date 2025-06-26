@@ -4,6 +4,7 @@ class ExcalidrawDocument {
     this.exdrawUuid = exdrawUuid;
     this.exdrawName = exdrawName;
     this.elements = exdrawContent.elements;
+    this.version = exdrawContent.version;
     this.last_modify_user = exdrawContent.last_modify_user;
     this.meta = {
       save_times: 0,
@@ -15,9 +16,10 @@ class ExcalidrawDocument {
     };
   }
 
-  setValue = (elements) => {
+  setValue = (elements, version) => {
     let last_access = new Date().getTime();
     this.elements = elements;
+    this.version = version;
     let need_save = true;
     this.setMeta({last_access, need_save});
   };
@@ -34,6 +36,7 @@ class ExcalidrawDocument {
     this.setMeta({last_access: new Date().getTime()});
     return {
       elements: this.elements,
+      version: this.version,
       last_modify_user: this.last_modify_user
     };
   };

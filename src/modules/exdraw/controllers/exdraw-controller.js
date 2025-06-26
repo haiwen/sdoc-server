@@ -53,7 +53,7 @@ class ExdrawController {
   }
 
   async saveSceneContent(req, res) {
-    const { file_uuid: exdrawUuid } = req.payload;
+    const { file_uuid: exdrawUuid, filename: exdrawName, username } = req.payload;
     const { doc_content: sceneContent } = req.body;
 
     if (!sceneContent) {
@@ -72,7 +72,7 @@ class ExdrawController {
     }
 
     const excalidrawManager = ExcalidrawManager.getInstance();
-    const saveFlag = await excalidrawManager.saveSceneDoc(exdrawUuid, content);
+    const saveFlag = await excalidrawManager.saveSceneDocToMemory(exdrawUuid, exdrawName, content, username);
 
     if (saveFlag) { // saved success
       res.send({success: true});

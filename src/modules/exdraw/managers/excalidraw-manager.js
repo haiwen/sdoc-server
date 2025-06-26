@@ -6,6 +6,7 @@ import { SAVE_INTERVAL, SEAHUB_SERVER } from "../../../config/config";
 import seaServerAPI from "../api/sea-server-api";
 import { DOC_CACHE_TIME } from '../constants';
 import ExcalidrawDocument from '../models/excalidraw-document';
+import { isHasProperty } from '../utils';
 
 class ExcalidrawManager {
 
@@ -92,6 +93,7 @@ class ExcalidrawManager {
 
     let result = null;
     const defineSceneConfig = {
+      version: 0,
       elements: [],
     };
     try {
@@ -103,6 +105,9 @@ class ExcalidrawManager {
       throw error;
     }
     const docContent = result.data ? result.data : defineSceneConfig;
+    if (!isHasProperty(docContent, 'version')) {
+      docContent.version = 0;
+    }
     const sceneData = new ExcalidrawDocument(exdrawUuid, exdrawName, docContent);
     sceneData.setLastModifyUser({username});
     this.documents.set(exdrawUuid, sceneData);
@@ -115,11 +120,11 @@ class ExcalidrawManager {
     return sceneData.toJson();
   };
 
-  saveSceneDoc = async (exdrawUuid, content) => {
+  saveSceneDoc = async (exdrawUuid) => {
     const document = this.documents.get(exdrawUuid);
     // The save function is an asynchronous function, which does not affect the normal execution of other programs,
     // and there is a possibility that the file has been deleted when the next file is saved
-    if (!document && !content) {
+    if (!document) {
       logger.info(`excalidraw ${exdrawUuid} has been removed from memory`);
       return Promise.resolve(false);
     }
@@ -132,16 +137,9 @@ class ExcalidrawManager {
     document.setMeta({ is_saving: true });
 
     // Get save info
-    const { elements, exdrawName, last_modify_user = '' } = document;
+    const exdrawContent = document.toJson();
+    const exdrawName = document.exdrawName;
 
-    let tempContent;
-    if (content) {
-      tempContent = content;
-      document.setValue(content.elements);
-    } else {
-      tempContent = { elements };
-    }
-    const exdrawContent = { ...tempContent, last_modify_user};
     let saveFlag = false;
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(exdrawContent), { flag: 'w+' });
@@ -166,6 +164,46 @@ class ExcalidrawManager {
     document.setMeta({is_saving: false, need_save: false});
 
     return Promise.resolve(saveFlag);
+  };
+
+  saveSceneDocToMemory = async (exdrawUuid, exdrawName, content, username) => {
+    const document = this.documents.get(exdrawUuid);
+    if (!document) {
+      try {
+        // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
+        await this.getDoc(exdrawUuid, exdrawName);
+      } catch(e) {
+        logger.error(`SOCKET_MESSAGE: Load ${exdrawName}(${exdrawUuid}) doc content error`);
+        const result = {
+          success: false,
+          error_type: 'load_document_content_error',
+        };
+        return Promise.resolve(result);
+      }
+    }
+
+
+    const { version: clientVersion} = content;
+    const { version: serverVersion } = document;
+    if (serverVersion !== clientVersion) {
+      const result = {
+        success: false,
+        version: serverVersion,
+        error_type: 'version_behind_server',
+      };
+      logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
+      return Promise.resolve(result);
+    }
+
+    const newVersion = clientVersion + 1;
+    document.setLastModifyUser(username);
+    document.setValue(content.elements, newVersion);
+    const result = {
+      success: true,
+      version: document.version,
+    };
+
+    return Promise.resolve(result);
   };
 
   removeDocsWithNoAccess(docUuids) {

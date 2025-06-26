@@ -5,6 +5,7 @@ import logger from '../loggers';
 import app from "../app";
 import IOServer from '../wss';
 import DocumentManager from '../modules/sdoc/managers/document-manager';
+import ExcalidrawManager from '../modules/exdraw/managers/excalidraw-manager';
 
 const server = http.createServer(app);
 
@@ -15,6 +16,9 @@ new IOServer(socketIO);
 // setup auto save operation
 const documentManager = DocumentManager.getInstance();
 documentManager.startSaveTimer();
+
+const exdrawManager = ExcalidrawManager.getInstance();
+exdrawManager.startSaveTimer();
 
 
 logger.info('Starting sdoc server process:', process.pid);

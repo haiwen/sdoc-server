@@ -61,7 +61,7 @@ class Document {
 
     if (!this.cursors) this.cursors = {};
     const { username: clientId } = user;
-  
+
     if (location) {
       const oldCursor = this.cursors[clientId] ? this.cursors[clientId] : {};
       const newCursorData = { ...oldCursor, ...location, ...cursorData};
