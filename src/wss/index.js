@@ -10,8 +10,9 @@ class IOServer {
     const ioHandler = IOHandler.getInstance(io);
     const exdrawHandler = ExdrawHandler.getInstance(io);
     io.on('connection', (socket) => { ioHandler.onConnection(socket); });
-    io.of(EXDRAW_NAMESPACE).on('connection', (socket) => { exdrawHandler.onConnection(socket); });
     io.use(auth);
+    io.of(EXDRAW_NAMESPACE).on('connection', (socket) => { exdrawHandler.onConnection(socket); });
+    io.of(EXDRAW_NAMESPACE).use(auth);
   }
 
 }
