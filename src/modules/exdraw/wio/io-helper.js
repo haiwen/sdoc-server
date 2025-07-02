@@ -46,6 +46,18 @@ class IOHelper {
     socket.to(roomId).emit('leave-room', username);
   };
 
+  sendInitRoomToPrivate = (sid) => {
+    this.io.of(EXDRAW_NAMESPACE).to(sid).emit('init-room');
+  };
+
+  sendFirstInRoomMessage = (sid) => {
+    this.io.of(EXDRAW_NAMESPACE).to(sid).emit('first-in-room');
+  };
+
+  sendNewUserMessage = (socket, roomId) => {
+    socket.to(roomId).emit('new-user');
+  };
+
   sendMessageToPrivate = (sid, params) => {
     this.io.of(EXDRAW_NAMESPACE).to(sid).emit('message', `${params.name} has join room`);
   };

@@ -22,8 +22,8 @@ class ExdrawIOHandler {
 
   onConnection(socket) {
     // todo permission check
-
-    socket.on('join-room', (params, callback) => {
+    this.ioHelper.sendInitRoomToPrivate(socket.id);
+    socket.on('join-room', async (params) => {
       // join room
       const { doc_uuid: docUuid, user: userInfo } = params;
       socket.join(docUuid);
@@ -34,24 +34,25 @@ class ExdrawIOHandler {
       }
 
       const users = usersManager.getDocUsers(docUuid);
+
+      if (users.length === 1) {
+        this.ioHelper.sendFirstInRoomMessage(socket.id);
+      } else {
+        this.ioHelper.sendNewUserMessage(socket, docUuid);
+      }
+
       this.ioHelper.sendRoomUserChangeMessage(socket, docUuid, users);
-      callback && callback({ success: true });
     });
 
     socket.on('server-broadcast', (params, callback) => {
-      const { doc_uuid: docUuid, elements } = params;
-      this.ioHelper.sendMessageToRoom(socket, docUuid, { elements });
+      const { doc_uuid: docUuid, ...rest } = params;
+      this.ioHelper.sendMessageToRoom(socket, docUuid, rest);
       callback && callback();
     });
 
     socket.on('server-volatile-broadcast', (params) => {
       const { doc_uuid: docUuid, elements } = params;
       this.ioHelper.sendMessageToRoom(socket, docUuid, { elements });
-    });
-
-    socket.on('mouse-location', (params) => {
-      const { doc_uuid: docUuid, ...reset } = params;
-      this.ioHelper.sendMouseMessageToRoom(socket, docUuid, { ...reset });
     });
 
     socket.on('leave-room', async () => {
