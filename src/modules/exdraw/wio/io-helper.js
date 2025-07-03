@@ -27,19 +27,35 @@ class IOHelper {
   };
 
   sendMessageToRoom = (socket, roomId, params) => {
-    socket.to(roomId).emit('update-document', {...params});
+    socket.to(roomId).emit('client-broadcast', {...params});
   };
 
-  sendCursorMessageToRoom = (socket, roomId, params) => {
-    socket.to(roomId).emit('update-cursor', {...params});
+  sendMouseMessageToRoom = (socket, roomId, params) => {
+    socket.to(roomId).emit('mouse-location', {...params});
   };
 
   sendJoinRoomMessage = (socket, roomId, userInfo) => {
     socket.to(roomId).emit('join-room', userInfo);
   };
 
+  sendRoomUserChangeMessage = (socket, roomId, users) => {
+    this.io.of(EXDRAW_NAMESPACE).to(roomId).emit('room-user-change', users);
+  };
+
   sendLeaveRoomMessage = (socket, roomId, username) => {
     socket.to(roomId).emit('leave-room', username);
+  };
+
+  sendInitRoomToPrivate = (sid) => {
+    this.io.of(EXDRAW_NAMESPACE).to(sid).emit('init-room');
+  };
+
+  sendFirstInRoomMessage = (sid) => {
+    this.io.of(EXDRAW_NAMESPACE).to(sid).emit('first-in-room');
+  };
+
+  sendNewUserMessage = (socket, roomId) => {
+    socket.to(roomId).emit('new-user');
   };
 
   sendMessageToPrivate = (sid, params) => {

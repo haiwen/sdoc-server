@@ -1,6 +1,6 @@
+import ExcalidrawManager from "../managers/excalidraw-manager";
+import UsersManager from "../managers/users-manager";
 import IOHelper from "./io-helper";
-
-const roomId = 'demo001';
 
 class ExdrawIOHandler {
 
@@ -22,19 +22,37 @@ class ExdrawIOHandler {
 
   onConnection(socket) {
     // todo permission check
-
-    socket.on('join-room', async (userInfo) => {
+    this.ioHelper.sendInitRoomToPrivate(socket.id);
+    socket.on('join-room', async (params) => {
       // join room
-      socket.join(roomId);
-      this.ioHelper.sendJoinRoomMessage(socket, roomId, userInfo);
+      const { doc_uuid: docUuid, user: userInfo } = params;
+      socket.join(docUuid);
+
+      const usersManager = UsersManager.getInstance();
+      if (!usersManager.getUser(docUuid, socket.id)) {
+        usersManager.addUser(docUuid, socket.id, userInfo);
+      }
+
+      const users = usersManager.getDocUsers(docUuid);
+
+      if (users.length === 1) {
+        this.ioHelper.sendFirstInRoomMessage(socket.id);
+      } else {
+        this.ioHelper.sendNewUserMessage(socket, docUuid);
+      }
+
+      this.ioHelper.sendRoomUserChangeMessage(socket, docUuid, users);
     });
 
-    socket.on('update-document', (msg) => {
-      this.ioHelper.sendMessageToRoom(socket, roomId, { msg });
+    socket.on('server-broadcast', (params, callback) => {
+      const { doc_uuid: docUuid, ...rest } = params;
+      this.ioHelper.sendMessageToRoom(socket, docUuid, rest);
+      callback && callback();
     });
 
-    socket.on('server-error', (params) => {
-      this.ioHelper.broadcastMessage(params);
+    socket.on('server-volatile-broadcast', (params) => {
+      const { doc_uuid: docUuid, elements } = params;
+      this.ioHelper.sendMessageToRoom(socket, docUuid, { elements });
     });
 
     socket.on('leave-room', async () => {
@@ -46,6 +64,22 @@ class ExdrawIOHandler {
     });
   }
 
+    handleDisconnect = async (socket) => {
+      const { docUuid } = socket;
+      const usersManager = UsersManager.getInstance();
+      const user = usersManager.getUser(docUuid, socket.id);
+      if (user) {
+        this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user);
+      }
+
+      // delete current user from memory
+      const usersCount = usersManager.deleteUser(docUuid, socket.id);
+      const documentManager = ExcalidrawManager.getInstance();
+      if (usersCount === 0) {
+        // save document first
+        await documentManager.saveSceneDoc(docUuid);
+      }
+    };
 }
 
 export default ExdrawIOHandler;
