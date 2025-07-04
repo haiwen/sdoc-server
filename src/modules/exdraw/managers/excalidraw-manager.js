@@ -196,7 +196,7 @@ class ExcalidrawManager {
     }
 
     const newVersion = clientVersion + 1;
-    document.setLastModifyUser(username);
+    document.setLastModifyUser({ username });
     document.setValue(content.elements, newVersion);
     const result = {
       success: true,
