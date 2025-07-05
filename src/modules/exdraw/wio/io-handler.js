@@ -35,11 +35,11 @@ class ExdrawIOHandler {
 
       const users = usersManager.getDocUsers(docUuid);
 
-      if (users.length === 1) {
+      // if (users.length === 1) {
         this.ioHelper.sendFirstInRoomMessage(socket.id);
-      } else {
-        this.ioHelper.sendNewUserMessage(socket, docUuid);
-      }
+      // } else {
+      //   this.ioHelper.sendNewUserMessage(socket, docUuid);
+      // }
 
       this.ioHelper.sendRoomUserChangeMessage(socket, docUuid, users);
     });
