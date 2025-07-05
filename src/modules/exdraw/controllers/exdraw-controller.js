@@ -74,8 +74,8 @@ class ExdrawController {
     const excalidrawManager = ExcalidrawManager.getInstance();
     const saveFlag = await excalidrawManager.saveSceneDocToMemory(exdrawUuid, exdrawName, content, username);
 
-    if (saveFlag) { // saved success
-      res.send({success: true});
+    if (saveFlag.success) { // saved success
+      res.send(saveFlag);
       return;
     }
 

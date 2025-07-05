@@ -184,11 +184,13 @@ class ExcalidrawManager {
 
 
     const { version: clientVersion} = content;
-    const { version: serverVersion } = document;
+    const { version: serverVersion, elements } = document;
     if (serverVersion !== clientVersion) {
       const result = {
-        success: false,
+        success: true,
+        updated: false,
         version: serverVersion,
+        elements: elements,
         error_type: 'version_behind_server',
       };
       logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
@@ -200,6 +202,7 @@ class ExcalidrawManager {
     document.setValue(content.elements, newVersion);
     const result = {
       success: true,
+      updated: true,
       version: document.version,
     };
 
