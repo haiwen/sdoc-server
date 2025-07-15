@@ -119,6 +119,19 @@ class IOHandler {
       return;
     });
 
+    socket.on('user-updated', (params) => {
+
+      const { user } = params;
+      const { docUuid } = socket;
+
+      // update storage user name
+      const usersManager = UsersManager.getInstance();
+      usersManager.deleteUser(docUuid, socket.id);
+      usersManager.addUser(docUuid, socket.id, user);
+
+      this.ioHelper.sendUserUpdatedMessage(socket, docUuid, user);
+    });
+
     socket.on('server-error', (params) => {
       this.ioHelper.broadcastMessage(params);
     });
