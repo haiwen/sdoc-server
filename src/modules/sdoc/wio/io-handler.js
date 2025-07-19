@@ -132,6 +132,11 @@ class IOHandler {
       this.ioHelper.sendUserUpdatedMessage(socket, docUuid, user);
     });
 
+    socket.on('reload-image', () => {
+      const { docUuid } = socket;
+      this.ioHelper.sendReloadImageMessage(socket, docUuid);
+    });
+
     socket.on('server-error', (params) => {
       this.ioHelper.broadcastMessage(params);
     });

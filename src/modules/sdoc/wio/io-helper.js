@@ -44,6 +44,10 @@ class IOHelper {
     socket.to(roomId).emit('user-updated', userInfo);
   };
 
+  sendReloadImageMessage = (socket, roomId) => {
+    socket.to(roomId).emit('reload-image');
+  };
+
   sendMessageToPrivate = (sid, params) => {
     this.io.to(sid).emit('message', `${params.name} has join room`);
   };
