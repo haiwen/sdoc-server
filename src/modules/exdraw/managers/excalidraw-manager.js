@@ -130,7 +130,7 @@ class ExcalidrawManager {
     }
 
     const meta = document.getMeta();
-    if (meta.is_saving) { // is saving
+    if (meta.is_saving || !meta.need_save) { // is saving
       return Promise.resolve(false);
     }
 
@@ -181,7 +181,6 @@ class ExcalidrawManager {
         return Promise.resolve(result);
       }
     }
-
 
     const { version: clientVersion} = content;
     const { version: serverVersion, elements } = document;
