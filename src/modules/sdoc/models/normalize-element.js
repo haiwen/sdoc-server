@@ -48,7 +48,7 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'column',
   'group',
   'chart',
-  'exdraw'
+  'whiteboard'
 ];
 
 const isElementNeedChildrenAttributes = (element) => {
