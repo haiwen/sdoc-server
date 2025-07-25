@@ -55,13 +55,8 @@ class CommentController {
       const _comment = result.data;
       res.send({comment: _comment});
       const notification = result.data.notification;
-      const toUsers = notification.to_users;
-      if (toUsers.length > 0) {
-        const notificationManager = NotificationManager.getInstance();
-        for (let username of toUsers) {
-          notificationManager.sendNotificationToUser(docUuid, username, notification);
-        }
-      }
+      const notificationManager = NotificationManager.getInstance();
+      notificationManager.sendNotificationToRoom(docUuid, notification);
       return;
     } catch(err) {
       logger.error(err.message);
@@ -80,6 +75,8 @@ class CommentController {
     try {
       await seaServerAPI.deleteComment(docUuid, comment_id);
       res.send({success: true});
+      const notificationManager = NotificationManager.getInstance();
+      notificationManager.sendNotificationToRoom(docUuid);
       return;
     } catch(err) {
       logger.error(err.message);
