@@ -47,13 +47,8 @@ class ReplyController {
       const _reply = result.data;
       res.send({reply: _reply});
       const notification = result.data.notification;
-      const toUsers = notification.to_users;
-      if (toUsers.length > 0) {
-        const notificationManager = NotificationManager.getInstance();
-        for (let username of toUsers) {
-          notificationManager.sendNotificationToUser(docUuid, username, notification);
-        }
-      }
+      const notificationManager = NotificationManager.getInstance();
+      notificationManager.sendNotificationToRoom(docUuid, notification);
       return;
     } catch(err) {
       logger.error(err.message);
@@ -71,6 +66,8 @@ class ReplyController {
 
     try {
       await seaServerAPI.deleteReply(docUuid, comment_id, reply_id);
+      const notificationManager = NotificationManager.getInstance();
+      notificationManager.sendNotificationToRoom(docUuid);
       res.send({success: true});
       return;
     } catch(err) {
