@@ -3,7 +3,7 @@ import { DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY, DEFAULT_TEXT_ALIGN, DEFAULT
 import { getLineHeight } from "./common/font-metadata";
 import { randomId } from "./common/random";
 import { normalizeLink } from "./common/url";
-import { getUpdatedTimestamp } from "./common/utils";
+import { arrayToMap, getUpdatedTimestamp } from "./common/utils";
 import { normalizeFixedPoint } from "./element/binding";
 import { syncInvalidIndices } from "./element/functionIndex";
 import LinearElementEditor from "./element/LinearElementEditor";
@@ -12,7 +12,6 @@ import { getNormalizedDimensions, isInvisiblySmallElement } from "./element/size
 import { detectLineHeight } from "./element/textMeasurements";
 import { isElbowArrow, isFixedPointBinding, isLineElement, isUsingAdaptiveRadius, isValidPolygon } from "./element/typeChecks";
 import { getSizeFromPoints, pointFrom } from "./math/points";
-import { arrayToMap } from "./utils";
 
 const getFontFamilyByName = fontFamilyName => {
   if (Object.keys(FONT_FAMILY).includes(fontFamilyName)) {

@@ -1,6 +1,6 @@
 import { generateNKeysBetween } from "fractional-indexing";
-import { arrayToMap } from "../utils";
 import { mutateElement } from "./mutateElement";
+import { arrayToMap } from "../common/utils";
 
 const generateIndices = (elements, indicesGroups) => {
   const elementsUpdates = new Map();
