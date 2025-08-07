@@ -1,6 +1,7 @@
 import { randomInteger } from "../common/random";
 import { getUpdatedTimestamp } from "../common/utils";
 
+// eslint-disable-next-line no-unused-vars
 export const mutateElement = (element, elementsMap, updates, options) => {
   let didChange = false;
 
