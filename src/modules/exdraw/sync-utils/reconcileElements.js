@@ -5,9 +5,9 @@ const shouldDiscardRemoteElement = (localAppState, local, remote) => {
   if (
     local &&
     // local element is being edited
-    (local.id === localAppState.editingTextElement?.id ||
-    local.id === localAppState.resizingElement?.id ||
-    local.id === localAppState.newElement?.id || // TODO: Is this still valid? As newElement is selection element, which is never part of the elements array
+    (local.id === localAppState?.editingTextElement?.id ||
+    local.id === localAppState?.resizingElement?.id ||
+    local.id === localAppState?.newElement?.id || // TODO: Is this still valid? As newElement is selection element, which is never part of the elements array
       // local element is newer
       local.version > remote.version ||
       // resolve conflicting edits deterministically by taking the one with

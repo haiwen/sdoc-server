@@ -1,4 +1,4 @@
-import { generateNKeysBetween } from "fractional-indexing";
+import { generateNKeysBetween } from "../fractional-indexing";
 import { mutateElement } from "./mutateElement";
 import { arrayToMap } from "../common/utils";
 

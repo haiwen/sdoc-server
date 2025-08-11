@@ -1,5 +1,18 @@
 import { v4 } from "uuid";
-import { Random } from "roughjs/bin/math";
+
+class Random {
+  constructor(seed) {
+    this.seed = seed;
+  }
+
+  next = () => {
+    if (this.seed) {
+      return ((2 ** 31 - 1) & (this.seed = Math.imul(48271, this.seed))) / 2 ** 31;
+    } else {
+      return Math.Random();
+    }
+  };
+}
 
 let random = new Random(Date.now());
 
