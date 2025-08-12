@@ -1,6 +1,7 @@
 import ExcalidrawManager from "../managers/excalidraw-manager";
 import UsersManager from "../managers/users-manager";
 import IOHelper from "./io-helper";
+import checkPermission from "./is-permission-valid";
 
 class ExdrawIOHandler {
 
@@ -45,6 +46,16 @@ class ExdrawIOHandler {
     });
 
     socket.on('elements-updated', async (params, callback) => {
+      const isValid = checkPermission(socket);
+      if (!isValid) {
+        const result = {
+          success: false,
+          error_type: 'token_expired',
+        };
+        callback && callback(result);
+        return;
+      }
+
       const { doc_uuid: docUuid, ...rest } = params;
       const excalidrawManager = ExcalidrawManager.getInstance();
       const result = await excalidrawManager.execOperationsBySocket(params);
