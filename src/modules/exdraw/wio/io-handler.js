@@ -36,7 +36,7 @@ class ExdrawIOHandler {
       const users = usersManager.getDocUsers(docUuid);
 
       // if (users.length === 1) {
-        this.ioHelper.sendFirstInRoomMessage(socket.id);
+      // this.ioHelper.sendFirstInRoomMessage(socket.id);
       // } else {
       //   this.ioHelper.sendNewUserMessage(socket, docUuid);
       // }
@@ -44,10 +44,21 @@ class ExdrawIOHandler {
       this.ioHelper.sendRoomUserChangeMessage(socket, docUuid, users);
     });
 
-    socket.on('server-broadcast', (params, callback) => {
+    socket.on('elements-updated', async (params, callback) => {
       const { doc_uuid: docUuid, ...rest } = params;
-      this.ioHelper.sendMessageToRoom(socket, docUuid, rest);
-      callback && callback();
+      const excalidrawManager = ExcalidrawManager.getInstance();
+      const result = await excalidrawManager.execOperationsBySocket(params);
+      if (result.success) {
+        const { version } = result;
+        rest.version = version;
+        this.ioHelper.sendElementsMessageToRoom(socket, docUuid, rest);
+      }
+      callback && callback(result);
+    });
+
+    socket.on('mouse-location-updated', async (params) => {
+      const { doc_uuid: docUuid, ...rest } = params;
+      this.ioHelper.sendMouseMessageToRoom(socket, docUuid, rest);
     });
 
     socket.on('server-volatile-broadcast', (params) => {

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { v4 } from "uuid";
+import deepCopy from 'deep-copy';
 import logger from "../../../loggers";
 import { deleteDir, getErrorMessage } from "../../../utils";
 import { SAVE_INTERVAL, SEAHUB_SERVER } from "../../../config/config";
@@ -7,6 +8,7 @@ import seaServerAPI from "../api/sea-server-api";
 import { DOC_CACHE_TIME } from '../constants';
 import ExcalidrawDocument from '../models/excalidraw-document';
 import { isHasProperty } from '../utils';
+import { syncElementsToCurrentDocument } from '../sync-utils';
 
 class ExcalidrawManager {
 
@@ -206,6 +208,64 @@ class ExcalidrawManager {
     };
 
     return Promise.resolve(result);
+  };
+
+  execOperationsBySocket = async (params, exdrawName) => {
+    const { docUuid, version: clientVersion, user, elements } = params;
+    const document = this.documents.get(docUuid);
+    if (!document) {
+      try {
+        // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
+        await this.getDoc(docUuid, exdrawName);
+      } catch(e) {
+        logger.error(`SOCKET_MESSAGE: Load ${exdrawName}(${docUuid}) doc content error`);
+        const result = {
+          success: false,
+          error_type: 'load_document_content_error',
+        };
+        return Promise.resolve(result);
+      }
+    }
+
+    const { version: serverVersion } = document;
+    if (serverVersion !== clientVersion) {
+      const result = {
+        success: false,
+        error_type: 'version_behind_server',
+        elements: document.elements,
+        version: serverVersion,
+      };
+      logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
+      logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s', document.docUuid, user.username);
+      return Promise.resolve(result);
+    }
+
+        // execute operations success
+    let isExecuteSuccess = false;
+    try {
+      // Prevent copying of references
+      const newElements = deepCopy(elements);
+      isExecuteSuccess = syncElementsToCurrentDocument(document, newElements, user);
+    } catch (e) {
+      logger.error('apply operations failed.', document.docUuid, elements);
+      isExecuteSuccess = false;
+    }
+
+    if (!isExecuteSuccess) {
+      const result = {
+        success: false,
+        error_type: 'execute_client_operations_error',
+      };
+      return Promise.resolve(result);
+    }
+
+    // execute operations success
+    const result = {
+      success: true,
+      version: document.version,
+    };
+    return Promise.resolve(result);
+
   };
 
   removeDocsWithNoAccess(docUuids) {
