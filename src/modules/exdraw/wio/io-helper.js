@@ -26,12 +26,12 @@ class IOHelper {
     this.io.of(EXDRAW_NAMESPACE).emit('message', `server error`);
   };
 
-  sendMessageToRoom = (socket, roomId, params) => {
-    socket.to(roomId).emit('client-broadcast', {...params});
+  sendElementsMessageToRoom = (socket, roomId, params) => {
+    socket.to(roomId).emit('elements-updated', {...params});
   };
 
   sendMouseMessageToRoom = (socket, roomId, params) => {
-    socket.to(roomId).emit('mouse-location', {...params});
+    socket.to(roomId).emit('mouse-location-updated', {...params});
   };
 
   sendJoinRoomMessage = (socket, roomId, userInfo) => {
