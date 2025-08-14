@@ -211,7 +211,7 @@ class ExcalidrawManager {
   };
 
   execOperationsBySocket = async (params, exdrawName) => {
-    const { docUuid, version: clientVersion, user, elements } = params;
+    const { doc_uuid: docUuid, version: clientVersion, user, elements } = params;
     const document = this.documents.get(docUuid);
     if (!document) {
       try {
