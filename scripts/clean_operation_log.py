@@ -43,6 +43,8 @@ def init_logging(args):
 
 def load_config():
     config_file = os.environ.get('SDOC_SERVER_CONFIG', '../config/config.json')
+    if not os.path.exists(config_file):
+        return {}
     with open(config_file, 'r') as f:
         content = f.read()
         return json.loads(content)
@@ -50,10 +52,10 @@ def load_config():
 
 def clean_operation_log():
     config = load_config()
-    user = config.get('user')
-    password = config.get('password')
-    database = config.get('database')
-    host = config.get('host')
+    user = os.getenv('DB_USER') or config.get('user')
+    password = os.getenv('DB_PASSWORD') or config.get('password')
+    database = os.getenv('DB_NAME') or config.get('database')
+    host = os.getenv('DB_HOST') or config.get('host')
     connection = pymysql.connect(user=user, password=password, database=database, host=host)
     with connection:
         with connection.cursor() as cursor:
