@@ -8,7 +8,7 @@ export const syncElementsToCurrentDocument = (document, elements, user) => {
 
   const version = document.version;
   const newVersion = version + 1;
-  document.setLastModifyUser(user);
+  document.setLastModifyUser({ username: user._username });
   document.setValue(reconciledElements, newVersion);
 
   return true;
