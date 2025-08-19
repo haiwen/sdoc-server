@@ -111,7 +111,7 @@ class ExcalidrawManager {
       docContent.version = 0;
     }
     const sceneData = new ExcalidrawDocument(exdrawUuid, exdrawName, docContent);
-    sceneData.setLastModifyUser({username});
+    sceneData.setLastModifyUser({ username });
     this.documents.set(exdrawUuid, sceneData);
 
     if (!result.data) {
