@@ -33,6 +33,7 @@
     "multer": "2.0.2",
     "mysql": "^2.17.1",
     "open-color": "1.9.1",
+    "response-time": "^2.3.4",
     "socket.io": "4.8.1",
     "uuid": "9.0.0"
   },
