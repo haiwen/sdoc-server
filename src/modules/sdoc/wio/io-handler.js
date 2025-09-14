@@ -1,4 +1,5 @@
 import logger from "../../../loggers";
+import { socketTime, slowSocketTime } from '../../../loggers';
 import { getErrorMessage } from "../../../utils";
 import seaServerAPI from "../api/sea-server-api";
 import { OPERATIONS_CACHE_LIMIT } from "../constants";
@@ -7,6 +8,17 @@ import OperationsManager from "../managers/operations-manager";
 import UsersManager from "../managers/users-manager";
 import IOHelper from "./io-helper";
 import isPermissionValid from "./is-permission-valid";
+
+const recordSocketLogger = (docUuid, operations, costsTime) => {
+
+  const operationType = operations[0].type;
+  const operateCount = operations.length;
+  socketTime.info(docUuid, operationType, operateCount, `${costsTime}ms`);
+  if (costsTime > 200) {
+    slowSocketTime.info(docUuid, operationType, operateCount, `${costsTime}ms`);
+  }
+
+};
 
 class IOHandler {
 
@@ -59,6 +71,7 @@ class IOHandler {
     });
 
     socket.on('update-document', async (params, callback) => {
+      const start = Date.now();
       const isValid = isPermissionValid(socket);
       if (!isValid) {
         const result = {
@@ -72,6 +85,15 @@ class IOHandler {
       const { doc_uuid: docUuid, operations, user, selection, cursor_data } = params;
       const documentManager = DocumentManager.getInstance();
       const result = await documentManager.execOperationsBySocket(params, docName);
+      
+      const end = Date.now();
+      const costsTime = end - start;
+      try {
+        recordSocketLogger(docUuid, operations, costsTime);
+      } catch (e) {
+        logger.warn(`recordSocketLogger error: ${e}`);
+      }
+
       if (result.success) {
         const { version } = result;
         this.ioHelper.sendMessageToRoom(socket, docUuid, { operations, version, user, selection, cursor_data});
