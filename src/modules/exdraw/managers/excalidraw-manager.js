@@ -2,7 +2,7 @@ import fs from 'fs';
 import { v4 } from "uuid";
 import deepCopy from 'deep-copy';
 import logger from "../../../loggers";
-import { deleteDir, getErrorMessage } from "../../../utils";
+import { deleteDir, getErrorMessage, errorHandle } from "../../../utils";
 import { SAVE_INTERVAL, SEAHUB_SERVER } from "../../../config/config";
 import seaServerAPI from "../api/sea-server-api";
 import { DOC_CACHE_TIME } from '../constants';
@@ -87,6 +87,7 @@ class ExcalidrawManager {
       const res = await seaServerAPI.getSceneDownloadLink(exdrawUuid);
       downloadLink = res.data.download_link;
     } catch (e) {
+      errorHandle(e);
       const error = new Error('Get doc download link error');
       error.error_type = 'get_doc_download_link_error';
       error.from_url = `${SEAHUB_SERVER}/api/v2.1/exdraw/download-link/${exdrawUuid}/`;
@@ -101,6 +102,7 @@ class ExcalidrawManager {
     try {
       result = await seaServerAPI.getSceneContent(downloadLink);
     } catch (e) {
+      errorHandle(e);
       const error = new Error('The content of the document loaded error');
       error.error_type = 'content_load_invalid';
       error.from_url = downloadLink;
