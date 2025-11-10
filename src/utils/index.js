@@ -162,7 +162,7 @@ export const errorHandle = (error) => {
     }
   }
 
-   const message = 'Service unknown error';
+  const message = 'Service unknown error';
   logger.error(message);
   logger.error('error_type: ', 'UNKNOWN_ERROR');
   logger.error('error_message: ', error.message);
