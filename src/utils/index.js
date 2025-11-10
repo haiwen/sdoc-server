@@ -145,7 +145,6 @@ export const errorHandle = (error) => {
   if (error.response) {
     const { status } = error.response;
 
-    // 4xx 错误 - 客户端错误
     if (status >= 400 && status < 500) {
       const message = 'Service client error';
       logger.error(message);
