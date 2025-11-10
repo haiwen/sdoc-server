@@ -3,7 +3,7 @@ import { v4 } from "uuid";
 import deepCopy from 'deep-copy';
 import { SAVE_INTERVAL, SEAHUB_SERVER } from "../../../config/config";
 import logger from "../../../loggers";
-import { deleteDir, getErrorMessage } from "../../../utils";
+import { deleteDir, getErrorMessage, errorHandle } from "../../../utils";
 import seaServerAPI from "../api/sea-server-api";
 import { DOC_CACHE_TIME } from '../constants';
 import Document from '../models/document';
@@ -88,7 +88,8 @@ class DocumentManager {
     try {
       const res = await seaServerAPI.getDocDownloadLink(docUuid);
       downloadLink = res.data.download_link;
-    } catch (e) {
+    } catch (err) {
+      errorHandle(err);
       const error = new Error('Get doc download link error');
       error.error_type = 'get_doc_download_link_error';
       error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/download-link/${docUuid}/`;
@@ -98,7 +99,8 @@ class DocumentManager {
     let result = null;
     try {
       result = await seaServerAPI.getDocContent(downloadLink);
-    } catch (e) {
+    } catch (err) {
+      errorHandle(err);
       const error = new Error('The content of the document loaded error');
       error.error_type = 'content_load_invalid';
       error.from_url = downloadLink;
@@ -127,7 +129,8 @@ class DocumentManager {
     try {
       const res = await seaServerAPI.getDocDownloadLink(docUuid);
       downloadLink = res.data.download_link;
-    } catch (e) {
+    } catch (err) {
+      errorHandle(err);
       const error = new Error('Get doc download link error');
       error.error_type = 'get_doc_download_link_error';
       error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/download-link/${docUuid}/`;
@@ -137,7 +140,8 @@ class DocumentManager {
     let result = null;
     try {
       result = await seaServerAPI.getDocContent(downloadLink);
-    } catch (e) {
+    } catch (err) {
+      errorHandle(err);
       const error = new Error('The content of the document loaded error');
       error.error_type = 'content_load_invalid';
       error.from_url = downloadLink;

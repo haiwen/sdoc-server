@@ -1,4 +1,5 @@
 import fs from 'fs';
+import logger from '../loggers';
 
 export const getDirPath = (path) => {
   let dir = path.slice(0, path.lastIndexOf('/'));
@@ -121,4 +122,52 @@ export function uuidStrTo36Chars(uuid) {
     return uuid;
   }
 }
+
+export const errorHandle = (error) => {
+  if (error.code === 'ECONNREFUSED') {
+    const message = 'Service connection refused';
+    logger.error(message);
+    logger.error('error_name: ', error.name);
+    logger.error('error_message: ', error.message);
+    logger.error('error_code: ', error.code);
+    return;
+  }
+
+  if (error.code === 'ETIMEDOUT') {
+    const message = 'Service request timeout';
+    logger.error(message);
+    logger.error('error_name: ', error.name);
+    logger.error('error_message: ', error.message);
+    logger.error('error_code: ', error.code);
+    return;
+  }
+
+  if (error.response) {
+    const { status } = error.response;
+
+    // 4xx 错误 - 客户端错误
+    if (status >= 400 && status < 500) {
+      const message = 'Service client error';
+      logger.error(message);
+      logger.error('error_name: ', 'HttpClientError');
+      logger.error('error_message: ', `HTTP ${status}: ${error.message}`);
+      return;
+    }
+
+    if (status >= 500) {
+      const message = 'Service server error';
+      logger.error(message);
+      logger.error('error_name: ', 'HttpServerError');
+      logger.error('error_message: ', `HTTP ${status}: ${error.message}`);
+      return;
+    }
+  }
+
+   const message = 'Service unknown error';
+  logger.error(message);
+  logger.error('error_type: ', 'UNKNOWN_ERROR');
+  logger.error('error_message: ', error.message);
+  logger.error('error_stack: ', error.stack);
+  return;
+};
 
