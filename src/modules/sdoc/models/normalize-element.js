@@ -49,7 +49,8 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'group',
   'chart',
   'whiteboard',
-  'file_view'
+  'file_view',
+  'formula'
 ];
 
 const isElementNeedChildrenAttributes = (element) => {
