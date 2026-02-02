@@ -71,7 +71,6 @@ class IOHandler {
     });
 
     socket.on('update-document', async (params, callback) => {
-      const start = Date.now();
       const isValid = isPermissionValid(socket);
       if (!isValid) {
         const result = {
@@ -81,11 +80,24 @@ class IOHandler {
         callback && callback(result);
         return;
       }
+
+      const { permission } = socket.payload;
+      if (permission !== 'rw') {
+        logger.error('You don\'t have permission to update the current sdoc.', params.doc_uuid);
+        const result = {
+          success: false,
+          error_type: 'permission_denied'
+        };
+        callback && callback(result);
+        return;
+      }
+
+      const start = Date.now();
       const { docName } = socket;
       const { doc_uuid: docUuid, operations, user, selection, cursor_data } = params;
       const documentManager = DocumentManager.getInstance();
       const result = await documentManager.execOperationsBySocket(params, docName);
-      
+
       const end = Date.now();
       const costsTime = end - start;
       try {
