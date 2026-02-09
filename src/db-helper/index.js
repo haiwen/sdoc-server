@@ -1,4 +1,4 @@
-import mysql from 'mysql';
+import mysql from 'mysql2/promise'; 
 import { MYSQL_CONFIG } from '../config/config';
 
 const mysql_config = {
@@ -14,27 +14,16 @@ const mysql_config = {
 
 const pool = mysql.createPool(mysql_config);
 
-const DBHelper = function (sql, values) {
-  return new Promise((resolve, reject) => {
-    pool.getConnection(function (err, connection) {
-      if (err) {
-        const error = new Error('Error connecting to Database');
-        error.error_type = 'database_error';
-        reject(error);
-      } else {
-        connection.query(sql, values, (err, rows) => {
-          if (err) {
-            const error = new Error('Query data from Database error');
-            error.error_type = 'database_error';
-            reject(error);
-          } else {
-            resolve(rows);
-          }
-          connection.release();
-        });
-      }
-    });
-  });
+const DBHelper = async function (sql, values) {
+  try {
+    const [rows] = await pool.query(sql, values);
+    return rows;
+  } catch (err) {
+    const error = new Error(err.message.includes('connect') ? 'Error connecting to Database' : 'Query data from Database error');
+    error.error_type = 'database_error';
+    error.originalError = err; 
+    throw error;
+  }
 };
 
 export default DBHelper;
