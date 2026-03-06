@@ -50,8 +50,17 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'chart',
   'whiteboard',
   'file_view',
-  'formula'
+  'formula',
+  'toggle_header',
+  'toggle_header1',
+  'toggle_header2',
+  'toggle_header3',
+  'toggle_content'
 ];
+
+const TOGGLE_CONTENT_CHILDREN_TYPES = FIRST_LEVEL_ELEMENT_TYPES.filter(item => {
+  return !['toggle_content', 'toggle_header1', 'toggle_header2', 'toggle_header3'].includes(item);
+});
 
 const isElementNeedChildrenAttributes = (element) => {
   const types = [...FIRST_LEVEL_ELEMENT_TYPES, ...INLINE_TYPES];
@@ -153,8 +162,30 @@ export const normalizeElement = (element) => {
     case 'header3':
     case 'header4':
     case 'header5':
-    case 'header6': {
+    case 'header6':
+    case 'toggle_header1':
+    case 'toggle_header2':
+    case 'toggle_header3': {
       element.children = formatElementChildrenWithTypes(children, INLINE_TYPES_WITHOUT_IMAGE);
+      break;
+    }
+    case 'toggle_header': {
+      const validChildren = Array.isArray(children) ? children : [];
+      const titleElement = validChildren.find(child => ['toggle_header1', 'toggle_header2', 'toggle_header3'].includes(child.type));
+      const toggleContentElement = validChildren.find(child => child.type === 'toggle_content');
+      const normalizedTitle = normalizeElement(titleElement);
+      const normalizedContent = normalizeElement(toggleContentElement);
+      element.children = [normalizedTitle, normalizedContent];
+      break;
+    }
+    case 'toggle_content': {
+      const supportTypes = [...INLINE_TYPES, ...TOGGLE_CONTENT_CHILDREN_TYPES];
+      const validChildren = formatElementChildrenWithTypes(children, supportTypes);
+      element.children = validChildren.map(element => {
+        if (element.type && TOGGLE_CONTENT_CHILDREN_TYPES.includes(element.type)) {
+          return normalizeElement(element);
+        }
+      });
       break;
     }
     case 'ordered_list':
