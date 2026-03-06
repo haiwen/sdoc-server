@@ -185,11 +185,6 @@ export const normalizeElement = (element) => {
         if (element.type && TOGGLE_CONTENT_CHILDREN_TYPES.includes(element.type)) {
           return normalizeElement(element);
         }
-        return {
-          id: v4(),
-          type: 'paragraph',
-          children: [element],
-        };
       });
       break;
     }
