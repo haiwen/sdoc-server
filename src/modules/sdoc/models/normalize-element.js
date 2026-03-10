@@ -51,11 +51,7 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'whiteboard',
   'file_view',
   'formula',
-  'toggle_header',
-  'toggle_header1',
-  'toggle_header2',
-  'toggle_header3',
-  'toggle_content'
+  'toggle_header'
 ];
 
 const TOGGLE_CONTENT_CHILDREN_TYPES = FIRST_LEVEL_ELEMENT_TYPES.filter(item => {
@@ -179,8 +175,7 @@ export const normalizeElement = (element) => {
       break;
     }
     case 'toggle_content': {
-      const supportTypes = [...INLINE_TYPES, ...TOGGLE_CONTENT_CHILDREN_TYPES];
-      const validChildren = formatElementChildrenWithTypes(children, supportTypes);
+      const validChildren = formatElementChildrenWithTypes(children, TOGGLE_CONTENT_CHILDREN_TYPES);
       element.children = validChildren.map(element => {
         if (element.type && TOGGLE_CONTENT_CHILDREN_TYPES.includes(element.type)) {
           return normalizeElement(element);
