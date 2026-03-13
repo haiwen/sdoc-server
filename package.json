@@ -30,7 +30,7 @@
     "form-data": "^4.0.4",
     "jsonwebtoken": "9.0.3",
     "log4js": "^6.9.0",
-    "multer": "2.0.2",
+    "multer": "2.1.1",
     "mysql2": "^3.16.3",
     "open-color": "1.9.1",
     "response-time": "^2.3.4",
