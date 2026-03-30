@@ -51,7 +51,8 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'whiteboard',
   'file_view',
   'formula',
-  'toggle_header'
+  'toggle_header',
+  'embed_link'
 ];
 
 const TOGGLE_CONTENT_CHILDREN_TYPES = FIRST_LEVEL_ELEMENT_TYPES.filter(item => {
