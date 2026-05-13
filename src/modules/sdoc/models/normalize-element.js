@@ -123,6 +123,32 @@ const formatElementChildrenWithTypes = (children, types) => {
   return newChildren.length === 0 ? defaultChildren : newChildren;
 };
 
+const generateToggleTitle = () => {
+  return {
+    id: v4(),
+    type: 'toggle_header1',
+    children: [
+      {id: v4(), text: ''}
+    ]
+  };
+};
+
+const generateToggleContent = () => {
+  return {
+    id: v4(),
+    type: 'toggle_content',
+    children: [
+      {
+        id: v4(),
+        type: 'paragraph',
+        children: [
+          {id: v4(), text: ''}
+        ]
+      }
+    ]
+  };
+};
+
 export const normalizeElement = (element) => {
   const { type, children } = element;
   // child is text
@@ -170,10 +196,14 @@ export const normalizeElement = (element) => {
     case 'toggle_header': {
       const validChildren = Array.isArray(children) ? children : [];
       const titleElement = validChildren.find(child => ['toggle_header1', 'toggle_header2', 'toggle_header3'].includes(child.type));
-      const toggleContentElement = validChildren.find(child => child.type === 'toggle_content');
-      const normalizedTitle = normalizeElement(titleElement);
-      const normalizedContent = normalizeElement(toggleContentElement);
-      element.children = [normalizedTitle, normalizedContent];
+      const normalizedTitle = titleElement ? normalizeElement(titleElement) : generateToggleTitle();
+      if (element.collapsed) {
+        element.children = [normalizedTitle];
+      } else {
+        const toggleContentElement = validChildren.find(child => child.type === 'toggle_content');
+        const normalizedContent = toggleContentElement ? normalizeElement(toggleContentElement) : generateToggleContent();
+        element.children = [normalizedTitle, normalizedContent];
+      }
       break;
     }
     case 'toggle_content': {
