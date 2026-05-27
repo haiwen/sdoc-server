@@ -65,7 +65,8 @@ class ReplyController {
     const { doc_uuid: docUuid, comment_id, reply_id } = req.params;
 
     try {
-      await seaServerAPI.deleteReply(docUuid, comment_id, reply_id);
+      const { username } = req.payload;
+      await seaServerAPI.deleteReply(docUuid, comment_id, reply_id, username);
       const notificationManager = NotificationManager.getInstance();
       notificationManager.sendNotificationToRoom(docUuid);
       res.send({success: true});
@@ -90,7 +91,8 @@ class ReplyController {
     }
 
     try {
-      await seaServerAPI.updateReply(docUuid, comment_id, reply_id, { reply });
+      const { username } = req.payload;
+      await seaServerAPI.updateReply(docUuid, comment_id, reply_id, { reply }, username);
       res.send({success: true});
       return;
     } catch(err) {

@@ -73,17 +73,17 @@ class SeaServerAPI {
     return axios.post(uploadLink, data, config);
   };
 
-  deleteComment = (docUuid, commentId) => {
+  deleteComment = (docUuid, commentId, username) => {
     const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/';
 
-    const config = this.getConfig(docUuid);
+    const config = this.getConfig(docUuid, username);
     return axios.delete(uploadLink, config);
   };
 
-  updateComment = (docUuid, commentId, comment) => {
+  updateComment = (docUuid, commentId, comment, username) => {
     const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/';
     const data = comment;
-    const config = this.getConfig(docUuid);
+    const config = this.getConfig(docUuid, username);
     return axios.put(uploadLink, data, config);
   };
 
@@ -102,17 +102,17 @@ class SeaServerAPI {
     return axios.post(uploadLink, data, config);
   };
 
-  deleteReply = (docUuid, commentId, replyId) => {
+  deleteReply = (docUuid, commentId, replyId, username) => {
     const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/' + replyId + '/';
 
-    const config = this.getConfig(docUuid);
+    const config = this.getConfig(docUuid, username);
     return axios.delete(uploadLink, config);
   };
 
-  updateReply = (docUuid, commentId, replyId, reply) => {
+  updateReply = (docUuid, commentId, replyId, reply, username) => {
     const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/' + replyId + '/';
     const data = reply;
-    const config = this.getConfig(docUuid);
+    const config = this.getConfig(docUuid, username);
     return axios.put(uploadLink, data, config);
   };
 
