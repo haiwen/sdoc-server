@@ -73,7 +73,8 @@ class CommentController {
     const { doc_uuid: docUuid, comment_id } = req.params;
 
     try {
-      await seaServerAPI.deleteComment(docUuid, comment_id);
+      const { username } = req.payload;
+      await seaServerAPI.deleteComment(docUuid, comment_id, username);
       res.send({success: true});
       const notificationManager = NotificationManager.getInstance();
       notificationManager.sendNotificationToRoom(docUuid);
@@ -126,7 +127,8 @@ class CommentController {
 
 
     try {
-      await seaServerAPI.updateComment(docUuid, comment_id, updatedComment);
+      const { username } = req.payload;
+      await seaServerAPI.updateComment(docUuid, comment_id, updatedComment, username);
       res.send({success: true});
       return;
     } catch(err) {
