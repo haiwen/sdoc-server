@@ -35,7 +35,7 @@
     "open-color": "1.9.1",
     "response-time": "^2.3.4",
     "socket.io": "4.8.1",
-    "uuid": "9.0.0"
+    "uuid": "14.0.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.21.0",
