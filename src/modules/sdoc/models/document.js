@@ -36,8 +36,9 @@ class Document {
     this.meta = {...this.meta, ...meta};
   };
 
-  setLastModifyUser = (user = { username: '' }) => {
-    this.last_modify_user = user.username || '';
+  setLastModifyUser = (user = { username: '', name: '' }) => {
+    const { username = '', name = '' } = user;
+    this.last_modify_user = username.startsWith('anon_') ? (name || 'Anonymous') : username;
   };
 
   getMeta = () => {
