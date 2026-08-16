@@ -171,11 +171,12 @@ class ExcalidrawManager {
   };
 
   saveSceneDocToMemory = async (exdrawUuid, exdrawName, content, username) => {
-    const document = this.documents.get(exdrawUuid);
+    let document = this.documents.get(exdrawUuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
-        await this.getDoc(exdrawUuid, exdrawName);
+        await this.getSceneDoc(exdrawUuid, exdrawName);
+        document = this.documents.get(exdrawUuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${exdrawName}(${exdrawUuid}) doc content error`);
         const result = {
@@ -184,6 +185,14 @@ class ExcalidrawManager {
         };
         return Promise.resolve(result);
       }
+    }
+
+    if (!document) {
+      logger.error(`SOCKET_MESSAGE: Document ${exdrawName}(${exdrawUuid}) is not available after loading`);
+      return Promise.resolve({
+        success: false,
+        error_type: 'load_document_content_error',
+      });
     }
 
     const { version: clientVersion} = content;
@@ -214,11 +223,12 @@ class ExcalidrawManager {
 
   execOperationsBySocket = async (params, exdrawName) => {
     const { doc_uuid: docUuid, version: clientVersion, user, elements } = params;
-    const document = this.documents.get(docUuid);
+    let document = this.documents.get(docUuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
-        await this.getDoc(docUuid, exdrawName);
+        await this.getSceneDoc(docUuid, exdrawName);
+        document = this.documents.get(docUuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${exdrawName}(${docUuid}) doc content error`);
         const result = {
@@ -227,6 +237,14 @@ class ExcalidrawManager {
         };
         return Promise.resolve(result);
       }
+    }
+
+    if (!document) {
+      logger.error(`SOCKET_MESSAGE: Document ${exdrawName}(${docUuid}) is not available after loading`);
+      return Promise.resolve({
+        success: false,
+        error_type: 'load_document_content_error',
+      });
     }
 
     const { version: serverVersion } = document;
@@ -240,6 +258,14 @@ class ExcalidrawManager {
       logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
       logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s', document.docUuid, user.username);
       return Promise.resolve(result);
+    }
+
+    if (!Array.isArray(elements) || elements.length === 0) {
+      return Promise.resolve({
+        success: true,
+        updated: false,
+        version: document.version,
+      });
     }
 
         // execute operations success

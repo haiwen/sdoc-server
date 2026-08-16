@@ -24,10 +24,10 @@ class ExdrawIOHandler {
   onConnection(socket) {
     // todo permission check
     this.ioHelper.sendInitRoomToPrivate(socket.id);
-    socket.on('join-room', async (params) => {
+    socket.on('join-room', async (params, callback) => {
       // join room
       const { doc_uuid: docUuid, user: userInfo } = params;
-      socket.join(docUuid);
+      await socket.join(docUuid);
 
       const usersManager = UsersManager.getInstance();
       if (!usersManager.getUser(docUuid, socket.id)) {
@@ -43,6 +43,7 @@ class ExdrawIOHandler {
       // }
 
       this.ioHelper.sendRoomUserChangeMessage(socket, docUuid, users);
+      callback && callback({ success: true });
     });
 
     socket.on('elements-updated', async (params, callback) => {
