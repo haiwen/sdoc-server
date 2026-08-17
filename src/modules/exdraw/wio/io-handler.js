@@ -2,6 +2,7 @@ import ExcalidrawManager from "../managers/excalidraw-manager";
 import UsersManager from "../managers/users-manager";
 import IOHelper from "./io-helper";
 import checkPermission from "./is-permission-valid";
+import logger from "../../../loggers";
 
 class ExdrawIOHandler {
 
@@ -25,25 +26,36 @@ class ExdrawIOHandler {
     // todo permission check
     this.ioHelper.sendInitRoomToPrivate(socket.id);
     socket.on('join-room', async (params, callback) => {
-      // join room
-      const { doc_uuid: docUuid, user: userInfo } = params;
-      await socket.join(docUuid);
+      try {
+        const { doc_uuid: docUuid, user: userInfo } = params || {};
+        if (!docUuid || !userInfo) {
+          throw new Error('Invalid join-room parameters');
+        }
 
-      const usersManager = UsersManager.getInstance();
-      if (!usersManager.getUser(docUuid, socket.id)) {
-        usersManager.addUser(docUuid, socket.id, userInfo);
+        await socket.join(docUuid);
+
+        const usersManager = UsersManager.getInstance();
+        if (!usersManager.getUser(docUuid, socket.id)) {
+          usersManager.addUser(docUuid, socket.id, userInfo);
+        }
+
+        const users = usersManager.getDocUsers(docUuid);
+
+        // if (users.length === 1) {
+        // this.ioHelper.sendFirstInRoomMessage(socket.id);
+        // } else {
+        //   this.ioHelper.sendNewUserMessage(socket, docUuid);
+        // }
+
+        this.ioHelper.sendRoomUserChangeMessage(socket, docUuid, users);
+        callback && callback({ success: true });
+      } catch (error) {
+        logger.error('SOCKET_MESSAGE: Join room failed', error);
+        callback && callback({
+          success: false,
+          error_type: 'join_room_error',
+        });
       }
-
-      const users = usersManager.getDocUsers(docUuid);
-
-      // if (users.length === 1) {
-      // this.ioHelper.sendFirstInRoomMessage(socket.id);
-      // } else {
-      //   this.ioHelper.sendNewUserMessage(socket, docUuid);
-      // }
-
-      this.ioHelper.sendRoomUserChangeMessage(socket, docUuid, users);
-      callback && callback({ success: true });
     });
 
     socket.on('elements-updated', async (params, callback) => {
