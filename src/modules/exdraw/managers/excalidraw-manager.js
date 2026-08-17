@@ -114,10 +114,18 @@ class ExcalidrawManager {
     }
     const sceneData = new ExcalidrawDocument(exdrawUuid, exdrawName, docContent);
     sceneData.setLastModifyUser({ username });
+
+    // Multiple operations may load the same cold document concurrently.
+    // Use the document that won the cache race instead of overwriting it.
+    const cachedDocument = this.documents.get(exdrawUuid);
+    if (cachedDocument) {
+      return cachedDocument.toJson();
+    }
+
     this.documents.set(exdrawUuid, sceneData);
 
     if (!result.data) {
-      sceneData.setMeta({need_save: true});
+      sceneData.setMeta({ need_save: true });
       await this.saveSceneDoc(exdrawUuid);
     }
 
@@ -140,7 +148,9 @@ class ExcalidrawManager {
 
     document.setMeta({ is_saving: true });
 
-    // Get save info
+    // Capture the version included in this save. Operations that arrive while
+    // the upload is in flight must keep the document dirty for a later save.
+    const savedVersion = document.version;
     const exdrawContent = document.toJson();
     const exdrawName = document.exdrawName;
 
@@ -165,7 +175,11 @@ class ExcalidrawManager {
     } finally {
       deleteDir(tempPath);
     }
-    document.setMeta({is_saving: false, need_save: false});
+    const hasNewerChanges = document.version !== savedVersion;
+    document.setMeta({
+      is_saving: false,
+      need_save: !saveFlag || hasNewerChanges,
+    });
 
     return Promise.resolve(saveFlag);
   };
