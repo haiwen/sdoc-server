@@ -39,8 +39,10 @@ class SeaServerAPI {
     return axios.get(url, config);
   };
 
-  getSceneContent = (downloadLink) => {
-    return axios.get(downloadLink);
+  getSceneContent = (exdrawUuid) => {
+    const config = this.getConfig(exdrawUuid);
+    const url = '/api/v2.1/exdraw/content/' + exdrawUuid + '/';
+    return axios.get(url, config);
   };
 
   saveSceneContent = (exdrawUuid, docData, lastModifyUser) => {
