@@ -175,7 +175,7 @@ class ExcalidrawManager {
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
-        await this.getDoc(exdrawUuid, exdrawName);
+        await this.getSceneDoc(exdrawUuid, exdrawName);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${exdrawName}(${exdrawUuid}) doc content error`);
         const result = {
@@ -218,7 +218,7 @@ class ExcalidrawManager {
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
-        await this.getDoc(docUuid, exdrawName);
+        await this.getSceneDoc(docUuid, exdrawName);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${exdrawName}(${docUuid}) doc content error`);
         const result = {
