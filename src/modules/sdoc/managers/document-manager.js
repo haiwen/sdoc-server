@@ -12,6 +12,59 @@ import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import UsersManager from './users-manager';
+import IOHelper from '../wio/io-helper';
+import { buildDocumentContext } from '../utils/agent-context';
+import { applyPayloadDigest, selectionDigest, setBlockTypeHash, setListTypeHash, CanonicalizationError } from '../utils/sdoc-canonical';
+
+const REVIEW_BLOCK_TYPES = new Set([
+  'title', 'subtitle', 'header1', 'header2', 'header3', 'header4', 'header5', 'header6', 'paragraph', 'table_cell',
+]);
+
+const resolveLeafPath = (elements, blockId, textNodeId) => {
+  let result = null;
+
+  const visit = (node, path, block) => {
+    if (result || !node) return;
+    if (node.id === textNodeId && typeof node.text === 'string') {
+      if (block && block.id === blockId) {
+        result = {path};
+      }
+      return;
+    }
+    if (!Array.isArray(node.children)) return;
+    const nextBlock = REVIEW_BLOCK_TYPES.has(node.type) ? node : block;
+    node.children.forEach((child, index) => visit(child, path.concat(index), nextBlock));
+  };
+
+  elements.forEach((element, index) => visit(element, [index], null));
+  return result;
+};
+
+const buildApplyResult = (params, approvedBy, partial) => {
+  return {
+    schema_version: 'sdoc-apply-result/v1',
+    apply_attempt_id: params.apply_attempt_id,
+    task_id: params.task_id,
+    review_decision_id: params.review_decision_id,
+    snapshot_id: params.snapshot_id,
+    document_incarnation: params.document_incarnation,
+    file_uuid: params.file_uuid,
+    doc_uuid: params.doc_uuid,
+    changeset_revision_id: params.changeset_revision_id,
+    changeset_revision: params.changeset_revision,
+    card_revision: params.card_revision,
+    decision_kind: params.decision_kind,
+    selection_digest: params.selection_digest,
+    apply_payload_digest: params.apply_payload_digest,
+    approved_by: approvedBy,
+    status: partial.status,
+    conflicts: partial.conflicts || [],
+    applied_sdoc_version: partial.applied_sdoc_version ?? null,
+    operation_log_correlation_id: partial.operation_log_correlation_id ?? null,
+    persistence_status: partial.persistence_status || 'not_requested',
+    error_code: partial.error_code || null,
+  };
+};
 
 class DocumentManager {
 
@@ -19,6 +72,9 @@ class DocumentManager {
     this.instance = null;
     this.users = [];
     this.documents = new Map();
+    this.docWriteQueues = new Map();
+    this.reviewSaveTasks = new Map();
+    this.applyRegistrations = new Map();
 
     // save infos
     this.isSaving = false;
@@ -165,33 +221,376 @@ class DocumentManager {
     document.setMeta({is_saving: true});
 
     // Get save info
-    const { version, format_version, elements, docName, last_modify_user = '' } = document;
-    const docContent = { version, format_version, elements, last_modify_user };
+    const { version: savingVersion, format_version, elements, docName, last_modify_user = '' } = document;
+    const docContent = { version: savingVersion, format_version, elements, last_modify_user };
 
     let saveFlag = false;
+    let saveErrorMessage = null;
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
       saveFlag = true;
       logger.info(`${docName}(${docUuid}) saved`);
+      await this.sendReviewSaveResults(docUuid, savingVersion, 'persisted');
     } catch(err) {
       saveFlag = false;
       const message = getErrorMessage(err);
+      saveErrorMessage = message;
       if (message.status && message.status === 404) {
         logger.info(`${docName}(${docUuid}) save failed`);
         logger.info(JSON.stringify(message));
+        await this.sendReviewSaveResults(docUuid, savingVersion, 'file_unavailable');
         await this.removeDoc(docUuid);
       } else {
         logger.error(`${docName}(${docUuid}) save failed`);
         logger.error(JSON.stringify(message));
+        await this.sendReviewSaveResults(docUuid, savingVersion, 'save_pending');
       }
     } finally {
       deleteDir(tempPath);
     }
 
-    document.setMeta({is_saving: false, need_save: false});
+    const needSave = saveFlag ? document.version !== savingVersion : !(saveErrorMessage && saveErrorMessage.status === 404);
+    document.setMeta({is_saving: false, need_save: needSave});
     return Promise.resolve(saveFlag);
+  };
+
+  enqueueDocWrite = (docUuid, callback) => {
+    const previous = this.docWriteQueues.get(docUuid) || Promise.resolve();
+    const next = previous.catch(() => {}).then(callback);
+    const tracked = next.finally(() => {
+      if (this.docWriteQueues.get(docUuid) === tracked) {
+        this.docWriteQueues.delete(docUuid);
+      }
+    });
+    this.docWriteQueues.set(docUuid, tracked);
+    return next;
+  };
+
+  registerReviewSaveTask = (docUuid, task) => {
+    const tasks = this.reviewSaveTasks.get(docUuid) || [];
+    if (!tasks.some(item => item.applyAttemptId === task.applyAttemptId && item.appliedVersion === task.appliedVersion)) {
+      tasks.push(task);
+      this.reviewSaveTasks.set(docUuid, tasks);
+    }
+  };
+
+  sendReviewSaveResults = async (docUuid, savedVersion, outcome) => {
+    const tasks = this.reviewSaveTasks.get(docUuid) || [];
+    const remaining = [];
+    for (const task of tasks) {
+      if (outcome === 'persisted' && task.appliedVersion > savedVersion) {
+        remaining.push(task);
+        continue;
+      }
+      try {
+        await seaServerAPI.sendReviewSaveResult({
+          docUuid,
+          applyAttemptId: task.applyAttemptId,
+          operationLogCorrelationId: task.operationLogCorrelationId,
+          documentIncarnation: task.documentIncarnation,
+          appliedVersion: task.appliedVersion,
+          approvedBy: task.approvedBy,
+          outcome,
+          savedVersion,
+        });
+        if (outcome === 'save_pending') {
+          remaining.push(task);
+        }
+      } catch (error) {
+        logger.error('Send SDoc review save result failed:', error.message);
+        remaining.push(task);
+      }
+    }
+    if (remaining.length) {
+      this.reviewSaveTasks.set(docUuid, remaining);
+    } else {
+      this.reviewSaveTasks.delete(docUuid);
+    }
+  };
+
+  applyReviewChangeSet = async (docUuid, docName, params, approvedBy) => {
+    return this.enqueueDocWrite(docUuid, async () => {
+      let document = this.documents.get(docUuid);
+      if (!document) {
+        await this.getDoc(docUuid, docName);
+        document = this.documents.get(docUuid);
+      }
+      if (!document) {
+        return buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'document_unavailable'});
+      }
+
+      if (document.document_incarnation !== params.document_incarnation) {
+        return buildApplyResult(params, approvedBy, {
+          status: 'preflight_conflicted',
+          conflicts: [{item_id: null, conflict_code: 'document_incarnation_changed'}],
+        });
+      }
+
+      const existing = this.applyRegistrations.get(params.apply_attempt_id);
+      if (existing) {
+        return existing.result;
+      }
+
+      // Recompute both digests before preflight; mismatch is fail-closed.
+      try {
+        const computedSelection = selectionDigest({
+          taskId: params.task_id,
+          cardRevision: params.card_revision,
+          changesetRevision: params.changeset_revision,
+          decisionKind: params.decision_kind,
+          selectedChangeItemIds: params.selected_change_item_ids,
+        });
+        if (computedSelection !== params.selection_digest) {
+          return buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'invalid_selection_payload'});
+        }
+        const computedPayload = applyPayloadDigest({
+          taskId: params.task_id,
+          reviewDecisionId: params.review_decision_id,
+          cardRevision: params.card_revision,
+          changesetRevisionId: params.changeset_revision_id,
+          changesetRevision: params.changeset_revision,
+          selectionDigestValue: params.selection_digest,
+          selectedItems: params.selected_items,
+        });
+        if (computedPayload !== params.apply_payload_digest) {
+          return buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'invalid_selection_payload'});
+        }
+      } catch (error) {
+        if (error instanceof CanonicalizationError) {
+          return buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'invalid_selection_payload'});
+        }
+        throw error;
+      }
+
+      // Resolve each selected item against the current document projection.
+      const projection = buildDocumentContext({
+        elements: document.elements,
+        version: document.version,
+        fileUuid: docUuid,
+        documentIncarnation: document.document_incarnation,
+        snapshotId: params.snapshot_id,
+      });
+      const blockById = new Map(projection.blocks.map(block => [block.block_id, block]));
+      const listById = new Map((projection.lists || []).map(list => [list.block_id, list]));
+
+      const conflicts = [];
+      const operations = [];
+      for (const item of params.selected_items) {
+        const target = item.target || {};
+        const precondition = item.precondition || {};
+
+        if (item.kind === 'set_list_type') {
+          const listNode = listById.get(target.block_id);
+          const blockIndex = document.elements.findIndex(el => el && el.id === target.block_id);
+          if (!listNode || blockIndex < 0) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'target_not_found'});
+            continue;
+          }
+          if (listNode.type !== target.block_type) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'block_type_mismatch'});
+            continue;
+          }
+          if (JSON.stringify(listNode.ancestor_path) !== JSON.stringify(target.ancestor_path)) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'ancestor_path_mismatch'});
+            continue;
+          }
+          let currentHash;
+          try {
+            currentHash = setListTypeHash({
+              blockId: target.block_id,
+              blockType: listNode.type,
+              ancestorPath: listNode.ancestor_path,
+              fileUuid: docUuid,
+              documentIncarnation: document.document_incarnation,
+            });
+          } catch (error) {
+            if (!(error instanceof CanonicalizationError)) throw error;
+            conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
+            continue;
+          }
+          if (currentHash !== precondition.canonical_before_hash) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
+            continue;
+          }
+          operations.push({
+            type: 'set_node',
+            path: [blockIndex],
+            node_id: target.block_id,
+            properties: {type: listNode.type},
+            newProperties: {type: item.after_type},
+          });
+          continue;
+        }
+
+        const block = blockById.get(target.block_id);
+        if (!block || !block.supported) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'target_not_found'});
+          continue;
+        }
+
+        if (item.kind === 'set_block_type') {
+          const blockIndex = document.elements.findIndex(el => el && el.id === target.block_id);
+          if (blockIndex < 0) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'target_not_found'});
+            continue;
+          }
+          if (block.type !== target.block_type) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'block_type_mismatch'});
+            continue;
+          }
+          if (JSON.stringify(block.ancestor_path) !== JSON.stringify(target.ancestor_path)) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'ancestor_path_mismatch'});
+            continue;
+          }
+          let currentHash;
+          try {
+            currentHash = setBlockTypeHash({
+              blockId: target.block_id,
+              blockType: block.type,
+              ancestorPath: block.ancestor_path,
+              beforeLeafText: block.before_leaf_text,
+              fileUuid: docUuid,
+              documentIncarnation: document.document_incarnation,
+            });
+          } catch (error) {
+            if (!(error instanceof CanonicalizationError)) throw error;
+            conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
+            continue;
+          }
+          if (currentHash !== precondition.canonical_before_hash) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
+            continue;
+          }
+          operations.push({
+            type: 'set_node',
+            path: [blockIndex],
+            node_id: target.block_id,
+            properties: {type: block.type},
+            newProperties: {type: item.after_type},
+          });
+          continue;
+        }
+
+        if (block.text_node_id !== target.text_node_id) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'target_not_found'});
+          continue;
+        }
+        if (block.type !== target.block_type) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'block_type_mismatch'});
+          continue;
+        }
+        if (JSON.stringify(block.ancestor_path) !== JSON.stringify(target.ancestor_path)) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'ancestor_path_mismatch'});
+          continue;
+        }
+        if (block.canonical_before_hash !== precondition.canonical_before_hash || block.before_leaf_text !== precondition.before_leaf_text) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
+          continue;
+        }
+        const resolved = resolveLeafPath(document.elements, target.block_id, target.text_node_id);
+        if (!resolved) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'target_not_found'});
+          continue;
+        }
+        operations.push(
+          {type: 'remove_text', path: resolved.path, node_id: target.text_node_id, offset: 0, text: precondition.before_leaf_text},
+          {type: 'insert_text', path: resolved.path, node_id: target.text_node_id, offset: 0, text: item.after_text},
+        );
+      }
+
+      if (conflicts.length) {
+        const result = buildApplyResult(params, approvedBy, {status: 'preflight_conflicted', conflicts});
+        this.applyRegistrations.set(params.apply_attempt_id, {status: 'preflight_conflicted', result});
+        return result;
+      }
+
+      const draft = new Document(docUuid, docName, {
+        version: document.version,
+        format_version: document.format_version,
+        elements: deepCopy(document.elements),
+        last_modify_user: document.last_modify_user,
+      });
+      if (!applyOperations(draft, deepCopy(operations), {username: approvedBy})) {
+        const result = buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'preflight_validation_failed'});
+        this.applyRegistrations.set(params.apply_attempt_id, {status: 'failed_precommit', result});
+        return result;
+      }
+
+      this.applyRegistrations.set(params.apply_attempt_id, {
+        status: 'committing',
+        result: buildApplyResult(params, approvedBy, {status: 'in_progress'}),
+      });
+
+      try {
+        const operationsManager = OperationsManager.getInstance();
+        await operationsManager.addOperations(docUuid, operations, draft.version, {username: approvedBy});
+      } catch (error) {
+        logger.error('Save review operations failed:', error);
+        const result = buildApplyResult(params, approvedBy, {status: 'outcome_unknown', error_code: 'post_commit_indeterminate'});
+        this.applyRegistrations.set(params.apply_attempt_id, {status: 'outcome_unknown', result});
+        return result;
+      }
+
+      document.elements = draft.elements;
+      document.version = draft.version;
+      document.last_modify_user = draft.last_modify_user;
+      document.setMeta({need_save: true});
+      this.registerReviewSaveTask(docUuid, {
+        applyAttemptId: params.apply_attempt_id,
+        operationLogCorrelationId: params.apply_attempt_id,
+        appliedVersion: draft.version,
+        documentIncarnation: params.document_incarnation,
+        approvedBy,
+      });
+      IOHelper.getInstance().sendDocumentUpdateToRoom(docUuid, {
+        operations,
+        version: draft.version,
+        user: {username: approvedBy},
+        selection: null,
+        cursor_data: null,
+      });
+      this.saveDoc(docUuid).catch(error => logger.error('Save reviewed document failed:', error));
+
+      const result = buildApplyResult(params, approvedBy, {
+        status: 'applied',
+        applied_sdoc_version: draft.version,
+        operation_log_correlation_id: params.apply_attempt_id,
+        persistence_status: 'not_requested',
+      });
+      this.applyRegistrations.set(params.apply_attempt_id, {status: 'applied', result});
+      return result;
+    });
+  };
+
+  getApplyResult = async (docUuid, applyAttemptId) => {
+    return this.enqueueDocWrite(docUuid, async () => {
+      const registration = this.applyRegistrations.get(applyAttemptId);
+      if (!registration) {
+        return {error_code: 'attempt_not_found'};
+      }
+      return registration.result;
+    });
+  };
+
+  buildReviewSnapshot = async (docUuid, docName, fileUuid, docTitle, username) => {
+    return this.enqueueDocWrite(docUuid, async () => {
+      await this.getDoc(docUuid, docName, docTitle, username);
+      const document = this.documents.get(docUuid);
+      if (!document) {
+        throw new Error('load_document_content_error');
+      }
+      const snapshotId = v4();
+      const projection = buildDocumentContext({
+        elements: document.elements,
+        version: document.version,
+        fileUuid,
+        documentIncarnation: document.document_incarnation,
+        snapshotId,
+      });
+      return projection;
+    });
   };
 
   removeDoc = async (docUuid) => {
@@ -249,13 +648,18 @@ class DocumentManager {
   };
 
   execOperationsBySocket = async (params, docName) => {
+    return this.enqueueDocWrite(params.doc_uuid, () => this.execOperationsBySocketUnsafe(params, docName));
+  };
+
+  execOperationsBySocketUnsafe = async (params, docName) => {
     const { doc_uuid, version: clientVersion, operations, user } = params;
 
-    const document = this.documents.get(doc_uuid);
+    let document = this.documents.get(doc_uuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
         await this.getDoc(doc_uuid, docName);
+        document = this.documents.get(doc_uuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${docName}(${doc_uuid}) doc content error`);
         const result = {
