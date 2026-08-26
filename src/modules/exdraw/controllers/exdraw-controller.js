@@ -23,14 +23,6 @@ class ExdrawController {
         logger.error('Request timed out, please try again later');
       }
 
-      if (err.error_type === 'get_doc_download_link_error') {
-        logger.error(`Get doc download link error. request url is: ${err.from_url}`);
-        return res.status(500).send({
-          'error_type': 'get_doc_download_link_error',
-          'error_msg': 'Internal Server Error'
-        });
-      }
-
       if (err.error_type === 'content_load_invalid') {
         logger.error(`Load ${exdrawName}(${exdrawUuid}) from ${err.from_url} error`);
         return res.status(500).send({

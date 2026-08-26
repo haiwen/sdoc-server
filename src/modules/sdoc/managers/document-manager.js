@@ -84,26 +84,14 @@ class DocumentManager {
   reloadDoc = async (docUuid, docName) => {
     this.removeDocFromMemory(docUuid);
 
-    let downloadLink = '';
-    try {
-      const res = await seaServerAPI.getDocDownloadLink(docUuid);
-      downloadLink = res.data.download_link;
-    } catch (err) {
-      errorHandle(err);
-      const error = new Error('Get doc download link error');
-      error.error_type = 'get_doc_download_link_error';
-      error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/download-link/${docUuid}/`;
-      throw error;
-    }
-
     let result = null;
     try {
-      result = await seaServerAPI.getDocContent(downloadLink);
+      result = await seaServerAPI.getDocContent(docUuid);
     } catch (err) {
       errorHandle(err);
       const error = new Error('The content of the document loaded error');
       error.error_type = 'content_load_invalid';
-      error.from_url = downloadLink;
+      error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/content/${docUuid}/`;
       throw error;
     }
 
@@ -125,26 +113,14 @@ class DocumentManager {
       return document.toJson();
     }
 
-    let downloadLink = '';
-    try {
-      const res = await seaServerAPI.getDocDownloadLink(docUuid);
-      downloadLink = res.data.download_link;
-    } catch (err) {
-      errorHandle(err);
-      const error = new Error('Get doc download link error');
-      error.error_type = 'get_doc_download_link_error';
-      error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/download-link/${docUuid}/`;
-      throw error;
-    }
-
     let result = null;
     try {
-      result = await seaServerAPI.getDocContent(downloadLink);
+      result = await seaServerAPI.getDocContent(docUuid);
     } catch (err) {
       errorHandle(err);
       const error = new Error('The content of the document loaded error');
       error.error_type = 'content_load_invalid';
-      error.from_url = downloadLink;
+      error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/content/${docUuid}/`;
       throw error;
     }
 
