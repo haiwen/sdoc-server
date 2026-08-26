@@ -73,8 +73,8 @@ class ExdrawIOHandler {
     });
 
     socket.on('server-volatile-broadcast', (params) => {
-      const { doc_uuid: docUuid, elements } = params;
-      this.ioHelper.sendMessageToRoom(socket, docUuid, { elements });
+      const { doc_uuid: docUuid, ...rest } = params;
+      this.ioHelper.sendPreviewElementsMessageToRoom(socket, docUuid, rest);
     });
 
     socket.on('leave-room', async () => {
