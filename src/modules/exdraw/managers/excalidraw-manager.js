@@ -159,11 +159,12 @@ class ExcalidrawManager {
   };
 
   saveSceneDocToMemory = async (exdrawUuid, exdrawName, content, username) => {
-    const document = this.documents.get(exdrawUuid);
+    let document = this.documents.get(exdrawUuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
         await this.getSceneDoc(exdrawUuid, exdrawName);
+        document = this.documents.get(exdrawUuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${exdrawName}(${exdrawUuid}) doc content error`);
         const result = {
@@ -202,11 +203,12 @@ class ExcalidrawManager {
 
   execOperationsBySocket = async (params, exdrawName) => {
     const { doc_uuid: docUuid, version: clientVersion, user, elements } = params;
-    const document = this.documents.get(docUuid);
+    let document = this.documents.get(docUuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
         await this.getSceneDoc(docUuid, exdrawName);
+        document = this.documents.get(docUuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${exdrawName}(${docUuid}) doc content error`);
         const result = {
@@ -226,7 +228,7 @@ class ExcalidrawManager {
         version: serverVersion,
       };
       logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
-      logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s', document.docUuid, user.username);
+      logger.warn('apply operations failed: exdraw uuid is %s, modified user is %s', document.docUuid, user.username);
       return Promise.resolve(result);
     }
 

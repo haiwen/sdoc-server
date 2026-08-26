@@ -251,11 +251,12 @@ class DocumentManager {
   execOperationsBySocket = async (params, docName) => {
     const { doc_uuid, version: clientVersion, operations, user } = params;
 
-    const document = this.documents.get(doc_uuid);
+    let document = this.documents.get(doc_uuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
         await this.getDoc(doc_uuid, docName);
+        document = this.documents.get(doc_uuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${docName}(${doc_uuid}) doc content error`);
         const result = {

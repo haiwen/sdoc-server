@@ -3,6 +3,29 @@ import UsersManager from "../managers/users-manager";
 import IOHelper from "./io-helper";
 import checkPermission from "./is-permission-valid";
 
+const isValidPreviewPayload = (params) => {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+    return false;
+  }
+
+  const { gestureId, seq, elements } = params;
+  return (
+    typeof gestureId === 'string' &&
+    gestureId.length > 0 &&
+    gestureId.length <= 128 &&
+    Number.isInteger(seq) &&
+    seq >= 1 &&
+    Array.isArray(elements) &&
+    elements.length > 0 &&
+    elements.every((element) => (
+      element &&
+      typeof element === 'object' &&
+      typeof element.id === 'string' &&
+      element.id.length > 0
+    ))
+  );
+};
+
 class ExdrawIOHandler {
 
   constructor(io) {
@@ -72,8 +95,18 @@ class ExdrawIOHandler {
       this.ioHelper.sendMouseMessageToRoom(socket, docUuid, rest);
     });
 
-    socket.on('server-volatile-broadcast', (params) => {
-      const { doc_uuid: docUuid, ...rest } = params;
+    socket.on('server-volatile-broadcast', (params = {}) => {
+      if (!isValidPreviewPayload(params)) {
+        return;
+      }
+
+      const { doc_uuid: docUuid } = params;
+      if (docUuid !== socket.docUuid || !socket.rooms.has(docUuid)) {
+        return;
+      }
+
+      const rest = { ...params };
+      delete rest.doc_uuid;
       this.ioHelper.sendPreviewElementsMessageToRoom(socket, docUuid, rest);
     });
 
