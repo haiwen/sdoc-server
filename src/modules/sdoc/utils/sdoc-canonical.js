@@ -26,6 +26,15 @@ const VALID_ANCESTOR_TYPES = new Set([
   'table', 'table_row', 'table_cell',
 ]);
 const VALID_KINDS = new Set(['replace_block_text', 'set_block_type', 'set_list_type', 'replace_table_cell_text']);
+const LIST_TYPES = new Set(['ordered_list', 'unordered_list']);
+const EDITABLE_HEADING_TYPES = new Set([
+  'paragraph', 'header1', 'header2', 'header3', 'header4', 'header5', 'header6',
+]);
+const EDITABLE_TEXT_BLOCK_TYPES = new Set([
+  'title', 'subtitle', 'paragraph',
+  'header1', 'header2', 'header3', 'header4', 'header5', 'header6',
+  'list_item', 'table_cell',
+]);
 
 export const CANONICAL_HASH_SCHEMA = 'sdoc-canonical/v1';
 export const SELECTION_SCHEMA = 'sdoc-selection/v1';
@@ -272,6 +281,15 @@ function canonicalSelectedItem(item) {
     if (!VALID_BLOCK_TYPES.has(item.after_type)) {
       throw new CanonicalizationError('Invalid after_type: ' + item.after_type);
     }
+    if (item.kind === 'set_list_type') {
+      if (!LIST_TYPES.has(target.block_type) || !LIST_TYPES.has(item.after_type) || target.block_type === item.after_type) {
+        throw new CanonicalizationError('Invalid list type transition.');
+      }
+    } else if (!EDITABLE_HEADING_TYPES.has(target.block_type) ||
+               !EDITABLE_HEADING_TYPES.has(item.after_type) ||
+               target.block_type === item.after_type) {
+      throw new CanonicalizationError('Invalid block type transition.');
+    }
     const precondition = item.precondition;
     const preconditionKeys = Object.keys(precondition).sort();
     if (preconditionKeys.join(',') !== 'canonical_before_hash,hash_algorithm,hash_schema_version,projection_version') {
@@ -306,6 +324,15 @@ function canonicalSelectedItem(item) {
   }
   if (!VALID_BLOCK_TYPES.has(target.block_type)) {
     throw new CanonicalizationError('Invalid target block_type: ' + target.block_type);
+  }
+  if (!EDITABLE_TEXT_BLOCK_TYPES.has(target.block_type)) {
+    throw new CanonicalizationError('Unsupported text target block_type: ' + target.block_type);
+  }
+  if (item.kind === 'replace_table_cell_text' && target.block_type !== 'table_cell') {
+    throw new CanonicalizationError('replace_table_cell_text requires a table_cell target.');
+  }
+  if (item.kind === 'replace_block_text' && target.block_type === 'table_cell') {
+    throw new CanonicalizationError('replace_block_text cannot target a table_cell.');
   }
   const precondition = item.precondition;
   const preconditionKeys = Object.keys(precondition).sort();
