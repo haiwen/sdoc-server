@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS `sdoc_review_apply_registration` (
   `doc_uuid` varchar(36) NOT NULL,
   `apply_payload_digest` varchar(64) NOT NULL,
   `status` varchar(32) NOT NULL,
+  `persistence_status` varchar(32) NOT NULL DEFAULT 'pending',
+  `applied_sdoc_version` bigint(20) DEFAULT NULL,
   `result` longtext NOT NULL,
   `created_at` bigint(20) NOT NULL,
   `updated_at` bigint(20) NOT NULL,

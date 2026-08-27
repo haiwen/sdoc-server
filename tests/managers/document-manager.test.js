@@ -1,10 +1,17 @@
 jest.mock('../../src/modules/sdoc/dao/review-apply', () => ({
   getReviewApplyRegistration: jest.fn(),
   createReviewApplyRegistration: jest.fn(),
+  listPendingReviewSaveRegistrations: jest.fn(),
+  markReviewApplyPersistence: jest.fn(),
+  listPendingReviewSaveDocUuids: jest.fn(),
 }));
 
 import DocumentManager from '../../src/modules/sdoc/managers/document-manager';
-import { getReviewApplyRegistration } from '../../src/modules/sdoc/dao/review-apply';
+import seaServerAPI from '../../src/modules/sdoc/api/sea-server-api';
+import {
+  getReviewApplyRegistration, listPendingReviewSaveRegistrations,
+  markReviewApplyPersistence,
+} from '../../src/modules/sdoc/dao/review-apply';
 import { applyPayloadDigest, selectionDigest } from '../../src/modules/sdoc/utils/sdoc-canonical';
 
 describe('SDoc review apply idempotency', () => {
@@ -80,6 +87,123 @@ describe('SDoc review apply idempotency', () => {
       manager.enqueueDocWrite = originalQueue;
       manager.documents = originalDocuments;
       manager.applyRegistrations = originalRegistrations;
+    }
+  });
+
+  it('shares one cold-document load between Apply and ordinary callers', async () => {
+    const manager = DocumentManager.getInstance();
+    const originalDocuments = manager.documents;
+    const originalLoads = manager.docLoadPromises;
+    const originalLoadDoc = manager.loadDoc;
+    let resolveLoad;
+    const loadPromise = new Promise(resolve => {
+      resolveLoad = resolve;
+    });
+    manager.documents = new Map();
+    manager.docLoadPromises = new Map();
+    manager.loadDoc = jest.fn(() => loadPromise);
+
+    try {
+      const first = manager.getDoc('doc-uuid', 'Document');
+      const second = manager.getDoc('doc-uuid', 'Document');
+      expect(manager.loadDoc).toHaveBeenCalledTimes(1);
+      resolveLoad({version: 1});
+      await expect(Promise.all([first, second])).resolves.toEqual([{version: 1}, {version: 1}]);
+    } finally {
+      manager.documents = originalDocuments;
+      manager.docLoadPromises = originalLoads;
+      manager.loadDoc = originalLoadDoc;
+    }
+  });
+
+  it('redelivers a persisted save result from the durable registration after restart', async () => {
+    const manager = DocumentManager.getInstance();
+    const originalTasks = manager.reviewSaveTasks;
+    const originalSend = seaServerAPI.sendReviewSaveResult;
+    manager.reviewSaveTasks = new Map();
+    listPendingReviewSaveRegistrations.mockResolvedValue([{
+      apply_attempt_id: 'apply-attempt-id',
+      applied_sdoc_version: 7,
+      result: {
+        operation_log_correlation_id: 'operation-log-id',
+        document_incarnation: 'document-incarnation',
+        approved_by: 'reviewer@example.com',
+      },
+    }]);
+    seaServerAPI.sendReviewSaveResult = jest.fn().mockResolvedValue({});
+
+    try {
+      await manager.sendReviewSaveResults('doc-uuid', 7, 'persisted');
+      expect(seaServerAPI.sendReviewSaveResult).toHaveBeenCalledWith(expect.objectContaining({
+        applyAttemptId: 'apply-attempt-id',
+        appliedVersion: 7,
+        outcome: 'persisted',
+      }));
+      expect(markReviewApplyPersistence).toHaveBeenCalledWith('apply-attempt-id', 'persisted');
+    } finally {
+      manager.reviewSaveTasks = originalTasks;
+      seaServerAPI.sendReviewSaveResult = originalSend;
+      listPendingReviewSaveRegistrations.mockReset();
+      markReviewApplyPersistence.mockReset();
+    }
+  });
+
+  it('queues reload behind an active Apply for the same document', async () => {
+    const manager = DocumentManager.getInstance();
+    const originalQueues = manager.docWriteQueues;
+    const originalReload = manager.reloadDocUnsafe;
+    let finishApply;
+    const applyPromise = new Promise(resolve => {
+      finishApply = resolve;
+    });
+    manager.docWriteQueues = new Map();
+    manager.reloadDocUnsafe = jest.fn().mockResolvedValue({version: 2});
+
+    try {
+      const apply = manager.enqueueDocWrite('doc-uuid', () => applyPromise);
+      const reload = manager.reloadDoc('doc-uuid', 'Document');
+      await Promise.resolve();
+      expect(manager.reloadDocUnsafe).not.toHaveBeenCalled();
+
+      finishApply({version: 1});
+      await expect(apply).resolves.toEqual({version: 1});
+      await expect(reload).resolves.toEqual({version: 2});
+      expect(manager.reloadDocUnsafe).toHaveBeenCalledWith('doc-uuid', 'Document');
+    } finally {
+      manager.docWriteQueues = originalQueues;
+      manager.reloadDocUnsafe = originalReload;
+    }
+  });
+
+  it('makes concurrent document reads join an in-progress reload', async () => {
+    const manager = DocumentManager.getInstance();
+    const originalDocs = manager.documents;
+    const originalLoads = manager.docLoadPromises;
+    const originalRemove = manager.removeDocFromMemory;
+    const originalLoad = manager.loadDoc;
+    let finishLoad;
+    const loadPromise = new Promise(resolve => {
+      finishLoad = resolve;
+    });
+    manager.documents = new Map();
+    manager.docLoadPromises = new Map();
+    manager.removeDocFromMemory = jest.fn().mockResolvedValue(undefined);
+    manager.loadDoc = jest.fn().mockReturnValue(loadPromise);
+
+    try {
+      const reload = manager.reloadDocUnsafe('doc-uuid', 'Document');
+      await Promise.resolve();
+      const concurrentRead = manager.getDoc('doc-uuid', 'Document', 'Document');
+      expect(manager.loadDoc).toHaveBeenCalledTimes(1);
+
+      finishLoad({version: 2});
+      await expect(reload).resolves.toEqual({version: 2});
+      await expect(concurrentRead).resolves.toEqual({version: 2});
+    } finally {
+      manager.documents = originalDocs;
+      manager.docLoadPromises = originalLoads;
+      manager.removeDocFromMemory = originalRemove;
+      manager.loadDoc = originalLoad;
     }
   });
 });

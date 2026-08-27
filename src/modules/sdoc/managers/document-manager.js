@@ -10,7 +10,11 @@ import Document from '../models/document';
 import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
 import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
-import { getReviewApplyRegistration, createReviewApplyRegistration } from '../dao/review-apply';
+import {
+  getReviewApplyRegistration, createReviewApplyRegistration,
+  listPendingReviewSaveRegistrations, markReviewApplyPersistence,
+  listPendingReviewSaveDocUuids,
+} from '../dao/review-apply';
 import OperationsManager from './operations-manager';
 import UsersManager from './users-manager';
 import IOHelper from '../wio/io-helper';
@@ -77,6 +81,7 @@ class DocumentManager {
     this.instance = null;
     this.users = [];
     this.documents = new Map();
+    this.docLoadPromises = new Map();
     this.docWriteQueues = new Map();
     this.reviewSaveTasks = new Map();
     this.reviewSaveRetryStates = new Map();
@@ -96,8 +101,10 @@ class DocumentManager {
   };
 
   startSaveTimer = () => {
+    this.recoverReviewSaveResults().catch(error => logger.error('Recover SDoc review save results failed:', error.message));
     this.saveTimer = setInterval(() => {
       this.saveAllDocs();
+      this.recoverReviewSaveResults().catch(error => logger.error('Recover SDoc review save results failed:', error.message));
     }, SAVE_INTERVAL);
 
     process.on('SIGTERM', () => {
@@ -143,30 +150,53 @@ class DocumentManager {
     this.removeDocsWithNoAccess(unsavedDocs);
   };
 
+  recoverReviewSaveResults = async () => {
+    const docUuids = await listPendingReviewSaveDocUuids();
+    for (const docUuid of docUuids) {
+      try {
+        const result = await seaServerAPI.getDocContent(docUuid);
+        const savedVersion = result && result.data && result.data.version;
+        if (typeof savedVersion === 'number') {
+          await this.sendReviewSaveResults(docUuid, savedVersion, 'persisted');
+        }
+      } catch (error) {
+        const message = getErrorMessage(error);
+        if (message && message.status === 404) {
+          await this.sendReviewSaveResults(docUuid, 0, 'file_unavailable');
+        } else {
+          logger.error('Recover SDoc review save result failed:', error.message);
+        }
+      }
+    }
+  };
+
   reloadDoc = async (docUuid, docName) => {
-    this.removeDocFromMemory(docUuid);
+    return this.enqueueDocWrite(docUuid, () => this.reloadDocUnsafe(docUuid, docName));
+  };
 
-    let result = null;
+  reloadDocUnsafe = async (docUuid, docName) => {
+    const loading = this.docLoadPromises.get(docUuid);
+    if (loading) {
+      return loading;
+    }
+
+    // Publish the reload promise before removing the cached document. A
+    // concurrent getDoc() then joins this reload instead of loading an older
+    // snapshot in parallel and later replacing the post-Apply document.
+    const reloadPromise = (async () => {
+      await this.removeDocFromMemory(docUuid);
+      // Reuse the ordinary load path so committed operation-log rows are
+      // replayed before the replacement snapshot becomes visible in memory.
+      return this.loadDoc(docUuid, docName, docName);
+    })();
+    this.docLoadPromises.set(docUuid, reloadPromise);
     try {
-      result = await seaServerAPI.getDocContent(docUuid);
-    } catch (err) {
-      errorHandle(err);
-      const error = new Error('The content of the document loaded error');
-      error.error_type = 'content_load_invalid';
-      error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/content/${docUuid}/`;
-      throw error;
+      return await reloadPromise;
+    } finally {
+      if (this.docLoadPromises.get(docUuid) === reloadPromise) {
+        this.docLoadPromises.delete(docUuid);
+      }
     }
-
-    const docContent = result.data ? result.data : generateDefaultDocContent(docName);
-    if (!isSdocContentValid(docContent)) {
-      const error = new Error('The content of the document does not conform to the sdoc specification');
-      error.error_type = 'content_invalid';
-      throw error;
-    }
-    const doc = new Document(docUuid, docName, docContent);
-
-    this.documents.set(docUuid, doc);
-    return doc.toJson();
   };
 
   getDoc = async (docUuid, docName, docTitle, username) => {
@@ -175,6 +205,23 @@ class DocumentManager {
       return document.toJson();
     }
 
+    const loading = this.docLoadPromises.get(docUuid);
+    if (loading) {
+      return loading;
+    }
+
+    const loadPromise = this.loadDoc(docUuid, docName, docTitle, username);
+    this.docLoadPromises.set(docUuid, loadPromise);
+    try {
+      return await loadPromise;
+    } finally {
+      if (this.docLoadPromises.get(docUuid) === loadPromise) {
+        this.docLoadPromises.delete(docUuid);
+      }
+    }
+  };
+
+  loadDoc = async (docUuid, docName, docTitle, username) => {
     let result = null;
     try {
       result = await seaServerAPI.getDocContent(docUuid);
@@ -194,6 +241,7 @@ class DocumentManager {
 
     }
     const doc = new Document(docUuid, docName, docContent);
+    const persistedVersion = doc.version;
 
     // apply pending operations
     const results = await listPendingOperationsByDoc(docUuid, doc.version);
@@ -203,6 +251,8 @@ class DocumentManager {
     }
 
     this.documents.set(docUuid, doc);
+    this.sendReviewSaveResults(docUuid, persistedVersion, 'persisted')
+      .catch(error => logger.error('Recover SDoc review save result failed:', error.message));
     // save doc when content is empty
     if (!result.data) {
       doc.setMeta({need_save: true});
@@ -310,7 +360,28 @@ class DocumentManager {
     if (!isRetry) {
       this.clearReviewSaveResultRetry(docUuid);
     }
-    const tasks = this.reviewSaveTasks.get(docUuid) || [];
+    let persistedRegistrations = [];
+    try {
+      persistedRegistrations = await listPendingReviewSaveRegistrations(
+        docUuid, outcome === 'persisted' ? savedVersion : null);
+    } catch (error) {
+      logger.error('Load pending SDoc review save results failed:', error.message);
+    }
+    const taskByAttemptId = new Map();
+    for (const task of this.reviewSaveTasks.get(docUuid) || []) {
+      taskByAttemptId.set(task.applyAttemptId, task);
+    }
+    for (const registration of persistedRegistrations) {
+      const result = registration.result || {};
+      taskByAttemptId.set(registration.apply_attempt_id, {
+        applyAttemptId: registration.apply_attempt_id,
+        operationLogCorrelationId: result.operation_log_correlation_id,
+        documentIncarnation: result.document_incarnation,
+        appliedVersion: registration.applied_sdoc_version,
+        approvedBy: result.approved_by,
+      });
+    }
+    const tasks = Array.from(taskByAttemptId.values());
     const remaining = [];
     let deliveryFailed = false;
     for (const task of tasks) {
@@ -329,6 +400,11 @@ class DocumentManager {
           outcome,
           savedVersion,
         });
+        if (outcome === 'persisted') {
+          await markReviewApplyPersistence(task.applyAttemptId, 'persisted');
+        } else if (outcome === 'file_unavailable') {
+          await markReviewApplyPersistence(task.applyAttemptId, 'file_unavailable');
+        }
         if (outcome === 'save_pending') {
           remaining.push(task);
         }
@@ -721,6 +797,7 @@ class DocumentManager {
   };
 
   removeDocFromMemory = async (docUuid) => {
+    this.docLoadPromises.delete(docUuid);
     if (this.documents.has(docUuid)) {
       logger.info('Removed doc ', docUuid, ' from memory');
       const operationsManager = OperationsManager.getInstance();
