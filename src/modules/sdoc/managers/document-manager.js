@@ -19,6 +19,9 @@ import { applyPayloadDigest, selectionDigest, setBlockTypeHash, setListTypeHash,
 const REVIEW_BLOCK_TYPES = new Set([
   'title', 'subtitle', 'header1', 'header2', 'header3', 'header4', 'header5', 'header6', 'paragraph', 'table_cell',
 ]);
+const REVIEW_SAVE_RESULT_RETRY_INITIAL_DELAY = 5000;
+const REVIEW_SAVE_RESULT_RETRY_MAX_DELAY = 60000;
+const APPLY_REGISTRATION_LIMIT = 1000;
 
 const resolveLeafPath = (elements, blockId, textNodeId) => {
   let result = null;
@@ -74,6 +77,7 @@ class DocumentManager {
     this.documents = new Map();
     this.docWriteQueues = new Map();
     this.reviewSaveTasks = new Map();
+    this.reviewSaveRetryStates = new Map();
     this.applyRegistrations = new Map();
 
     // save infos
@@ -276,9 +280,37 @@ class DocumentManager {
     }
   };
 
-  sendReviewSaveResults = async (docUuid, savedVersion, outcome) => {
+  clearReviewSaveResultRetry = (docUuid) => {
+    const state = this.reviewSaveRetryStates.get(docUuid);
+    if (state && state.timer) {
+      clearTimeout(state.timer);
+    }
+    this.reviewSaveRetryStates.delete(docUuid);
+  };
+
+  scheduleReviewSaveResultRetry = (docUuid, savedVersion, outcome) => {
+    const previous = this.reviewSaveRetryStates.get(docUuid);
+    const delay = previous
+      ? Math.min(previous.delay * 2, REVIEW_SAVE_RESULT_RETRY_MAX_DELAY)
+      : REVIEW_SAVE_RESULT_RETRY_INITIAL_DELAY;
+    if (previous && previous.timer) {
+      clearTimeout(previous.timer);
+    }
+    const timer = setTimeout(() => {
+      this.reviewSaveRetryStates.set(docUuid, {...this.reviewSaveRetryStates.get(docUuid), timer: null});
+      this.sendReviewSaveResults(docUuid, savedVersion, outcome, true)
+        .catch(error => logger.error('Retry SDoc review save result failed:', error.message));
+    }, delay);
+    this.reviewSaveRetryStates.set(docUuid, {timer, delay, savedVersion, outcome});
+  };
+
+  sendReviewSaveResults = async (docUuid, savedVersion, outcome, isRetry = false) => {
+    if (!isRetry) {
+      this.clearReviewSaveResultRetry(docUuid);
+    }
     const tasks = this.reviewSaveTasks.get(docUuid) || [];
     const remaining = [];
+    let deliveryFailed = false;
     for (const task of tasks) {
       if (outcome === 'persisted' && task.appliedVersion > savedVersion) {
         remaining.push(task);
@@ -301,6 +333,7 @@ class DocumentManager {
       } catch (error) {
         logger.error('Send SDoc review save result failed:', error.message);
         remaining.push(task);
+        deliveryFailed = true;
       }
     }
     if (remaining.length) {
@@ -308,6 +341,29 @@ class DocumentManager {
     } else {
       this.reviewSaveTasks.delete(docUuid);
     }
+    // A successful file upload must not depend on need_save remaining true in
+    // order to deliver its Review result. Retry the callback independently.
+    // This intentionally provides process-local recovery only.
+    if (deliveryFailed && outcome !== 'save_pending') {
+      this.scheduleReviewSaveResultRetry(docUuid, savedVersion, outcome);
+    } else {
+      this.clearReviewSaveResultRetry(docUuid);
+    }
+  };
+
+  setApplyRegistration = (applyAttemptId, registration) => {
+    if (!this.applyRegistrations.has(applyAttemptId)
+        && this.applyRegistrations.size >= APPLY_REGISTRATION_LIMIT) {
+      for (const [registeredAttemptId, registered] of this.applyRegistrations) {
+        if (this.applyRegistrations.size < APPLY_REGISTRATION_LIMIT) {
+          break;
+        }
+        if (registered.status !== 'committing') {
+          this.applyRegistrations.delete(registeredAttemptId);
+        }
+      }
+    }
+    this.applyRegistrations.set(applyAttemptId, registration);
   };
 
   applyReviewChangeSet = async (docUuid, docName, params, approvedBy) => {
@@ -502,7 +558,7 @@ class DocumentManager {
 
       if (conflicts.length) {
         const result = buildApplyResult(params, approvedBy, {status: 'preflight_conflicted', conflicts});
-        this.applyRegistrations.set(params.apply_attempt_id, {status: 'preflight_conflicted', result});
+        this.setApplyRegistration(params.apply_attempt_id, {status: 'preflight_conflicted', result});
         return result;
       }
 
@@ -514,11 +570,11 @@ class DocumentManager {
       });
       if (!applyOperations(draft, deepCopy(operations), {username: approvedBy})) {
         const result = buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'preflight_validation_failed'});
-        this.applyRegistrations.set(params.apply_attempt_id, {status: 'failed_precommit', result});
+        this.setApplyRegistration(params.apply_attempt_id, {status: 'failed_precommit', result});
         return result;
       }
 
-      this.applyRegistrations.set(params.apply_attempt_id, {
+      this.setApplyRegistration(params.apply_attempt_id, {
         status: 'committing',
         result: buildApplyResult(params, approvedBy, {status: 'in_progress'}),
       });
@@ -529,7 +585,7 @@ class DocumentManager {
       } catch (error) {
         logger.error('Save review operations failed:', error);
         const result = buildApplyResult(params, approvedBy, {status: 'outcome_unknown', error_code: 'post_commit_indeterminate'});
-        this.applyRegistrations.set(params.apply_attempt_id, {status: 'outcome_unknown', result});
+        this.setApplyRegistration(params.apply_attempt_id, {status: 'outcome_unknown', result});
         return result;
       }
 
@@ -559,7 +615,7 @@ class DocumentManager {
         operation_log_correlation_id: params.apply_attempt_id,
         persistence_status: 'not_requested',
       });
-      this.applyRegistrations.set(params.apply_attempt_id, {status: 'applied', result});
+      this.setApplyRegistration(params.apply_attempt_id, {status: 'applied', result});
       return result;
     });
   };
