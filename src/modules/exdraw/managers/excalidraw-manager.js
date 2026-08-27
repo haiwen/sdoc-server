@@ -136,6 +136,10 @@ class ExcalidrawManager {
     }
 
     document.setMeta({ is_saving: true });
+    // Keep the version represented by this save request. A new edit may arrive
+    // while saveSceneContent is in flight, in which case the document remains
+    // dirty and must be saved again.
+    const saveVersion = document.version;
 
     // Get save info
     const exdrawContent = document.toJson();
@@ -162,7 +166,16 @@ class ExcalidrawManager {
     } finally {
       deleteDir(tempPath);
     }
-    document.setMeta({is_saving: false, need_save: false});
+    const currentDocument = this.documents.get(exdrawUuid);
+    if (currentDocument === document) {
+      const saveMeta = {is_saving: false};
+      // Only clear the dirty flag when this request successfully saved the
+      // current version. Otherwise, retain it for the next save attempt.
+      if (saveFlag && document.version === saveVersion) {
+        saveMeta.need_save = false;
+      }
+      document.setMeta(saveMeta);
+    }
 
     return Promise.resolve(saveFlag);
   };
