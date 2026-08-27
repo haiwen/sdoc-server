@@ -10,11 +10,13 @@ import Document from '../models/document';
 import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
 import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
+import { getReviewApplyRegistration, createReviewApplyRegistration } from '../dao/review-apply';
 import OperationsManager from './operations-manager';
 import UsersManager from './users-manager';
 import IOHelper from '../wio/io-helper';
 import { buildDocumentContext } from '../utils/agent-context';
 import { applyPayloadDigest, selectionDigest, setBlockTypeHash, setListTypeHash, CanonicalizationError } from '../utils/sdoc-canonical';
+import { withTransaction } from '../../../db-helper';
 
 const REVIEW_BLOCK_TYPES = new Set([
   'title', 'subtitle', 'header1', 'header2', 'header3', 'header4', 'header5', 'header6', 'paragraph', 'table_cell',
@@ -366,29 +368,48 @@ class DocumentManager {
     this.applyRegistrations.set(applyAttemptId, registration);
   };
 
+  getPersistedApplyResult = async (docUuid, params, approvedBy) => {
+    const registration = await getReviewApplyRegistration(params.apply_attempt_id);
+    if (!registration) return null;
+    if (registration.doc_uuid !== docUuid || registration.apply_payload_digest !== params.apply_payload_digest) {
+      return buildApplyResult(params, approvedBy, {
+        status: 'failed_precommit', error_code: 'invalid_selection_payload',
+      });
+    }
+    this.setApplyRegistration(params.apply_attempt_id, {
+      status: registration.status,
+      result: registration.result,
+    });
+    return registration.result;
+  };
+
+  persistApplyResult = async (docUuid, params, result) => {
+    try {
+      await createReviewApplyRegistration({
+        applyAttemptId: params.apply_attempt_id,
+        docUuid,
+        applyPayloadDigest: params.apply_payload_digest,
+        status: result.status,
+        result,
+      });
+    } catch (error) {
+      const existing = await getReviewApplyRegistration(params.apply_attempt_id);
+      if (!existing) throw error;
+      if (existing.doc_uuid !== docUuid || existing.apply_payload_digest !== params.apply_payload_digest) {
+        throw error;
+      }
+      this.setApplyRegistration(params.apply_attempt_id, {
+        status: existing.status,
+        result: existing.result,
+      });
+      return existing.result;
+    }
+    this.setApplyRegistration(params.apply_attempt_id, {status: result.status, result});
+    return result;
+  };
+
   applyReviewChangeSet = async (docUuid, docName, params, approvedBy) => {
     return this.enqueueDocWrite(docUuid, async () => {
-      let document = this.documents.get(docUuid);
-      if (!document) {
-        await this.getDoc(docUuid, docName);
-        document = this.documents.get(docUuid);
-      }
-      if (!document) {
-        return buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'document_unavailable'});
-      }
-
-      if (document.document_incarnation !== params.document_incarnation) {
-        return buildApplyResult(params, approvedBy, {
-          status: 'preflight_conflicted',
-          conflicts: [{item_id: null, conflict_code: 'document_incarnation_changed'}],
-        });
-      }
-
-      const existing = this.applyRegistrations.get(params.apply_attempt_id);
-      if (existing) {
-        return existing.result;
-      }
-
       // Recompute both digests before preflight; mismatch is fail-closed.
       try {
         const computedSelection = selectionDigest({
@@ -418,6 +439,32 @@ class DocumentManager {
           return buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'invalid_selection_payload'});
         }
         throw error;
+      }
+
+      const persistedResult = await this.getPersistedApplyResult(docUuid, params, approvedBy);
+      if (persistedResult) return persistedResult;
+
+      let document = this.documents.get(docUuid);
+      if (!document) {
+        await this.getDoc(docUuid, docName);
+        document = this.documents.get(docUuid);
+      }
+      if (!document) {
+        const result = buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'document_unavailable'});
+        return this.persistApplyResult(docUuid, params, result);
+      }
+
+      const existing = this.applyRegistrations.get(params.apply_attempt_id);
+      if (existing) {
+        return existing.result;
+      }
+
+      if (document.document_incarnation !== params.document_incarnation) {
+        const result = buildApplyResult(params, approvedBy, {
+          status: 'preflight_conflicted',
+          conflicts: [{item_id: null, conflict_code: 'document_incarnation_changed'}],
+        });
+        return this.persistApplyResult(docUuid, params, result);
       }
 
       // Resolve each selected item against the current document projection.
@@ -558,8 +605,7 @@ class DocumentManager {
 
       if (conflicts.length) {
         const result = buildApplyResult(params, approvedBy, {status: 'preflight_conflicted', conflicts});
-        this.setApplyRegistration(params.apply_attempt_id, {status: 'preflight_conflicted', result});
-        return result;
+        return this.persistApplyResult(docUuid, params, result);
       }
 
       const draft = new Document(docUuid, docName, {
@@ -570,8 +616,7 @@ class DocumentManager {
       });
       if (!applyOperations(draft, deepCopy(operations), {username: approvedBy})) {
         const result = buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'preflight_validation_failed'});
-        this.setApplyRegistration(params.apply_attempt_id, {status: 'failed_precommit', result});
-        return result;
+        return this.persistApplyResult(docUuid, params, result);
       }
 
       this.setApplyRegistration(params.apply_attempt_id, {
@@ -579,14 +624,36 @@ class DocumentManager {
         result: buildApplyResult(params, approvedBy, {status: 'in_progress'}),
       });
 
+      const result = buildApplyResult(params, approvedBy, {
+        status: 'applied',
+        applied_sdoc_version: draft.version,
+        operation_log_correlation_id: params.apply_attempt_id,
+        persistence_status: 'not_requested',
+      });
+      const operationsManager = OperationsManager.getInstance();
       try {
-        const operationsManager = OperationsManager.getInstance();
-        await operationsManager.addOperations(docUuid, operations, draft.version, {username: approvedBy});
+        await withTransaction(async (executor) => {
+          await createReviewApplyRegistration({
+            applyAttemptId: params.apply_attempt_id,
+            docUuid,
+            applyPayloadDigest: params.apply_payload_digest,
+            status: result.status,
+            result,
+          }, executor);
+          await operationsManager.addOperations(docUuid, operations, draft.version, {username: approvedBy}, {
+            executor,
+            deferCache: true,
+          });
+        });
+        operationsManager.addOperationsToCache(docUuid, operations, draft.version);
       } catch (error) {
+        const existingResult = await this.getPersistedApplyResult(docUuid, params, approvedBy);
+        if (existingResult) return existingResult;
         logger.error('Save review operations failed:', error);
-        const result = buildApplyResult(params, approvedBy, {status: 'outcome_unknown', error_code: 'post_commit_indeterminate'});
-        this.setApplyRegistration(params.apply_attempt_id, {status: 'outcome_unknown', result});
-        return result;
+        const failedResult = buildApplyResult(params, approvedBy, {
+          status: 'failed_precommit', error_code: 'operation_log_failed',
+        });
+        return this.persistApplyResult(docUuid, params, failedResult);
       }
 
       document.elements = draft.elements;
@@ -609,12 +676,6 @@ class DocumentManager {
       });
       this.saveDoc(docUuid).catch(error => logger.error('Save reviewed document failed:', error));
 
-      const result = buildApplyResult(params, approvedBy, {
-        status: 'applied',
-        applied_sdoc_version: draft.version,
-        operation_log_correlation_id: params.apply_attempt_id,
-        persistence_status: 'not_requested',
-      });
       this.setApplyRegistration(params.apply_attempt_id, {status: 'applied', result});
       return result;
     });
@@ -622,6 +683,11 @@ class DocumentManager {
 
   getApplyResult = async (docUuid, applyAttemptId) => {
     return this.enqueueDocWrite(docUuid, async () => {
+      const persisted = await getReviewApplyRegistration(applyAttemptId);
+      if (persisted && persisted.doc_uuid === docUuid) {
+        this.setApplyRegistration(applyAttemptId, {status: persisted.status, result: persisted.result});
+        return persisted.result;
+      }
       const registration = this.applyRegistrations.get(applyAttemptId);
       if (!registration) {
         return {error_code: 'attempt_not_found'};
