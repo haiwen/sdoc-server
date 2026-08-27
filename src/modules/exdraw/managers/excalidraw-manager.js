@@ -96,6 +96,15 @@ class ExcalidrawManager {
       error.from_url = `${SEAHUB_SERVER}/api/v2.1/exdraw/content/${exdrawUuid}/`;
       throw error;
     }
+
+    // Another request may have loaded and updated this document while the
+    // remote request was in flight. Always prefer the current in-memory
+    // document over this potentially stale response.
+    const currentDocument = this.documents.get(exdrawUuid);
+    if (currentDocument) {
+      return currentDocument.toJson();
+    }
+
     const docContent = result.data ? result.data : defineSceneConfig;
     if (!isHasProperty(docContent, 'version')) {
       docContent.version = 0;
