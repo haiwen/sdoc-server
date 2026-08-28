@@ -123,7 +123,7 @@ class DocumentController {
     const ioHelper = IOHelper.getInstance();
     try {
       const documentManager = DocumentManager.getInstance();
-      documentManager.removeDoc(docUuid);
+      await documentManager.removeDoc(docUuid);
       ioHelper.sendMessageToAllInRoom(docUuid, MESSAGE.DOC_REMOVED);
       res.status(200).send({'success': true});
       return;
@@ -253,7 +253,7 @@ class DocumentController {
     const ioHelper = IOHelper.getInstance();
     ioHelper.sendMessageToAllInRoom(docUuid, MESSAGE.DOC_PUBLISHED);
 
-    const removeFlag = await documentManager.removeDocFromMemory(docUuid);
+    const removeFlag = await documentManager.removeDoc(docUuid);
     if (!removeFlag) {
       logger.error(`Doc ${docUuid} remove from memory failed`);
     }

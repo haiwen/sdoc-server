@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { v4 } from "uuid";
+import { v4, v5 } from "uuid";
 import deepCopy from 'deep-copy';
 import { SAVE_INTERVAL, SEAHUB_SERVER } from "../../../config/config";
 import logger from "../../../loggers";
@@ -147,7 +147,7 @@ class DocumentManager {
     this.lastSavingInfo.startTime = startTime;
     this.lastSavingInfo.endTime = Date.now();
 
-    this.removeDocsWithNoAccess(unsavedDocs);
+    await this.removeDocsWithNoAccess(unsavedDocs);
   };
 
   recoverReviewSaveResults = async () => {
@@ -184,7 +184,7 @@ class DocumentManager {
     // concurrent getDoc() then joins this reload instead of loading an older
     // snapshot in parallel and later replacing the post-Apply document.
     const reloadPromise = (async () => {
-      await this.removeDocFromMemory(docUuid);
+      await this.removeDocFromMemoryUnsafe(docUuid);
       // Reuse the ordinary load path so committed operation-log rows are
       // replayed before the replacement snapshot becomes visible in memory.
       return this.loadDoc(docUuid, docName, docName);
@@ -256,12 +256,16 @@ class DocumentManager {
     // save doc when content is empty
     if (!result.data) {
       doc.setMeta({need_save: true});
-      await this.saveDoc(docUuid);
+      await this.saveDocUnsafe(docUuid);
     }
     return doc.toJson();
   };
 
   saveDoc = async (docUuid) => {
+    return this.enqueueDocWrite(docUuid, () => this.saveDocUnsafe(docUuid));
+  };
+
+  saveDocUnsafe = async (docUuid) => {
     const document = this.documents.get(docUuid);
     // The save function is an asynchronous function, which does not affect the normal execution of other programs,
     // and there is a possibility that the file has been deleted when the next file is saved
@@ -297,7 +301,7 @@ class DocumentManager {
         logger.info(`${docName}(${docUuid}) save failed`);
         logger.info(JSON.stringify(message));
         await this.sendReviewSaveResults(docUuid, savingVersion, 'file_unavailable');
-        await this.removeDoc(docUuid);
+        await this.removeDocFromMemoryUnsafe(docUuid);
       } else {
         logger.error(`${docName}(${docUuid}) save failed`);
         logger.error(JSON.stringify(message));
@@ -695,6 +699,18 @@ class DocumentManager {
         return this.persistApplyResult(docUuid, params, result);
       }
 
+      // The queue serializes normal unload/reload paths. Keep a final identity
+      // fence immediately before the durable commit so a future caller cannot
+      // accidentally commit against a document that is no longer active.
+      if (this.documents.get(docUuid) !== document
+          || document.document_incarnation !== params.document_incarnation) {
+        const result = buildApplyResult(params, approvedBy, {
+          status: 'preflight_conflicted',
+          conflicts: [{item_id: null, conflict_code: 'document_incarnation_changed'}],
+        });
+        return this.persistApplyResult(docUuid, params, result);
+      }
+
       this.setApplyRegistration(params.apply_attempt_id, {
         status: 'committing',
         result: buildApplyResult(params, approvedBy, {status: 'in_progress'}),
@@ -779,7 +795,10 @@ class DocumentManager {
       if (!document) {
         throw new Error('load_document_content_error');
       }
-      const snapshotId = v4();
+      const snapshotId = v5(
+        `${fileUuid}:${document.document_incarnation}:${document.version}`,
+        v5.URL,
+      );
       const projection = buildDocumentContext({
         elements: document.elements,
         version: document.version,
@@ -792,11 +811,16 @@ class DocumentManager {
   };
 
   removeDoc = async (docUuid) => {
-    const removeFlag = await this.removeDocFromMemory(docUuid);
-    return Promise.resolve(removeFlag);
+    return this.enqueueDocWrite(docUuid, () => this.removeDocFromMemoryUnsafe(docUuid));
   };
 
+  // Compatibility entry point for callers that previously bypassed the
+  // per-document queue. All public removals are now serialized with Apply.
   removeDocFromMemory = async (docUuid) => {
+    return this.removeDoc(docUuid);
+  };
+
+  removeDocFromMemoryUnsafe = async (docUuid) => {
     this.docLoadPromises.delete(docUuid);
     if (this.documents.has(docUuid)) {
       logger.info('Removed doc ', docUuid, ' from memory');
@@ -811,33 +835,26 @@ class DocumentManager {
     return this.documents.has(docUuid);
   };
 
-  removeDocs(docUuids) {
-    for (let docUuid of docUuids) {
-      if (this.documents.has(docUuid)) {
-        logger.info('Removed doc ', docUuid, ' from memory');
-        this.documents.delete(docUuid);
-      }
-    }
+  async removeDocs(docUuids) {
+    await Promise.all(docUuids.map(docUuid => this.removeDoc(docUuid)));
   }
 
-  removeDocsWithNoAccess(docUuids) {
-    const usersManager = UsersManager.getInstance();
-    for (let i = 0; i < docUuids.length; i++) {
-      const docUuid = docUuids[i];
-      const users = usersManager.getDocUsers(docUuid);
-      if (users.length > 0) {
-        continue;
-      }
-      const document = this.documents.get(docUuid);
-      if (!document) {
-        continue;
-      }
-      const meta = document.getMeta();
-      const currentTime = new Date().getTime();
-      if (currentTime - meta.last_access > DOC_CACHE_TIME) {
-        this.removeDoc(docUuid);
-        logger.info(`Regularly clear files that no one has accessed: ${docUuid}`);
-      }
+  async removeDocsWithNoAccess(docUuids) {
+    for (const docUuid of docUuids) {
+      await this.enqueueDocWrite(docUuid, async () => {
+        // Re-evaluate access after earlier writes complete; a collaborator may
+        // have reopened the document while cache cleanup was waiting.
+        const users = UsersManager.getInstance().getDocUsers(docUuid);
+        const document = this.documents.get(docUuid);
+        if (users.length > 0 || !document) {
+          return;
+        }
+        const meta = document.getMeta();
+        if (Date.now() - meta.last_access > DOC_CACHE_TIME) {
+          await this.removeDocFromMemoryUnsafe(docUuid);
+          logger.info(`Regularly clear files that no one has accessed: ${docUuid}`);
+        }
+      });
     }
   }
 

@@ -179,7 +179,7 @@ describe('SDoc review apply idempotency', () => {
     const manager = DocumentManager.getInstance();
     const originalDocs = manager.documents;
     const originalLoads = manager.docLoadPromises;
-    const originalRemove = manager.removeDocFromMemory;
+    const originalRemove = manager.removeDocFromMemoryUnsafe;
     const originalLoad = manager.loadDoc;
     let finishLoad;
     const loadPromise = new Promise(resolve => {
@@ -187,7 +187,7 @@ describe('SDoc review apply idempotency', () => {
     });
     manager.documents = new Map();
     manager.docLoadPromises = new Map();
-    manager.removeDocFromMemory = jest.fn().mockResolvedValue(undefined);
+    manager.removeDocFromMemoryUnsafe = jest.fn().mockResolvedValue(undefined);
     manager.loadDoc = jest.fn().mockReturnValue(loadPromise);
 
     try {
@@ -202,8 +202,68 @@ describe('SDoc review apply idempotency', () => {
     } finally {
       manager.documents = originalDocs;
       manager.docLoadPromises = originalLoads;
-      manager.removeDocFromMemory = originalRemove;
+      manager.removeDocFromMemoryUnsafe = originalRemove;
       manager.loadDoc = originalLoad;
+    }
+  });
+
+  it('builds a stable snapshot id for the same live document version', async () => {
+    const manager = DocumentManager.getInstance();
+    const originalQueue = manager.enqueueDocWrite;
+    const originalGetDoc = manager.getDoc;
+    const originalDocuments = manager.documents;
+    const document = {
+      elements: [], version: 7,
+      document_incarnation: '00000000-0000-4000-8000-000000000008',
+    };
+    manager.enqueueDocWrite = async (_docUuid, callback) => callback();
+    manager.getDoc = jest.fn().mockResolvedValue({version: 7});
+    manager.documents = new Map([['doc-uuid', document]]);
+
+    try {
+      const first = await manager.buildReviewSnapshot(
+        'doc-uuid', 'Document', '00000000-0000-4000-8000-000000000009',
+        'Document', 'reviewer@example.com');
+      const second = await manager.buildReviewSnapshot(
+        'doc-uuid', 'Document', '00000000-0000-4000-8000-000000000009',
+        'Document', 'reviewer@example.com');
+      expect(second.snapshot_id).toEqual(first.snapshot_id);
+      document.version = 8;
+      const changed = await manager.buildReviewSnapshot(
+        'doc-uuid', 'Document', '00000000-0000-4000-8000-000000000009',
+        'Document', 'reviewer@example.com');
+      expect(changed.snapshot_id).not.toEqual(first.snapshot_id);
+    } finally {
+      manager.enqueueDocWrite = originalQueue;
+      manager.getDoc = originalGetDoc;
+      manager.documents = originalDocuments;
+    }
+  });
+
+  it('queues document removal behind an active Apply', async () => {
+    const manager = DocumentManager.getInstance();
+    const originalQueues = manager.docWriteQueues;
+    const originalRemove = manager.removeDocFromMemoryUnsafe;
+    let finishApply;
+    const applyPromise = new Promise(resolve => {
+      finishApply = resolve;
+    });
+    manager.docWriteQueues = new Map();
+    manager.removeDocFromMemoryUnsafe = jest.fn().mockResolvedValue(true);
+
+    try {
+      const apply = manager.enqueueDocWrite('doc-uuid', () => applyPromise);
+      const remove = manager.removeDoc('doc-uuid');
+      await Promise.resolve();
+      expect(manager.removeDocFromMemoryUnsafe).not.toHaveBeenCalled();
+
+      finishApply({status: 'applied'});
+      await apply;
+      await expect(remove).resolves.toBe(true);
+      expect(manager.removeDocFromMemoryUnsafe).toHaveBeenCalledWith('doc-uuid');
+    } finally {
+      manager.docWriteQueues = originalQueues;
+      manager.removeDocFromMemoryUnsafe = originalRemove;
     }
   });
 });
