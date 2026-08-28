@@ -100,6 +100,13 @@ class ExdrawIOHandler {
         return;
       }
 
+      // Room membership can outlive the token that established the socket.
+      // Revalidate the token before forwarding a preview to other clients.
+      const isValid = checkPermission(socket);
+      if (!isValid) {
+        return;
+      }
+
       const { doc_uuid: docUuid } = params;
       if (docUuid !== socket.docUuid || !socket.rooms.has(docUuid)) {
         return;
