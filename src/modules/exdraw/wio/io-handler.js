@@ -47,25 +47,48 @@ class ExdrawIOHandler {
   onConnection(socket) {
     // todo permission check
     this.ioHelper.sendInitRoomToPrivate(socket.id);
-    socket.on('join-room', async (params) => {
-      // join room
+    socket.on('join-room', async (params = {}, callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {};
       const { doc_uuid: docUuid, user: userInfo } = params;
-      socket.join(docUuid);
 
-      const usersManager = UsersManager.getInstance();
-      if (!usersManager.getUser(docUuid, socket.id)) {
-        usersManager.addUser(docUuid, socket.id, userInfo);
+      if (!docUuid || !userInfo) {
+        respond({
+          success: false,
+          error_type: 'invalid_join_room',
+        });
+        return;
       }
 
-      const users = usersManager.getDocUsers(docUuid);
+      try {
+        // Wait until the socket is actually in the document room before
+        // acknowledging the handshake. This prevents clients from sending
+        // operations to a transport that has not joined the room yet.
+        await socket.join(docUuid);
 
-      // if (users.length === 1) {
-      // this.ioHelper.sendFirstInRoomMessage(socket.id);
-      // } else {
-      //   this.ioHelper.sendNewUserMessage(socket, docUuid);
-      // }
+        const usersManager = UsersManager.getInstance();
+        if (!usersManager.getUser(docUuid, socket.id)) {
+          usersManager.addUser(docUuid, socket.id, userInfo);
+        }
 
-      this.ioHelper.sendRoomUserChangeMessage(socket, docUuid, users);
+        const users = usersManager.getDocUsers(docUuid);
+
+        // if (users.length === 1) {
+        // this.ioHelper.sendFirstInRoomMessage(socket.id);
+        // } else {
+        //   this.ioHelper.sendNewUserMessage(socket, docUuid);
+        // }
+
+        this.ioHelper.sendRoomUserChangeMessage(socket, docUuid, users);
+        respond({
+          success: true,
+          doc_uuid: docUuid,
+        });
+      } catch (error) {
+        respond({
+          success: false,
+          error_type: 'join_room_error',
+        });
+      }
     });
 
     socket.on('elements-updated', async (params, callback) => {

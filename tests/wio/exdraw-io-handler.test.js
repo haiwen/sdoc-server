@@ -22,6 +22,7 @@ const createSocket = () => {
     authToken: 'expired-token',
     docUuid: 'doc-1',
     rooms: new Set(['doc-1']),
+    join: jest.fn().mockResolvedValue(),
     on: jest.fn((event, callback) => {
       handlers[event] = callback;
     }),
@@ -63,5 +64,42 @@ describe('ExdrawIOHandler preview permission', () => {
 
     expect(checkPermission).toHaveBeenCalledWith(socket);
     expect(socket.to).not.toHaveBeenCalled();
+  });
+
+
+  it('acknowledges join-room after the socket joins the room', async () => {
+    const { socket, handlers } = createSocket();
+    const handler = ExdrawIOHandler.getInstance(createIO());
+    const callback = jest.fn();
+
+    handler.onConnection(socket);
+    await handlers['join-room']({
+      doc_uuid: 'doc-1',
+      user: { username: 'user-1' },
+    }, callback);
+
+    expect(socket.join).toHaveBeenCalledWith('doc-1');
+    expect(callback).toHaveBeenCalledWith({
+      success: true,
+      doc_uuid: 'doc-1',
+    });
+  });
+
+  it('returns a join-room error when joining the room fails', async () => {
+    const { socket, handlers } = createSocket();
+    socket.join.mockRejectedValue(new Error('join failed'));
+    const handler = ExdrawIOHandler.getInstance(createIO());
+    const callback = jest.fn();
+
+    handler.onConnection(socket);
+    await handlers['join-room']({
+      doc_uuid: 'doc-1',
+      user: { username: 'user-1' },
+    }, callback);
+
+    expect(callback).toHaveBeenCalledWith({
+      success: false,
+      error_type: 'join_room_error',
+    });
   });
 });
