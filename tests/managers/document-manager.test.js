@@ -266,4 +266,31 @@ describe('SDoc review apply idempotency', () => {
       manager.removeDocFromMemoryUnsafe = originalRemove;
     }
   });
+
+  it('queues normalization behind an active Apply', async () => {
+    const manager = DocumentManager.getInstance();
+    const originalQueues = manager.docWriteQueues;
+    const originalNormalize = manager.normalizeSdocUnsafe;
+    let finishApply;
+    const applyPromise = new Promise(resolve => {
+      finishApply = resolve;
+    });
+    manager.docWriteQueues = new Map();
+    manager.normalizeSdocUnsafe = jest.fn();
+
+    try {
+      const apply = manager.enqueueDocWrite('doc-uuid', () => applyPromise);
+      const normalize = manager.normalizeSdoc('doc-uuid');
+      await Promise.resolve();
+      expect(manager.normalizeSdocUnsafe).not.toHaveBeenCalled();
+
+      finishApply({status: 'applied'});
+      await apply;
+      await normalize;
+      expect(manager.normalizeSdocUnsafe).toHaveBeenCalledWith('doc-uuid');
+    } finally {
+      manager.docWriteQueues = originalQueues;
+      manager.normalizeSdocUnsafe = originalNormalize;
+    }
+  });
 });

@@ -858,7 +858,11 @@ class DocumentManager {
     }
   }
 
-  normalizeSdoc = (docUuid) => {
+  normalizeSdoc = async (docUuid) => {
+    return this.enqueueDocWrite(docUuid, () => this.normalizeSdocUnsafe(docUuid));
+  };
+
+  normalizeSdocUnsafe = (docUuid) => {
     const document = this.documents.get(docUuid);
     document.elements = normalizeChildren(document.elements);
   };

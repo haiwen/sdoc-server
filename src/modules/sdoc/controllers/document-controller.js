@@ -104,7 +104,7 @@ class DocumentController {
     const { file_uuid: docUuid } = req.payload;
     try {
       const documentManager = DocumentManager.getInstance();
-      documentManager.normalizeSdoc(docUuid);
+      await documentManager.normalizeSdoc(docUuid);
       res.send({"success": true});
       return;
     } catch(err) {
