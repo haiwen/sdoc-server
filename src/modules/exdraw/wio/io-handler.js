@@ -49,17 +49,14 @@ class ExdrawIOHandler {
     this.ioHelper.sendInitRoomToPrivate(socket.id);
     socket.on('join-room', async (params = {}, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {};
-      const { doc_uuid: docUuid, user: userInfo } = params;
-      const requestedUsername = userInfo?._username || userInfo?.username;
+      // The authenticated socket identity is authoritative; ignore client payload.
+      void params;
+      const { docUuid, userInfo } = socket;
 
-      // The JWT middleware has already authenticated this socket. Only accept
-      // join-room payloads that match the authenticated document and user.
-      if (
-        !docUuid ||
-        !userInfo ||
-        docUuid !== socket.docUuid ||
-        requestedUsername !== socket.userInfo?.username
-      ) {
+      // The JWT middleware has already authenticated this socket. The event
+      // payload is intentionally ignored so clients cannot choose another
+      // document or impersonate another user when joining a room.
+      if (!docUuid || !userInfo) {
         respond({
           success: false,
           error_type: 'invalid_join_room',
