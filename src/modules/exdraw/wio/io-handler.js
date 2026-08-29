@@ -50,8 +50,16 @@ class ExdrawIOHandler {
     socket.on('join-room', async (params = {}, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {};
       const { doc_uuid: docUuid, user: userInfo } = params;
+      const requestedUsername = userInfo?._username || userInfo?.username;
 
-      if (!docUuid || !userInfo) {
+      // The JWT middleware has already authenticated this socket. Only accept
+      // join-room payloads that match the authenticated document and user.
+      if (
+        !docUuid ||
+        !userInfo ||
+        docUuid !== socket.docUuid ||
+        requestedUsername !== socket.userInfo?.username
+      ) {
         respond({
           success: false,
           error_type: 'invalid_join_room',

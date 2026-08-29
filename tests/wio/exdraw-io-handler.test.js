@@ -21,6 +21,12 @@ const createSocket = () => {
     id: 'socket-1',
     authToken: 'expired-token',
     docUuid: 'doc-1',
+    userInfo: {
+      username: 'auth-user',
+      name: 'Authenticated User',
+      permission: 'rw',
+      avatar_url: 'avatar.png',
+    },
     rooms: new Set(['doc-1']),
     join: jest.fn().mockResolvedValue(),
     on: jest.fn((event, callback) => {
@@ -67,7 +73,7 @@ describe('ExdrawIOHandler preview permission', () => {
   });
 
 
-  it('acknowledges join-room after the socket joins the room', async () => {
+  it('acknowledges join-room after the socket joins the authenticated room', async () => {
     const { socket, handlers } = createSocket();
     const handler = ExdrawIOHandler.getInstance(createIO());
     const callback = jest.fn();
@@ -75,13 +81,46 @@ describe('ExdrawIOHandler preview permission', () => {
     handler.onConnection(socket);
     await handlers['join-room']({
       doc_uuid: 'doc-1',
-      user: { username: 'user-1' },
+      user: { username: 'auth-user' },
     }, callback);
 
     expect(socket.join).toHaveBeenCalledWith('doc-1');
     expect(callback).toHaveBeenCalledWith({
       success: true,
       doc_uuid: 'doc-1',
+    });
+  });
+
+  it('rejects a join-room request for a different document', async () => {
+    const { socket, handlers } = createSocket();
+    const handler = ExdrawIOHandler.getInstance(createIO());
+    const callback = jest.fn();
+
+    handler.onConnection(socket);
+    await handlers['join-room']({ doc_uuid: 'doc-2' }, callback);
+
+    expect(socket.join).not.toHaveBeenCalled();
+    expect(callback).toHaveBeenCalledWith({
+      success: false,
+      error_type: 'invalid_join_room',
+    });
+  });
+
+  it('rejects a join-room request with a different user', async () => {
+    const { socket, handlers } = createSocket();
+    const handler = ExdrawIOHandler.getInstance(createIO());
+    const callback = jest.fn();
+
+    handler.onConnection(socket);
+    await handlers['join-room']({
+      doc_uuid: 'doc-1',
+      user: { _username: 'forged-user' },
+    }, callback);
+
+    expect(socket.join).not.toHaveBeenCalled();
+    expect(callback).toHaveBeenCalledWith({
+      success: false,
+      error_type: 'invalid_join_room',
     });
   });
 
@@ -94,7 +133,7 @@ describe('ExdrawIOHandler preview permission', () => {
     handler.onConnection(socket);
     await handlers['join-room']({
       doc_uuid: 'doc-1',
-      user: { username: 'user-1' },
+      user: { username: 'auth-user' },
     }, callback);
 
     expect(callback).toHaveBeenCalledWith({
