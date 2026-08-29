@@ -124,6 +124,13 @@ class DocumentManager {
       throw error;
     }
 
+    // Another request may have loaded this document while the remote request
+    // was in flight. Prefer the current in-memory document over a stale response.
+    const currentDocument = this.documents.get(docUuid);
+    if (currentDocument) {
+      return currentDocument.toJson();
+    }
+
     const docContent = result.data ? result.data : generateDefaultDocContent(docTitle, username);
     if (!isSdocContentValid(docContent)) {
       const error = new Error('The content of the document does not conform to the sdoc specification');
@@ -138,6 +145,14 @@ class DocumentManager {
     if (results.length) {
       logger.info(`doc ${docName}(${docUuid}) re-execute ${results.length} pending operations`);
       this.applyPendingOperations(doc, results);
+    }
+
+    // Loading pending operations is asynchronous. A different request may
+    // have installed and updated the document while it was in progress, so
+    // check the cache again before publishing this potentially stale document.
+    const loadedDocument = this.documents.get(docUuid);
+    if (loadedDocument) {
+      return loadedDocument.toJson();
     }
 
     this.documents.set(docUuid, doc);
@@ -251,11 +266,12 @@ class DocumentManager {
   execOperationsBySocket = async (params, docName) => {
     const { doc_uuid, version: clientVersion, operations, user } = params;
 
-    const document = this.documents.get(doc_uuid);
+    let document = this.documents.get(doc_uuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
         await this.getDoc(doc_uuid, docName);
+        document = this.documents.get(doc_uuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${docName}(${doc_uuid}) doc content error`);
         const result = {

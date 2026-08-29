@@ -96,6 +96,15 @@ class ExcalidrawManager {
       error.from_url = `${SEAHUB_SERVER}/api/v2.1/exdraw/content/${exdrawUuid}/`;
       throw error;
     }
+
+    // Another request may have loaded and updated this document while the
+    // remote request was in flight. Always prefer the current in-memory
+    // document over this potentially stale response.
+    const currentDocument = this.documents.get(exdrawUuid);
+    if (currentDocument) {
+      return currentDocument.toJson();
+    }
+
     const docContent = result.data ? result.data : defineSceneConfig;
     if (!isHasProperty(docContent, 'version')) {
       docContent.version = 0;
@@ -127,6 +136,10 @@ class ExcalidrawManager {
     }
 
     document.setMeta({ is_saving: true });
+    // Keep the version represented by this save request. A new edit may arrive
+    // while saveSceneContent is in flight, in which case the document remains
+    // dirty and must be saved again.
+    const saveVersion = document.version;
 
     // Get save info
     const exdrawContent = document.toJson();
@@ -153,17 +166,27 @@ class ExcalidrawManager {
     } finally {
       deleteDir(tempPath);
     }
-    document.setMeta({is_saving: false, need_save: false});
+    const currentDocument = this.documents.get(exdrawUuid);
+    if (currentDocument === document) {
+      const saveMeta = {is_saving: false};
+      // Only clear the dirty flag when this request successfully saved the
+      // current version. Otherwise, retain it for the next save attempt.
+      if (saveFlag && document.version === saveVersion) {
+        saveMeta.need_save = false;
+      }
+      document.setMeta(saveMeta);
+    }
 
     return Promise.resolve(saveFlag);
   };
 
   saveSceneDocToMemory = async (exdrawUuid, exdrawName, content, username) => {
-    const document = this.documents.get(exdrawUuid);
+    let document = this.documents.get(exdrawUuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
         await this.getSceneDoc(exdrawUuid, exdrawName);
+        document = this.documents.get(exdrawUuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${exdrawName}(${exdrawUuid}) doc content error`);
         const result = {
@@ -202,11 +225,12 @@ class ExcalidrawManager {
 
   execOperationsBySocket = async (params, exdrawName) => {
     const { doc_uuid: docUuid, version: clientVersion, user, elements } = params;
-    const document = this.documents.get(docUuid);
+    let document = this.documents.get(docUuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
         await this.getSceneDoc(docUuid, exdrawName);
+        document = this.documents.get(docUuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${exdrawName}(${docUuid}) doc content error`);
         const result = {
@@ -226,7 +250,7 @@ class ExcalidrawManager {
         version: serverVersion,
       };
       logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
-      logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s', document.docUuid, user.username);
+      logger.warn('apply operations failed: exdraw uuid is %s, modified user is %s', document.docUuid, user.username);
       return Promise.resolve(result);
     }
 
