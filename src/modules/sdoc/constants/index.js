@@ -16,3 +16,9 @@ export const MESSAGE = {
 export const DOC_CACHE_TIME = 24 * 60 * 60 * 1000;
 
 export const DOC_FORMAT_VERSION = 4;
+
+export const ELEMENT_COMMAND_LIMITS = {
+  MAX_COMMANDS: 100,
+  MAX_REQUEST_BYTES: 1024 * 1024,
+  MAX_TEXT_BYTES: 256 * 1024,
+};

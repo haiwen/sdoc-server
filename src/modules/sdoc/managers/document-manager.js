@@ -213,6 +213,36 @@ class DocumentManager {
     return this.documents.has(docUuid);
   };
 
+  getDocument = (docUuid) => {
+    return this.documents.get(docUuid);
+  };
+
+  commitElementCommands = async (docUuid, baseDocumentVersion, operations, elements, user) => {
+    const document = this.documents.get(docUuid);
+    if (!document || document.version !== baseDocumentVersion) {
+      const error = new Error('Document version conflict');
+      error.error_code = 'document_version_conflict';
+      throw error;
+    }
+
+    // Keep this synchronous so a socket update cannot commit from the same version.
+    const version = document.version + 1;
+    document.setLastModifyUser(user);
+    document.setValue(elements, version);
+
+    try {
+      const operationsManager = OperationsManager.getInstance();
+      await operationsManager.addOperations(docUuid, operations, version, user);
+    } catch (err) {
+      logger.error('Save element command operations to database error:', document.docUuid, operations);
+      const error = new Error('Save element command operations to database error');
+      error.error_code = 'apply_failed';
+      throw error;
+    }
+
+    return { version };
+  };
+
   removeDocs(docUuids) {
     for (let docUuid of docUuids) {
       if (this.documents.has(docUuid)) {
