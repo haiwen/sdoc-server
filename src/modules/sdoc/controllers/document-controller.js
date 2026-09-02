@@ -25,6 +25,7 @@ class DocumentController {
     try {
       await documentManager.getDoc(docUuid, docName, docTitle, username);
       const document = documentManager.getDocument(docUuid);
+      const expectedElements = document.elements;
       const elementCommandManager = new ElementCommandManager();
       const plan = elementCommandManager.prepare(document, req.body);
       const result = await documentManager.commitElementCommands(
@@ -33,6 +34,8 @@ class DocumentController {
         plan.operations,
         plan.elements,
         { username },
+        document,
+        expectedElements,
       );
 
       if (IOHelper.hasInstance()) {
@@ -150,7 +153,7 @@ class DocumentController {
     const { file_uuid: docUuid } = req.payload;
     try {
       const documentManager = DocumentManager.getInstance();
-      documentManager.normalizeSdoc(docUuid);
+      await documentManager.normalizeSdoc(docUuid);
       res.send({"success": true});
       return;
     } catch(err) {
@@ -169,7 +172,7 @@ class DocumentController {
     const ioHelper = IOHelper.getInstance();
     try {
       const documentManager = DocumentManager.getInstance();
-      documentManager.removeDoc(docUuid);
+      await documentManager.removeDoc(docUuid);
       ioHelper.sendMessageToAllInRoom(docUuid, MESSAGE.DOC_REMOVED);
       res.status(200).send({'success': true});
       return;
@@ -200,14 +203,15 @@ class DocumentController {
     const { origin_doc_uuid: originDocUuid, origin_doc_name: originDocName } = req.body;
     const documentManager = DocumentManager.getInstance();
 
-    // send message to all: doc has been publish
     const ioHelper = IOHelper.getInstance();
-    ioHelper.sendMessageToAllInRoom(docUuid, MESSAGE.DOC_PUBLISHED);
-
     const removeFlag = await documentManager.removeDocFromMemory(docUuid);
     if (!removeFlag) {
       logger.error(`Doc ${docUuid} remove from memory failed`);
+      res.status(500).send({'error_msg': 'Internal Server Error'});
+      return;
     }
+    // Publish only after the queued document removal completes.
+    ioHelper.sendMessageToAllInRoom(docUuid, MESSAGE.DOC_PUBLISHED);
 
     if (!documentManager.isDocInMemory(originDocUuid)) {
       res.status(200).send({'success': true});
