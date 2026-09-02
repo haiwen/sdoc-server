@@ -18,7 +18,6 @@ app.use(elementCommandPath, (err, req, res, next) => {
     res.status(413).send({
       error_code: 'batch_limit_exceeded',
       command_index: null,
-      document_version: null,
     });
     return;
   }

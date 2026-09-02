@@ -10,7 +10,6 @@ jest.mock('../../src/modules/sdoc/api/sea-server-api', () => ({
 }));
 
 import Document from '../../src/modules/sdoc/models/document';
-import deepCopy from 'deep-copy';
 import DocumentManager from '../../src/modules/sdoc/managers/document-manager';
 import OperationsManager from '../../src/modules/sdoc/managers/operations-manager';
 import UsersManager from '../../src/modules/sdoc/managers/users-manager';
@@ -36,9 +35,14 @@ const makeDocument = () => new Document('doc-1', 'test.sdoc', {
   elements: [{ id: 'p1', type: 'paragraph', children: [{ id: 't1', text: 'before' }] }],
 });
 
-const commitElements = (documentManager, elements, user = { username: 'writer@example.com' }) => {
-  const document = documentManager.getDocument('doc-1');
-  return documentManager.commitElementCommands('doc-1', document.version, [], elements, user, document, document.elements);
+const replaceCommand = (targetElementId, text) => ({
+  kind: 'replace_element_content',
+  target_element_id: targetElementId,
+  payload: { text },
+});
+
+const applyCommands = (documentManager, commands, username = 'writer@example.com', docUuid = 'doc-1', docName = 'test.sdoc') => {
+  return documentManager.applyElementCommands(docUuid, docName, undefined, username, { commands });
 };
 
 describe('DocumentManager element command commits', () => {
@@ -59,7 +63,6 @@ describe('DocumentManager element command commits', () => {
   });
 
   it('records operations before updating the collaboration document and save state', async () => {
-    const elements = [{ id: 'p1', type: 'paragraph', children: [{ id: 't2', text: 'after' }] }];
     recordOperations.mockImplementation(() => {
       const document = documentManager.getDocument('doc-1');
       expect(document.version).toBe(4);
@@ -68,13 +71,12 @@ describe('DocumentManager element command commits', () => {
       return Promise.resolve();
     });
 
-    const expectedDocument = documentManager.getDocument('doc-1');
-    const result = await documentManager.commitElementCommands('doc-1', 4, [{ type: 'remove_node', path: [0, 0], node: { id: 't1', text: 'before' } }], elements, { username: 'writer@example.com' }, expectedDocument, expectedDocument.elements);
+    const result = await applyCommands(documentManager, [replaceCommand('p1', 'after')]);
 
     const document = documentManager.getDocument('doc-1');
     expect(result.version).toBe(5);
     expect(document.version).toBe(5);
-    expect(document.elements).toEqual(elements);
+    expect(document.elements[0].children[0].text).toBe('after');
     expect(document.last_modify_user).toBe('writer@example.com');
     expect(document.getMeta().need_save).toBe(true);
     expect(recordOperations).toHaveBeenCalledWith('doc-1', expect.any(Array), 5, { username: 'writer@example.com' });
@@ -82,9 +84,8 @@ describe('DocumentManager element command commits', () => {
 
   it('keeps the document and operation cache unchanged when operation log recording fails', async () => {
     recordOperations.mockRejectedValue(new Error('database unavailable'));
-    const elements = [{ id: 'p1', type: 'paragraph', children: [{ id: 't2', text: 'after' }] }];
 
-    await expect(commitElements(documentManager, elements)).rejects.toMatchObject({ error_code: 'apply_failed' });
+    await expect(applyCommands(documentManager, [replaceCommand('p1', 'after')])).rejects.toMatchObject({ error_code: 'apply_failed' });
 
     const document = documentManager.getDocument('doc-1');
     expect(document.version).toBe(4);
@@ -94,34 +95,32 @@ describe('DocumentManager element command commits', () => {
     expect(OperationsManager.getInstance().operationListMap.has('doc-1')).toBe(false);
   });
 
-  it('allows a failed element command request to retry with its original version', async () => {
-    const elements = [{ id: 'p1', type: 'paragraph', children: [{ id: 't2', text: 'after' }] }];
+  it('allows a failed element command request to retry against the current document', async () => {
     recordOperations.mockRejectedValueOnce(new Error('database unavailable')).mockResolvedValueOnce();
 
-    await expect(commitElements(documentManager, elements)).rejects.toMatchObject({ error_code: 'apply_failed' });
-    await expect(commitElements(documentManager, elements)).resolves.toEqual({ version: 5 });
+    await expect(applyCommands(documentManager, [replaceCommand('p1', 'after')])).rejects.toMatchObject({ error_code: 'apply_failed' });
+    await expect(applyCommands(documentManager, [replaceCommand('p1', 'after')])).resolves.toMatchObject({ version: 5 });
 
     expect(documentManager.getDocument('doc-1').version).toBe(5);
-    expect(recordOperations).toHaveBeenNthCalledWith(2, 'doc-1', [], 5, { username: 'writer@example.com' });
+    expect(recordOperations).toHaveBeenCalledWith('doc-1', expect.any(Array), 5, { username: 'writer@example.com' });
   });
 
-  it('rejects a stale version without modifying the document', async () => {
+  it('uses the current document state without requiring a caller version', async () => {
     recordOperations.mockResolvedValue();
     const document = documentManager.getDocument('doc-1');
+    document.setValue([{ id: 'p1', type: 'paragraph', children: [{ id: 't2', text: 'updated by another writer' }] }], 5);
 
-    await expect(documentManager.commitElementCommands('doc-1', 3, [], [], { username: 'writer@example.com' }, document, document.elements)).rejects.toMatchObject({ error_code: 'document_version_conflict' });
+    await expect(applyCommands(documentManager, [replaceCommand('p1', 'applied to current content')])).resolves.toMatchObject({ version: 6 });
 
-    expect(document.version).toBe(4);
-    expect(document.elements[0].children[0].text).toBe('before');
-    expect(recordOperations).not.toHaveBeenCalled();
+    expect(document.version).toBe(6);
+    expect(document.elements[0].children[0].text).toBe('applied to current content');
+    expect(recordOperations).toHaveBeenCalledWith('doc-1', expect.any(Array), 6, { username: 'writer@example.com' });
   });
 
   it('serializes an element command and socket update for the same document', async () => {
     const write = deferred();
     recordOperations.mockImplementation(() => write.promise);
-    const elements = [{ id: 'p1', type: 'paragraph', children: [{ id: 't2', text: 'element' }] }];
-    const document = documentManager.getDocument('doc-1');
-    const elementCommit = documentManager.commitElementCommands('doc-1', 4, [{ type: 'insert_node' }], elements, { username: 'element@example.com' }, document, document.elements);
+    const elementCommit = applyCommands(documentManager, [replaceCommand('p1', 'element')], 'element@example.com');
     const socketCommit = documentManager.execOperationsBySocket({
       doc_uuid: 'doc-1',
       version: 4,
@@ -133,10 +132,67 @@ describe('DocumentManager element command commits', () => {
     expect(recordOperations).toHaveBeenCalledTimes(1);
     write.resolve();
 
-    await expect(elementCommit).resolves.toEqual({ version: 5 });
+    await expect(elementCommit).resolves.toMatchObject({ version: 5 });
     await expect(socketCommit).resolves.toMatchObject({ success: false, error_type: 'version_behind_server' });
     expect(recordOperations).toHaveBeenCalledTimes(1);
     expect(documentManager.getDocument('doc-1').version).toBe(5);
+  });
+
+  it('resolves targets against the state reached by earlier queued writes', async () => {
+    const document = documentManager.getDocument('doc-1');
+    document.elements.push({ id: 'p2', type: 'paragraph', children: [{ id: 't2', text: 'remaining' }] });
+    recordOperations.mockResolvedValue();
+
+    const socketUpdate = documentManager.execOperationsBySocket({
+      doc_uuid: 'doc-1',
+      version: 4,
+      operations: [{ type: 'remove_node', path: [0], node: document.elements[0] }],
+      user: { username: 'socket@example.com' },
+    }, 'test.sdoc');
+    const command = applyCommands(documentManager, [replaceCommand('p1', 'no longer exists')]);
+
+    await expect(socketUpdate).resolves.toMatchObject({ success: true, version: 5 });
+    await expect(command).rejects.toMatchObject({ error_code: 'element_not_found', command_index: 0 });
+    expect(documentManager.getDocument('doc-1').elements.some(element => element.id === 'p1')).toBe(false);
+    expect(recordOperations).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a structured failure when a queued socket update follows document removal', async () => {
+    const blocker = deferred();
+    const blockingWrite = documentManager.enqueueDocumentWrite('doc-1', () => blocker.promise);
+    const removal = documentManager.removeDoc('doc-1');
+    const socketUpdate = documentManager.execOperationsBySocket({
+      doc_uuid: 'doc-1',
+      version: 4,
+      operations: [{ type: 'insert_text', path: [0, 0], offset: 6, text: ' socket' }],
+      user: { username: 'socket@example.com' },
+    }, 'test.sdoc');
+
+    blocker.resolve();
+
+    await expect(blockingWrite).resolves.toBeUndefined();
+    await expect(removal).resolves.toBe(true);
+    await expect(socketUpdate).resolves.toEqual({
+      success: false,
+      error_type: 'document_not_found',
+    });
+    expect(recordOperations).not.toHaveBeenCalled();
+    expect(documentManager.getDocument('doc-1')).toBeUndefined();
+  });
+
+  it('returns document_not_found when a queued element command follows document removal', async () => {
+    const blocker = deferred();
+    const blockingWrite = documentManager.enqueueDocumentWrite('doc-1', () => blocker.promise);
+    const removal = documentManager.removeDoc('doc-1');
+    const command = applyCommands(documentManager, [replaceCommand('p1', 'after removal')]);
+
+    blocker.resolve();
+
+    await expect(blockingWrite).resolves.toBeUndefined();
+    await expect(removal).resolves.toBe(true);
+    await expect(command).rejects.toMatchObject({ error_code: 'document_not_found' });
+    expect(recordOperations).not.toHaveBeenCalled();
+    expect(documentManager.getDocument('doc-1')).toBeUndefined();
   });
 
   it('allows writes for different documents to persist in parallel', async () => {
@@ -150,28 +206,27 @@ describe('DocumentManager element command commits', () => {
     }));
     recordOperations.mockImplementation(docUuid => docUuid === 'doc-1' ? firstWrite.promise : secondWrite.promise);
 
-    const firstDocument = documentManager.getDocument('doc-1');
-    const secondDocument = documentManager.getDocument('doc-2');
-    const first = documentManager.commitElementCommands('doc-1', 4, [], [{ id: 'p1', type: 'paragraph', children: [{ id: 't1-new', text: 'first' }] }], { username: 'first@example.com' }, firstDocument, firstDocument.elements);
-    const second = documentManager.commitElementCommands('doc-2', 4, [], [{ id: 'p2', type: 'paragraph', children: [{ id: 't2-new', text: 'second' }] }], { username: 'second@example.com' }, secondDocument, secondDocument.elements);
+    const first = applyCommands(documentManager, [replaceCommand('p1', 'first')], 'first@example.com');
+    const second = applyCommands(documentManager, [replaceCommand('p2', 'second')], 'second@example.com', 'doc-2', 'second.sdoc');
 
     await flushPromises();
     expect(recordOperations).toHaveBeenCalledTimes(2);
     secondWrite.resolve();
     firstWrite.resolve();
-    await expect(Promise.all([first, second])).resolves.toEqual([{ version: 5 }, { version: 5 }]);
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      expect.objectContaining({ version: 5 }),
+      expect.objectContaining({ version: 5 }),
+    ]);
   });
 
   it('continues a document write queue after a failed task', async () => {
     recordOperations.mockRejectedValueOnce(new Error('database unavailable')).mockResolvedValueOnce();
-    const elements = [{ id: 'p1', type: 'paragraph', children: [{ id: 't2', text: 'after' }] }];
 
-    const document = documentManager.getDocument('doc-1');
-    const failed = documentManager.commitElementCommands('doc-1', 4, [], elements, { username: 'first@example.com' }, document, document.elements);
-    const succeeded = documentManager.commitElementCommands('doc-1', 4, [], elements, { username: 'second@example.com' }, document, document.elements);
+    const failed = applyCommands(documentManager, [replaceCommand('p1', 'after')], 'first@example.com');
+    const succeeded = applyCommands(documentManager, [replaceCommand('p1', 'after')], 'second@example.com');
 
     await expect(failed).rejects.toMatchObject({ error_code: 'apply_failed' });
-    await expect(succeeded).resolves.toEqual({ version: 5 });
+    await expect(succeeded).resolves.toMatchObject({ version: 5 });
     expect(documentManager.getDocument('doc-1').last_modify_user).toBe('second@example.com');
   });
 
@@ -234,50 +289,22 @@ describe('DocumentManager element command commits', () => {
     expect(documentManager.getDocument('doc-1')).toBeUndefined();
   });
 
-  it('rejects a plan when its document instance was replaced with the same version', async () => {
-    const expectedDocument = documentManager.getDocument('doc-1');
-    const expectedElements = expectedDocument.elements;
-    const replacement = makeDocument();
-    documentManager.documents.set('doc-1', replacement);
-
-    await expect(documentManager.commitElementCommands('doc-1', 4, [], [], { username: 'writer@example.com' }, expectedDocument, expectedElements)).rejects.toMatchObject({ error_code: 'document_version_conflict' });
-
-    expect(recordOperations).not.toHaveBeenCalled();
-    expect(replacement.version).toBe(4);
-    expect(replacement.elements[0].children[0].text).toBe('before');
-    expect(replacement.last_modify_user).toBe('');
-    expect(replacement.getMeta().need_save).toBe(false);
-  });
-
-  it('rejects a plan when normalize replaces elements without changing its version', async () => {
-    const document = documentManager.getDocument('doc-1');
-    const expectedElements = document.elements;
-    document.elements = deepCopy(document.elements);
-
-    await expect(documentManager.commitElementCommands('doc-1', 4, [], [], { username: 'writer@example.com' }, document, expectedElements)).rejects.toMatchObject({ error_code: 'document_version_conflict' });
-
-    expect(recordOperations).not.toHaveBeenCalled();
-    expect(document.version).toBe(4);
-    expect(document.last_modify_user).toBe('');
-    expect(document.getMeta().need_save).toBe(false);
-  });
-
-  it('does not remove a document while an element commit persists its operation log', async () => {
+  it('does not remove a document while an element command persists its operation log', async () => {
     const write = deferred();
     recordOperations.mockReturnValue(write.promise);
     const document = documentManager.getDocument('doc-1');
-    const commit = documentManager.commitElementCommands('doc-1', 4, [], [{ id: 'p1', type: 'paragraph', children: [{ id: 't2', text: 'after' }] }], { username: 'writer@example.com' }, document, document.elements);
+    const commit = applyCommands(documentManager, [replaceCommand('p1', 'after')]);
     const remove = documentManager.removeDoc('doc-1');
 
     await flushPromises();
     expect(documentManager.getDocument('doc-1')).toBe(document);
     write.resolve();
-    await expect(commit).resolves.toEqual({ version: 5 });
+    await expect(commit).resolves.toMatchObject({ version: 5 });
     await remove;
     expect(documentManager.getDocument('doc-1')).toBeUndefined();
   });
 
-  it('does not reload a document while an element commit persists its operation log', async () => {
+  it('does not reload a document while an element command persists its operation log', async () => {
     const write = deferred();
     recordOperations.mockReturnValue(write.promise);
     seaServerAPI.getDocContent.mockResolvedValue({ data: {
@@ -287,40 +314,15 @@ describe('DocumentManager element command commits', () => {
       elements: [{ id: 'reloaded', type: 'paragraph', children: [{ id: 'reloaded-text', text: 'reloaded' }] }],
     } });
     const document = documentManager.getDocument('doc-1');
-    const commit = documentManager.commitElementCommands('doc-1', 4, [], [{ id: 'p1', type: 'paragraph', children: [{ id: 't2', text: 'after' }] }], { username: 'writer@example.com' }, document, document.elements);
+    const commit = applyCommands(documentManager, [replaceCommand('p1', 'after')]);
     const reload = documentManager.reloadDoc('doc-1', 'test.sdoc');
 
     await flushPromises();
     expect(documentManager.getDocument('doc-1')).toBe(document);
     write.resolve();
-    await expect(commit).resolves.toEqual({ version: 5 });
+    await expect(commit).resolves.toMatchObject({ version: 5 });
     await reload;
     expect(documentManager.getDocument('doc-1').elements[0].id).toBe('reloaded');
-  });
-
-  it('rejects an old plan after removal completes first', async () => {
-    const expectedDocument = documentManager.getDocument('doc-1');
-    const expectedElements = expectedDocument.elements;
-
-    await documentManager.removeDoc('doc-1');
-    await expect(documentManager.commitElementCommands('doc-1', 4, [], [], { username: 'writer@example.com' }, expectedDocument, expectedElements)).rejects.toMatchObject({ error_code: 'document_version_conflict' });
-
-    expect(recordOperations).not.toHaveBeenCalled();
-  });
-
-  it('rejects an old plan after a queued reload completes first', async () => {
-    const expectedDocument = documentManager.getDocument('doc-1');
-    const expectedElements = expectedDocument.elements;
-    seaServerAPI.getDocContent.mockResolvedValue({ data: {
-      version: 4,
-      format_version: 4,
-      last_modify_user: 'reload@example.com',
-      elements: [{ id: 'reloaded', type: 'paragraph', children: [{ id: 'reloaded-text', text: 'reloaded' }] }],
-    } });
-
-    await documentManager.reloadDoc('doc-1', 'test.sdoc');
-    await expect(documentManager.commitElementCommands('doc-1', 4, [], [], { username: 'writer@example.com' }, expectedDocument, expectedElements)).rejects.toMatchObject({ error_code: 'document_version_conflict' });
-    expect(recordOperations).not.toHaveBeenCalled();
   });
 
   it('shares one cold load between concurrent requests', async () => {

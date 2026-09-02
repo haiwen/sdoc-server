@@ -97,16 +97,13 @@ const createElement = (type, text) => {
 
 class ElementCommandManager {
   prepare(document, request) {
-    if (!isObject(request) || !Number.isInteger(request.base_document_version) || !Array.isArray(request.commands)) {
+    if (!isObject(request) || !Array.isArray(request.commands)) {
       invalid(null);
     }
-    if (Object.keys(request).some(key => !['request_id', 'base_document_version', 'commands'].includes(key))) invalid(null);
+    if (Object.keys(request).some(key => key !== 'commands')) invalid(null);
     if (request.commands.length === 0) invalid(null);
     if (byteLength(JSON.stringify(request)) > ELEMENT_COMMAND_LIMITS.MAX_REQUEST_BYTES || request.commands.length > ELEMENT_COMMAND_LIMITS.MAX_COMMANDS) {
       throw new ElementCommandError('batch_limit_exceeded');
-    }
-    if (document.version !== request.base_document_version) {
-      throw new ElementCommandError('document_version_conflict');
     }
 
     const elements = deepCopy(document.elements);
@@ -160,7 +157,6 @@ class ElementCommandManager {
     }
 
     return {
-      baseDocumentVersion: request.base_document_version,
       operations,
       elements: slateDocument.elements,
       commandResults,

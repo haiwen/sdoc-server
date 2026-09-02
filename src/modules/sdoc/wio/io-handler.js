@@ -96,7 +96,16 @@ class IOHandler {
       const { docName } = socket;
       const { doc_uuid: docUuid, operations, user, selection, cursor_data } = params;
       const documentManager = DocumentManager.getInstance();
-      const result = await documentManager.execOperationsBySocket(params, docName);
+      let result;
+      try {
+        result = await documentManager.execOperationsBySocket(params, docName);
+      } catch (err) {
+        logger.error(`SOCKET_MESSAGE: Update ${docName}(${docUuid}) doc content error`, err);
+        result = {
+          success: false,
+          error_type: 'update_document_error',
+        };
+      }
 
       const end = Date.now();
       const costsTime = end - start;

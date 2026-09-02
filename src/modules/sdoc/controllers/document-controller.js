@@ -4,7 +4,6 @@ import DocumentManager from '../managers/document-manager';
 import { resetDocContentCursors } from "../models/document-utils";
 import { MESSAGE } from '../constants';
 import IOHelper from "../wio/io-helper";
-import ElementCommandManager from '../managers/element-command-manager';
 
 class DocumentController {
 
@@ -16,53 +15,41 @@ class DocumentController {
       res.status(403).send({
         error_code: 'permission_denied',
         command_index: null,
-        document_version: null,
       });
       return;
     }
 
     const documentManager = DocumentManager.getInstance();
     try {
-      await documentManager.getDoc(docUuid, docName, docTitle, username);
-      const document = documentManager.getDocument(docUuid);
-      const expectedElements = document.elements;
-      const elementCommandManager = new ElementCommandManager();
-      const plan = elementCommandManager.prepare(document, req.body);
-      const result = await documentManager.commitElementCommands(
-        docUuid,
-        plan.baseDocumentVersion,
-        plan.operations,
-        plan.elements,
-        { username },
-        document,
-        expectedElements,
-      );
+      const result = await documentManager.applyElementCommands(docUuid, docName, docTitle, username, req.body);
 
       if (IOHelper.hasInstance()) {
-        const ioHelper = IOHelper.getInstance();
-        ioHelper.sendDocumentUpdate(docUuid, {
-          operations: plan.operations,
-          version: result.version,
-          user: { username },
-        });
+        try {
+          const ioHelper = IOHelper.getInstance();
+          ioHelper.sendDocumentUpdate(docUuid, {
+            operations: result.plan.operations,
+            version: result.version,
+            user: { username },
+          });
+        } catch (err) {
+          logger.error(`Broadcast element command update for ${docUuid} failed`, err);
+        }
       }
 
       res.status(200).send({
-        document_version: result.version,
-        command_results: plan.commandResults,
-        element_id_mappings: plan.elementIdMappings,
+        applied_document_version: result.version,
+        command_results: result.plan.commandResults,
+        element_id_mappings: result.plan.elementIdMappings,
       });
     } catch (err) {
       const errorCode = err.error_code || 'apply_failed';
-      const status = errorCode === 'document_version_conflict' ? 409 : errorCode === 'apply_failed' ? 500 : 400;
-      const document = documentManager.getDocument(docUuid);
+      const status = errorCode === 'document_not_found' ? 404 : errorCode === 'apply_failed' ? 500 : 400;
       if (errorCode === 'apply_failed') {
         logger.error(err.message);
       }
       res.status(status).send({
         error_code: errorCode,
         command_index: err.command_index === undefined ? null : err.command_index,
-        document_version: document ? document.version : null,
       });
     }
   }

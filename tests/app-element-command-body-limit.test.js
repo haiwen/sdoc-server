@@ -47,7 +47,6 @@ describe('Element Command request body limit', () => {
     expect(JSON.parse(response.body)).toEqual({
       error_code: 'batch_limit_exceeded',
       command_index: null,
-      document_version: null,
     });
   });
 
@@ -62,7 +61,7 @@ describe('Element Command request body limit', () => {
   });
 
   it('passes a body under the route limit to the existing auth middleware', async () => {
-    const body = JSON.stringify({ base_document_version: 1, commands: [] });
+    const body = JSON.stringify({ commands: [] });
 
     const response = await postJson(server, `${BASE_URL_VERSION1}/doc-1/element-commands`, body);
 

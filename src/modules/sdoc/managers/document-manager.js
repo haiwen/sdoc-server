@@ -12,6 +12,7 @@ import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import UsersManager from './users-manager';
+import ElementCommandManager from './element-command-manager';
 
 class DocumentManager {
 
@@ -258,29 +259,38 @@ class DocumentManager {
     return taskPromise;
   };
 
-  commitElementCommands = async (docUuid, baseDocumentVersion, operations, elements, user, expectedDocument, expectedElements) => {
+  applyElementCommands = async (docUuid, docName, docTitle, username, request) => {
+    // Keep the hot-cache path synchronous so this request takes its queue
+    // position before a later Socket update for the same document.
+    if (!this.documents.get(docUuid)) {
+      await this.getDoc(docUuid, docName, docTitle, username);
+    }
+
     return this.enqueueDocumentWrite(docUuid, async () => {
       const document = this.documents.get(docUuid);
-      if (document !== expectedDocument || document.elements !== expectedElements || document.version !== baseDocumentVersion) {
-        const error = new Error('Document version conflict');
-        error.error_code = 'document_version_conflict';
+      if (!document) {
+        const error = new Error('Document is not available for element command execution');
+        error.error_code = 'document_not_found';
         throw error;
       }
+
+      const elementCommandManager = new ElementCommandManager();
+      const plan = elementCommandManager.prepare(document, request);
 
       const version = document.version + 1;
       try {
         const operationsManager = OperationsManager.getInstance();
-        await operationsManager.addOperations(docUuid, operations, version, user);
+        await operationsManager.addOperations(docUuid, plan.operations, version, { username });
       } catch (err) {
-        logger.error('Save element command operations to database error:', document.docUuid, operations);
+        logger.error('Save element command operations to database error:', document.docUuid, plan.operations);
         const error = new Error('Save element command operations to database error');
         error.error_code = 'apply_failed';
         throw error;
       }
 
-      document.setLastModifyUser(user);
-      document.setValue(elements, version);
-      return { version };
+      document.setLastModifyUser({ username });
+      document.setValue(plan.elements, version);
+      return { version, plan };
     });
   };
 
@@ -350,6 +360,12 @@ class DocumentManager {
 
     return this.enqueueDocumentWrite(doc_uuid, async () => {
       const document = this.documents.get(doc_uuid);
+      if (!document) {
+        return {
+          success: false,
+          error_type: 'document_not_found',
+        };
+      }
       const { version: serverVersion } = document;
       if (serverVersion !== clientVersion) {
         const operationsManager = OperationsManager.getInstance();

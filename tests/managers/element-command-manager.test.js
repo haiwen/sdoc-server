@@ -13,7 +13,6 @@ const makeDocument = (elements = [paragraph('p1', 'one'), paragraph('p2', 'two')
 });
 
 const prepare = (document, commands) => new ElementCommandManager().prepare(document, {
-  base_document_version: document.version,
   commands,
 });
 
@@ -321,10 +320,10 @@ describe('ElementCommandManager', () => {
     }]), 'unsupported_element_type', 0);
   });
 
-  it('checks versions, command count, request size and text size before applying', () => {
+  it('checks request shape, command count, request size and text size before applying', () => {
     const document = makeDocument();
-    expectError(() => new ElementCommandManager().prepare(document, { base_document_version: 2, commands: [] }), 'invalid_request', null);
-    expectError(() => new ElementCommandManager().prepare(document, { base_document_version: document.version, commands: [] }), 'invalid_request', null);
+    expectError(() => new ElementCommandManager().prepare(document, { commands: [], base_document_version: 2 }), 'invalid_request', null);
+    expectError(() => new ElementCommandManager().prepare(document, { commands: [], request_id: 'not-supported' }), 'invalid_request', null);
     expect(document.version).toBe(3);
     expect(document.elements[0].children[0].text).toBe('one');
     const commands = Array.from({ length: 101 }, () => ({ kind: 'insert_element', parent_element_id: null, position: 'append', payload: { type: 'paragraph', text: '' } }));
