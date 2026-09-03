@@ -7,6 +7,53 @@ import IOHelper from "../wio/io-helper";
 
 class DocumentController {
 
+  async applyElementCommands(req, res) {
+    const { doc_uuid: docUuid } = req.params;
+    const { file_uuid: fileUuid, permission, username, filename: docName, default_title: docTitle } = req.payload || {};
+
+    if (fileUuid !== docUuid || permission !== 'rw' || !username) {
+      res.status(403).send({
+        error_code: 'permission_denied',
+        command_index: null,
+      });
+      return;
+    }
+
+    const documentManager = DocumentManager.getInstance();
+    try {
+      const result = await documentManager.applyElementCommands(docUuid, docName, docTitle, username, req.body);
+
+      if (IOHelper.hasInstance()) {
+        try {
+          const ioHelper = IOHelper.getInstance();
+          ioHelper.sendDocumentUpdate(docUuid, {
+            operations: result.plan.operations,
+            version: result.version,
+            user: { username },
+          });
+        } catch (err) {
+          logger.error(`Broadcast element command update for ${docUuid} failed`, err);
+        }
+      }
+
+      res.status(200).send({
+        applied_document_version: result.version,
+        command_results: result.plan.commandResults,
+        element_id_mappings: result.plan.elementIdMappings,
+      });
+    } catch (err) {
+      const errorCode = err.error_code || 'apply_failed';
+      const status = errorCode === 'document_not_found' ? 404 : errorCode === 'apply_failed' ? 500 : 400;
+      if (errorCode === 'apply_failed') {
+        logger.error(err.message);
+      }
+      res.status(status).send({
+        error_code: errorCode,
+        command_index: err.command_index === undefined ? null : err.command_index,
+      });
+    }
+  }
+
   async loadDocContent(req, res) {
     const { file_uuid: docUuid, filename: docName, username, default_title: docTitle } = req.payload;
     try {
@@ -93,7 +140,7 @@ class DocumentController {
     const { file_uuid: docUuid } = req.payload;
     try {
       const documentManager = DocumentManager.getInstance();
-      documentManager.normalizeSdoc(docUuid);
+      await documentManager.normalizeSdoc(docUuid);
       res.send({"success": true});
       return;
     } catch(err) {
@@ -112,7 +159,7 @@ class DocumentController {
     const ioHelper = IOHelper.getInstance();
     try {
       const documentManager = DocumentManager.getInstance();
-      documentManager.removeDoc(docUuid);
+      await documentManager.removeDoc(docUuid);
       ioHelper.sendMessageToAllInRoom(docUuid, MESSAGE.DOC_REMOVED);
       res.status(200).send({'success': true});
       return;
@@ -143,14 +190,15 @@ class DocumentController {
     const { origin_doc_uuid: originDocUuid, origin_doc_name: originDocName } = req.body;
     const documentManager = DocumentManager.getInstance();
 
-    // send message to all: doc has been publish
     const ioHelper = IOHelper.getInstance();
-    ioHelper.sendMessageToAllInRoom(docUuid, MESSAGE.DOC_PUBLISHED);
-
     const removeFlag = await documentManager.removeDocFromMemory(docUuid);
     if (!removeFlag) {
       logger.error(`Doc ${docUuid} remove from memory failed`);
+      res.status(500).send({'error_msg': 'Internal Server Error'});
+      return;
     }
+    // Publish only after the queued document removal completes.
+    ioHelper.sendMessageToAllInRoom(docUuid, MESSAGE.DOC_PUBLISHED);
 
     if (!documentManager.isDocInMemory(originDocUuid)) {
       res.status(200).send({'success': true});

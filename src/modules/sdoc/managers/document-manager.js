@@ -12,6 +12,7 @@ import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import UsersManager from './users-manager';
+import ElementCommandManager from './element-command-manager';
 
 class DocumentManager {
 
@@ -19,6 +20,7 @@ class DocumentManager {
     this.instance = null;
     this.users = [];
     this.documents = new Map();
+    this.documentWriteQueues = new Map();
 
     // save infos
     this.isSaving = false;
@@ -78,33 +80,35 @@ class DocumentManager {
     this.lastSavingInfo.startTime = startTime;
     this.lastSavingInfo.endTime = Date.now();
 
-    this.removeDocsWithNoAccess(unsavedDocs);
+    await this.removeDocsWithNoAccess(unsavedDocs);
   };
 
   reloadDoc = async (docUuid, docName) => {
-    this.removeDocFromMemory(docUuid);
+    return this.enqueueDocumentWrite(docUuid, async () => {
+      this.removeDocFromMemoryUnsafe(docUuid);
 
-    let result = null;
-    try {
-      result = await seaServerAPI.getDocContent(docUuid);
-    } catch (err) {
-      errorHandle(err);
-      const error = new Error('The content of the document loaded error');
-      error.error_type = 'content_load_invalid';
-      error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/content/${docUuid}/`;
-      throw error;
-    }
+      let result = null;
+      try {
+        result = await seaServerAPI.getDocContent(docUuid);
+      } catch (err) {
+        errorHandle(err);
+        const error = new Error('The content of the document loaded error');
+        error.error_type = 'content_load_invalid';
+        error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/content/${docUuid}/`;
+        throw error;
+      }
 
-    const docContent = result.data ? result.data : generateDefaultDocContent(docName);
-    if (!isSdocContentValid(docContent)) {
-      const error = new Error('The content of the document does not conform to the sdoc specification');
-      error.error_type = 'content_invalid';
-      throw error;
-    }
-    const doc = new Document(docUuid, docName, docContent);
+      const docContent = result.data ? result.data : generateDefaultDocContent(docName);
+      if (!isSdocContentValid(docContent)) {
+        const error = new Error('The content of the document does not conform to the sdoc specification');
+        error.error_type = 'content_invalid';
+        throw error;
+      }
+      const doc = new Document(docUuid, docName, docContent);
 
-    this.documents.set(docUuid, doc);
-    return doc.toJson();
+      this.documents.set(docUuid, doc);
+      return doc.toJson();
+    });
   };
 
   getDoc = async (docUuid, docName, docTitle, username) => {
@@ -113,40 +117,50 @@ class DocumentManager {
       return document.toJson();
     }
 
-    let result = null;
-    try {
-      result = await seaServerAPI.getDocContent(docUuid);
-    } catch (err) {
-      errorHandle(err);
-      const error = new Error('The content of the document loaded error');
-      error.error_type = 'content_load_invalid';
-      error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/content/${docUuid}/`;
-      throw error;
-    }
+    const loadResult = await this.enqueueDocumentWrite(docUuid, async () => {
+      const currentDocument = this.documents.get(docUuid);
+      if (currentDocument) {
+        return { document: currentDocument, shouldSave: false };
+      }
 
-    const docContent = result.data ? result.data : generateDefaultDocContent(docTitle, username);
-    if (!isSdocContentValid(docContent)) {
-      const error = new Error('The content of the document does not conform to the sdoc specification');
-      error.error_type = 'content_invalid';
-      throw error;
+      let result = null;
+      try {
+        result = await seaServerAPI.getDocContent(docUuid);
+      } catch (err) {
+        errorHandle(err);
+        const error = new Error('The content of the document loaded error');
+        error.error_type = 'content_load_invalid';
+        error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/content/${docUuid}/`;
+        throw error;
+      }
 
-    }
-    const doc = new Document(docUuid, docName, docContent);
+      const docContent = result.data ? result.data : generateDefaultDocContent(docTitle, username);
+      if (!isSdocContentValid(docContent)) {
+        const error = new Error('The content of the document does not conform to the sdoc specification');
+        error.error_type = 'content_invalid';
+        throw error;
+      }
+      const loadedDocument = new Document(docUuid, docName, docContent);
 
-    // apply pending operations
-    const results = await listPendingOperationsByDoc(docUuid, doc.version);
-    if (results.length) {
-      logger.info(`doc ${docName}(${docUuid}) re-execute ${results.length} pending operations`);
-      this.applyPendingOperations(doc, results);
-    }
+      // apply pending operations
+      const results = await listPendingOperationsByDoc(docUuid, loadedDocument.version);
+      if (results.length) {
+        logger.info(`doc ${docName}(${docUuid}) re-execute ${results.length} pending operations`);
+        this.applyPendingOperations(loadedDocument, results);
+      }
 
-    this.documents.set(docUuid, doc);
-    // save doc when content is empty
-    if (!result.data) {
-      doc.setMeta({need_save: true});
+      this.documents.set(docUuid, loadedDocument);
+      if (!result.data) {
+        loadedDocument.setMeta({need_save: true});
+      }
+      return { document: loadedDocument, shouldSave: !result.data };
+    });
+
+    // Saving outside the queue prevents a 404 removal from waiting on itself.
+    if (loadResult.shouldSave) {
       await this.saveDoc(docUuid);
     }
-    return doc.toJson();
+    return loadResult.document.toJson();
   };
 
   saveDoc = async (docUuid) => {
@@ -164,9 +178,10 @@ class DocumentManager {
 
     document.setMeta({is_saving: true});
 
-    // Get save info
+    // Save a stable version snapshot without holding the document write queue.
     const { version, format_version, elements, docName, last_modify_user = '' } = document;
-    const docContent = { version, format_version, elements, last_modify_user };
+    const savingVersion = version;
+    const docContent = { version, format_version, elements: deepCopy(elements), last_modify_user };
 
     let saveFlag = false;
     const tempPath = `/tmp/` + v4();
@@ -188,42 +203,104 @@ class DocumentManager {
       }
     } finally {
       deleteDir(tempPath);
+      document.setMeta({is_saving: false});
+
+      const currentDocument = this.documents.get(docUuid);
+      if (currentDocument === document) {
+        if (saveFlag && currentDocument.version === savingVersion) {
+          currentDocument.setMeta({need_save: false});
+        } else if (!saveFlag) {
+          currentDocument.setMeta({need_save: true});
+        }
+      }
     }
 
-    document.setMeta({is_saving: false, need_save: false});
     return Promise.resolve(saveFlag);
   };
 
   removeDoc = async (docUuid) => {
-    const removeFlag = await this.removeDocFromMemory(docUuid);
-    return Promise.resolve(removeFlag);
+    return this.removeDocFromMemory(docUuid);
   };
 
   removeDocFromMemory = async (docUuid) => {
+    return this.enqueueDocumentWrite(docUuid, async () => this.removeDocFromMemoryUnsafe(docUuid));
+  };
+
+  removeDocFromMemoryUnsafe = (docUuid) => {
     if (this.documents.has(docUuid)) {
       logger.info('Removed doc ', docUuid, ' from memory');
       const operationsManager = OperationsManager.getInstance();
       operationsManager.clearOperations(docUuid);
       this.documents.delete(docUuid);
     }
-    return Promise.resolve(true);
+    return true;
   };
 
   isDocInMemory = (docUuid) => {
     return this.documents.has(docUuid);
   };
 
-  removeDocs(docUuids) {
-    for (let docUuid of docUuids) {
-      if (this.documents.has(docUuid)) {
-        logger.info('Removed doc ', docUuid, ' from memory');
-        this.documents.delete(docUuid);
+  getDocument = (docUuid) => {
+    return this.documents.get(docUuid);
+  };
+
+  enqueueDocumentWrite = (docUuid, task) => {
+    const previous = this.documentWriteQueues.get(docUuid) || Promise.resolve();
+    const taskPromise = previous.catch(() => {}).then(task);
+    const queueTail = taskPromise.catch(() => {});
+
+    this.documentWriteQueues.set(docUuid, queueTail);
+    queueTail.then(() => {
+      if (this.documentWriteQueues.get(docUuid) === queueTail) {
+        this.documentWriteQueues.delete(docUuid);
       }
+    });
+
+    return taskPromise;
+  };
+
+  applyElementCommands = async (docUuid, docName, docTitle, username, request) => {
+    // Keep the hot-cache path synchronous so this request takes its queue
+    // position before a later Socket update for the same document.
+    if (!this.documents.get(docUuid)) {
+      await this.getDoc(docUuid, docName, docTitle, username);
     }
+
+    return this.enqueueDocumentWrite(docUuid, async () => {
+      const document = this.documents.get(docUuid);
+      if (!document) {
+        const error = new Error('Document is not available for element command execution');
+        error.error_code = 'document_not_found';
+        throw error;
+      }
+
+      const elementCommandManager = new ElementCommandManager();
+      const plan = elementCommandManager.prepare(document, request);
+
+      const version = document.version + 1;
+      try {
+        const operationsManager = OperationsManager.getInstance();
+        await operationsManager.addOperations(docUuid, plan.operations, version, { username });
+      } catch (err) {
+        logger.error('Save element command operations to database error:', document.docUuid, plan.operations);
+        const error = new Error('Save element command operations to database error');
+        error.error_code = 'apply_failed';
+        throw error;
+      }
+
+      document.setLastModifyUser({ username });
+      document.setValue(plan.elements, version);
+      return { version, plan };
+    });
+  };
+
+  removeDocs(docUuids) {
+    return Promise.all(docUuids.map(docUuid => this.removeDocFromMemory(docUuid)));
   }
 
   removeDocsWithNoAccess(docUuids) {
     const usersManager = UsersManager.getInstance();
+    const evictionTasks = [];
     for (let i = 0; i < docUuids.length; i++) {
       const docUuid = docUuids[i];
       const users = usersManager.getDocUsers(docUuid);
@@ -237,22 +314,37 @@ class DocumentManager {
       const meta = document.getMeta();
       const currentTime = new Date().getTime();
       if (currentTime - meta.last_access > DOC_CACHE_TIME) {
-        this.removeDoc(docUuid);
-        logger.info(`Regularly clear files that no one has accessed: ${docUuid}`);
+        evictionTasks.push(this.enqueueDocumentWrite(docUuid, async () => {
+          const currentDocument = this.documents.get(docUuid);
+          if (currentDocument !== document || usersManager.getDocUsers(docUuid).length > 0) {
+            return false;
+          }
+
+          const currentMeta = currentDocument.getMeta();
+          if (new Date().getTime() - currentMeta.last_access <= DOC_CACHE_TIME) {
+            return false;
+          }
+
+          this.removeDocFromMemoryUnsafe(docUuid);
+          logger.info(`Regularly clear files that no one has accessed: ${docUuid}`);
+          return true;
+        }));
       }
     }
+    return Promise.all(evictionTasks);
   }
 
-  normalizeSdoc = (docUuid) => {
-    const document = this.documents.get(docUuid);
-    document.elements = normalizeChildren(document.elements);
+  normalizeSdoc = async (docUuid) => {
+    return this.enqueueDocumentWrite(docUuid, async () => {
+      const document = this.documents.get(docUuid);
+      document.elements = normalizeChildren(document.elements);
+    });
   };
 
   execOperationsBySocket = async (params, docName) => {
     const { doc_uuid, version: clientVersion, operations, user } = params;
 
-    const document = this.documents.get(doc_uuid);
-    if (!document) {
+    if (!this.documents.get(doc_uuid)) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
         await this.getDoc(doc_uuid, docName);
@@ -266,60 +358,74 @@ class DocumentManager {
       }
     }
 
-    const { version: serverVersion } = document;
-    if (serverVersion !== clientVersion) {
-      const operationsManager = OperationsManager.getInstance();
-      const loseOperations = await operationsManager.getLoseOperationList(doc_uuid, clientVersion);
-      const result = {
-        success: false,
-        error_type: 'version_behind_server',
-        lose_operations: loseOperations,
+    return this.enqueueDocumentWrite(doc_uuid, async () => {
+      const document = this.documents.get(doc_uuid);
+      if (!document) {
+        return {
+          success: false,
+          error_type: 'document_not_found',
+        };
+      }
+      const { version: serverVersion } = document;
+      if (serverVersion !== clientVersion) {
+        const operationsManager = OperationsManager.getInstance();
+        const loseOperations = await operationsManager.getLoseOperationList(doc_uuid, clientVersion);
+        const result = {
+          success: false,
+          error_type: 'version_behind_server',
+          lose_operations: loseOperations,
+        };
+        logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
+        logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s, execute operations %o', document.docUuid, user.username, operations);
+        return result;
+      }
+
+      const draftDocument = {
+        version: document.version,
+        elements: deepCopy(document.elements),
+        last_modify_user: document.last_modify_user,
+        setLastModifyUser(draftUser = { username: '', name: '' }) {
+          const { username = '', name = '' } = draftUser;
+          this.last_modify_user = username.startsWith('anon_') ? (name || 'Anonymous') : username;
+        },
+        setValue(newElements, newVersion) {
+          this.elements = newElements;
+          this.version = newVersion;
+        },
       };
-      logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
-      logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s, execute operations %o', document.docUuid, user.username, operations);
-      return Promise.resolve(result);
-    }
 
-    // execute operations success
-    let isExecuteSuccess = false;
-    try {
-      // Prevent copying of references
-      const dupOperations = deepCopy(operations);
-      isExecuteSuccess = applyOperations(document, dupOperations, user);
-    } catch (e) {
-      logger.error('apply operations failed.', document.docUuid, operations);
-      isExecuteSuccess = false;
-    }
+      let isExecuteSuccess = false;
+      try {
+        isExecuteSuccess = applyOperations(draftDocument, deepCopy(operations), user);
+      } catch (e) {
+        logger.error('apply operations failed.', document.docUuid, operations);
+      }
 
-    // execute operations failed
-    if (!isExecuteSuccess) {
-      const result = {
-        success: false,
-        error_type: 'execute_client_operations_error',
-      };
-      return Promise.resolve(result);
-    }
+      if (!isExecuteSuccess) {
+        return {
+          success: false,
+          error_type: 'execute_client_operations_error',
+        };
+      }
 
-    if (isExecuteSuccess) {
       try {
         const operationsManager = OperationsManager.getInstance();
-        await operationsManager.addOperations(doc_uuid, operations, document.version, user);
+        await operationsManager.addOperations(doc_uuid, operations, draftDocument.version, user);
       } catch(e) {
         logger.error('Save operations to database error:', document.docUuid, operations);
-        const result = {
+        return {
           success: false,
           error_type: 'save_operations_to_database_error',
         };
-        return Promise.resolve(result);
       }
-    }
 
-    // execute operations success
-    const result = {
-      success: true,
-      version: document.version,
-    };
-    return Promise.resolve(result);
+      document.setLastModifyUser(user);
+      document.setValue(draftDocument.elements, draftDocument.version);
+      return {
+        success: true,
+        version: document.version,
+      };
+    });
 
   };
 

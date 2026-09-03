@@ -12,6 +12,7 @@ router.get(`${BASE_URL_VERSION1}/:doc_uuid/normalize-sdoc`, documentController.n
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/save/`, formdata.none(), documentController.saveDoc);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/publish/`, formdata.fields([{name: 'origin_doc_uuid', maxCount: 1}, {name: 'origin_doc_name', maxCount: 1}]), documentController.publishDoc);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/replace/`, formdata.single('doc_name'), documentController.reloadDoc);
+router.post(`${BASE_URL_VERSION1}/:doc_uuid/element-commands`, documentController.applyElementCommands);
 
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/collaborators`, userController.getCollaborators);
 

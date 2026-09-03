@@ -16,6 +16,10 @@ class IOHelper {
     return this.instance;
   };
 
+  static hasInstance = () => {
+    return Boolean(this.instance);
+  };
+
   getConnectedSocketsCount = () => {
     return this.io.sockets.sockets.size;
   };
@@ -26,6 +30,10 @@ class IOHelper {
 
   sendMessageToRoom = (socket, roomId, params) => {
     socket.to(roomId).emit('update-document', {...params});
+  };
+
+  sendDocumentUpdate = (roomId, params) => {
+    this.io.to(roomId).emit('update-document', {...params});
   };
 
   sendCursorMessageToRoom = (socket, roomId, params) => {
