@@ -20,6 +20,7 @@ class DocumentManager {
     this.instance = null;
     this.users = [];
     this.documents = new Map();
+    this.documentLoadPromises = new Map();
 
     // save infos
     this.isSaving = false;
@@ -114,6 +115,22 @@ class DocumentManager {
       return document.toJson();
     }
 
+    let loadPromise = this.documentLoadPromises.get(docUuid);
+    if (!loadPromise) {
+      loadPromise = this.loadDocFromServer(docUuid, docName, docTitle, username);
+      this.documentLoadPromises.set(docUuid, loadPromise);
+    }
+
+    try {
+      return await loadPromise;
+    } finally {
+      if (this.documentLoadPromises.get(docUuid) === loadPromise) {
+        this.documentLoadPromises.delete(docUuid);
+      }
+    }
+  };
+
+  loadDocFromServer = async (docUuid, docName, docTitle, username) => {
     let result = null;
     try {
       result = await seaServerAPI.getDocContent(docUuid);
@@ -279,11 +296,12 @@ class DocumentManager {
   execOperationsBySocket = async (params, docName) => {
     const { doc_uuid, version: clientVersion, operations, user } = params;
 
-    const document = this.documents.get(doc_uuid);
+    let document = this.documents.get(doc_uuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
         await this.getDoc(doc_uuid, docName);
+        document = this.documents.get(doc_uuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${docName}(${doc_uuid}) doc content error`);
         const result = {
@@ -292,6 +310,13 @@ class DocumentManager {
         };
         return Promise.resolve(result);
       }
+    }
+
+    if (!document) {
+      return Promise.resolve({
+        success: false,
+        error_type: 'load_document_content_error',
+      });
     }
 
     const { version: serverVersion } = document;

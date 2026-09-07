@@ -5,7 +5,6 @@ import { applyOperations } from '../../src/modules/sdoc/utils/slate-utils';
 
 const text = (id, value) => ({ id, text: value });
 const paragraph = (id, value) => ({ id, type: 'paragraph', children: [text(`${id}-text`, value)] });
-const header = (id, value) => ({ id, type: 'header2', children: [text(`${id}-text`, value)] });
 
 const makeDocument = (elements = [paragraph('p1', 'one'), paragraph('p2', 'two')], version = 3) => ({
   version,
@@ -105,6 +104,40 @@ describe('ElementCommandManager', () => {
     ]), 'invalid_request', 0);
   });
 
+  it('returns mappings for client references that match object prototype property names', () => {
+    const plan = prepare(makeDocument(), [{
+      kind: 'insert_element',
+      client_ref: '__proto__',
+      parent_element_id: null,
+      position: 'append',
+      payload: { type: 'paragraph', text: 'prototype-safe' },
+    }]);
+
+    expect(Object.getPrototypeOf(plan.elementIdMappings)).toBeNull();
+    expect(plan.elementIdMappings.__proto__).toBe(plan.commandResults[0].target_element_id);
+    expect(JSON.parse(JSON.stringify(plan.elementIdMappings)).__proto__).toBe(plan.commandResults[0].target_element_id);
+  });
+
+  it('rejects empty element identifiers and references without side effects', () => {
+    const document = makeDocument();
+    const originalElements = deepCopy(document.elements);
+    const invalidCommands = [
+      [{ kind: 'delete_element', target_element_id: '' }, 'invalid_request'],
+      [{ kind: 'delete_element', target_ref: '' }, 'invalid_request'],
+      [{ kind: 'insert_element', parent_element_id: '', position: 'append', payload: { type: 'paragraph', text: 'bad parent' } }, 'invalid_request'],
+      [{ kind: 'insert_element', parent_ref: '', position: 'append', payload: { type: 'paragraph', text: 'bad parent ref' } }, 'invalid_request'],
+      [{ kind: 'insert_element', client_ref: '', parent_element_id: null, position: 'append', payload: { type: 'paragraph', text: 'bad client ref' } }, 'invalid_request'],
+      [{ kind: 'insert_element', parent_element_id: null, before_element_id: '', payload: { type: 'paragraph', text: 'bad anchor' } }, 'invalid_anchor'],
+    ];
+
+    invalidCommands.forEach(([command, errorCode]) => {
+      expectError(() => prepare(document, [command]), errorCode, 0);
+    });
+
+    expect(document.elements).toEqual(originalElements);
+    expect(document.version).toBe(3);
+  });
+
   it('rejects invalid hierarchy and anchors outside the declared parent', () => {
     const list = { id: 'list', type: 'unordered_list', children: [{ id: 'item', type: 'list_item', children: [paragraph('list-p', 'item')] }] };
     expectError(() => prepare(makeDocument([paragraph('p1', 'one'), list]), [{
@@ -179,7 +212,7 @@ describe('ElementCommandManager', () => {
     expect(document.elements).toEqual([paragraph('p1', 'one'), table]);
   });
 
-  it('allows deletion of non-table structural nodes and individual text leaves when valid', () => {
+  it('rejects direct deletion of text leaves and structural internal elements without side effects', () => {
     const list = {
       id: 'list',
       type: 'unordered_list',
@@ -189,25 +222,38 @@ describe('ElementCommandManager', () => {
       ],
     };
     const codeBlock = { id: 'code-block', type: 'code_block', children: [{ id: 'code-line', type: 'code_line', children: [text('code-text', 'code')] }] };
-    const group = { id: 'group', type: 'group', children: [paragraph('group-paragraph', 'group')] };
-    const multiText = { id: 'multi-text', type: 'paragraph', children: [text('first-text', 'first'), text('second-text', 'second')] };
-    const plan = prepare(makeDocument([paragraph('p1', 'one'), list, codeBlock, group, multiText]), [
-      { kind: 'delete_element', target_element_id: 'item-1' },
-      { kind: 'delete_element', target_element_id: 'code-block' },
-      { kind: 'delete_element', target_element_id: 'group' },
-      { kind: 'delete_element', target_element_id: 'first-text' },
-    ]);
+    const table = { id: 'table', type: 'table', children: [{ id: 'row', type: 'table_row', children: [{ id: 'cell', type: 'table_cell', children: [text('cell-text', 'cell')] }] }] };
+    const multiColumn = { id: 'multi-column', type: 'multi_column', children: [{ id: 'column', type: 'column', children: [paragraph('column-paragraph', 'column')] }] };
+    const document = makeDocument([paragraph('p1', 'one'), list, codeBlock, table, multiColumn]);
+    const originalElements = deepCopy(document.elements);
 
-    expect(plan.elements.map(element => element.id)).toEqual(['p1', 'list', 'multi-text']);
-    expect(plan.elements[1].children).toHaveLength(1);
-    expect(plan.elements[2].children).toEqual([text('second-text', 'second')]);
+    ['p1-text', 'code-line', 'row', 'cell', 'column'].forEach(targetElementId => {
+      expectError(() => prepare(document, [{ kind: 'delete_element', target_element_id: targetElementId }]), 'unsupported_element_type', 0);
+    });
+
+    expect(document.elements).toEqual(originalElements);
+    expect(document.version).toBe(3);
+  });
+
+  it('applies direct-target restrictions to targets resolved by client reference', () => {
+    const manager = new ElementCommandManager();
+    const elements = [{ id: 'code-block', type: 'code_block', children: [{ id: 'code-line', type: 'code_line', children: [text('code-text', 'code')] }] }];
+
+    // Public batches cannot insert prohibited internal node types, so exercise the
+    // shared target resolver with the same reference map it receives during preflight.
+    expectError(() => manager.resolveTarget(
+      { target_ref: 'code-line' },
+      0,
+      elements,
+      new Map([['code-line', 'code-line']]),
+    ), 'unsupported_element_type', 0);
   });
 
   it('rejects deletions that leave a parent without children without creating a plan', () => {
     const document = makeDocument([paragraph('p1', 'one')]);
     const originalElements = deepCopy(document.elements);
 
-    expectError(() => prepare(document, [{ kind: 'delete_element', target_element_id: 'p1-text' }]), 'invalid_parent_child', 0);
+    expectError(() => prepare(document, [{ kind: 'delete_element', target_element_id: 'p1-text' }]), 'unsupported_element_type', 0);
 
     expect(document.elements).toEqual(originalElements);
     expect(document.version).toBe(3);
@@ -220,20 +266,65 @@ describe('ElementCommandManager', () => {
     expectError(() => prepare(makeDocument([paragraph('p1', 'one'), list]), [{ kind: 'delete_element', target_element_id: 'item' }]), 'invalid_parent_child', 0);
   });
 
-  it('replaces simple paragraph, heading, list paragraph and table-cell text', () => {
+  it('allows deletion of ordinary blocks, lists and list items when the result remains valid', () => {
+    const list = {
+      id: 'list',
+      type: 'unordered_list',
+      children: [
+        { id: 'item-1', type: 'list_item', children: [paragraph('item-1-paragraph', 'one')] },
+        { id: 'item-2', type: 'list_item', children: [paragraph('item-2-paragraph', 'two')] },
+      ],
+    };
+    const plan = prepare(makeDocument([paragraph('p1', 'one'), paragraph('p2', 'two'), list]), [
+      { kind: 'delete_element', target_element_id: 'p1' },
+      { kind: 'delete_element', target_element_id: 'item-1' },
+      { kind: 'delete_element', target_element_id: 'list' },
+    ]);
+
+    expect(plan.elements).toEqual([paragraph('p2', 'two')]);
+  });
+
+  it('replaces simple paragraph and every heading level text', () => {
     const list = { id: 'list', type: 'unordered_list', children: [{ id: 'item', type: 'list_item', children: [paragraph('list-p', 'item')] }] };
-    const cell = { id: 'cell', type: 'table_cell', children: [text('cell-text', 'cell')] };
-    const table = { id: 'table', type: 'table', children: [{ id: 'row', type: 'table_row', children: [cell] }] };
-    const plan = prepare(makeDocument([paragraph('p1', 'one'), header('h1', 'heading'), list, table]), [
+    const headings = ['header1', 'header2', 'header3', 'header4', 'header5', 'header6'].map((type, index) => ({
+      id: `h${index + 1}`,
+      type,
+      children: [text(`h${index + 1}-text`, `heading ${index + 1}`)],
+    }));
+    const plan = prepare(makeDocument([paragraph('p1', 'one'), ...headings, list]), [
       { kind: 'replace_element_content', target_element_id: 'p1', payload: { text: 'paragraph' } },
-      { kind: 'replace_element_content', target_element_id: 'h1', payload: { text: 'header' } },
+      ...headings.map((heading, index) => ({
+        kind: 'replace_element_content', target_element_id: heading.id, payload: { text: `header ${index + 1}` },
+      })),
       { kind: 'replace_element_content', target_element_id: 'list-p', payload: { text: 'list paragraph' } },
-      { kind: 'replace_element_content', target_element_id: 'cell', payload: { text: 'table cell' } },
     ]);
     expect(plan.elements[0].children[0].text).toBe('paragraph');
-    expect(plan.elements[1].children[0].text).toBe('header');
-    expect(plan.elements[2].children[0].children[0].children[0].text).toBe('list paragraph');
-    expect(plan.elements[3].children[0].children[0].children[0].text).toBe('table cell');
+    headings.forEach((heading, index) => {
+      expect(plan.elements[index + 1].children[0].text).toBe(`header ${index + 1}`);
+    });
+    expect(plan.elements[7].children[0].children[0].children[0].text).toBe('list paragraph');
+  });
+
+  it('rejects table-cell text replacement without modifying the document', () => {
+    const cell = { id: 'cell', type: 'table_cell', children: [text('cell-text', 'cell')] };
+    const table = { id: 'table', type: 'table', children: [{ id: 'row', type: 'table_row', children: [cell] }] };
+    const document = makeDocument([paragraph('p1', 'one'), table]);
+    const originalElements = deepCopy(document.elements);
+
+    expectError(() => prepare(document, [{
+      kind: 'replace_element_content', target_element_id: 'cell', payload: { text: 'table cell' },
+    }]), 'unsupported_content', 0);
+
+    expect(document.elements).toEqual(originalElements);
+    expect(document.version).toBe(3);
+  });
+
+  it('rejects simple-text replacement on element types outside the specification', () => {
+    const title = { id: 'title', type: 'title', children: [text('title-text', 'title')] };
+
+    expectError(() => prepare(makeDocument([title]), [{
+      kind: 'replace_element_content', target_element_id: 'title', payload: { text: 'replacement' },
+    }]), 'unsupported_content', 0);
   });
 
   it('creates ordered and unordered lists with one standard initial list item', () => {
@@ -318,6 +409,67 @@ describe('ElementCommandManager', () => {
     expectError(() => prepare(makeDocument([paragraph('p1', 'one')]), [{
       kind: 'update_element_attributes', target_element_id: 'p1', payload: { type: 'ordered_list' },
     }]), 'unsupported_element_type', 0);
+  });
+
+  it('rejects converting paragraph content that headings cannot preserve', () => {
+    const paragraphWithImage = {
+      id: 'p1',
+      type: 'paragraph',
+      children: [
+        text('p1-text', 'caption'),
+        { id: 'image', type: 'image', src: 'example.png', children: [text('image-text', '')] },
+      ],
+    };
+    const document = makeDocument([paragraphWithImage]);
+    const originalElements = deepCopy(document.elements);
+
+    expectError(() => prepare(document, [{
+      kind: 'update_element_attributes',
+      target_element_id: 'p1',
+      payload: { type: 'header2' },
+    }]), 'unsupported_content', 0);
+
+    expect(document.elements).toEqual(originalElements);
+    expect(document.version).toBe(3);
+  });
+
+  it('preserves supported inline links when converting a paragraph to a heading', () => {
+    const linkedParagraph = {
+      id: 'p1',
+      type: 'paragraph',
+      children: [
+        text('p1-text', 'See '),
+        { id: 'link', type: 'link', href: 'https://example.com', children: [text('link-text', 'example')] },
+      ],
+    };
+
+    const plan = prepare(makeDocument([linkedParagraph]), [{
+      kind: 'update_element_attributes',
+      target_element_id: 'p1',
+      payload: { type: 'header2' },
+    }]);
+
+    expect(plan.elements[0].type).toBe('header2');
+    expect(plan.elements[0].children).toEqual(linkedParagraph.children);
+  });
+
+  it('rejects attribute updates for internal structural targets without side effects', () => {
+    const table = {
+      id: 'table',
+      type: 'table',
+      children: [{ id: 'row', type: 'table_row', children: [{ id: 'cell', type: 'table_cell', children: [text('cell-text', 'cell')] }] }],
+    };
+    const document = makeDocument([paragraph('p1', 'one'), table]);
+    const originalElements = deepCopy(document.elements);
+
+    expectError(() => prepare(document, [{
+      kind: 'update_element_attributes',
+      target_element_id: 'cell',
+      payload: { type: 'paragraph' },
+    }]), 'unsupported_element_type', 0);
+
+    expect(document.elements).toEqual(originalElements);
+    expect(document.version).toBe(3);
   });
 
   it('checks request shape, command count, request size and text size before applying', () => {
