@@ -32,8 +32,12 @@ class OperationsManager {
   addOperations = (docUuid, operations, version, user) => {
     this.recordOperationInMemory(docUuid, operations, version);
 
-    // Do not wait for operation-log persistence in the document operation path.
-    recordOperations(docUuid, operations, version, user);
+    // Persist in the background. Callers deliberately do not wait for this.
+    try {
+      return Promise.resolve(recordOperations(docUuid, operations, version, user));
+    } catch (error) {
+      return Promise.reject(error);
+    }
   };
 
   getLoseOperationList = async (docUuid, version) => {

@@ -12,6 +12,7 @@ import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import UsersManager from './users-manager';
+import ElementCommandManager from './element-command-manager';
 
 class DocumentManager {
 
@@ -213,6 +214,33 @@ class DocumentManager {
     return this.documents.has(docUuid);
   };
 
+  applyElementCommands = async (docUuid, docName, docTitle, username, request) => {
+    if (!this.documents.get(docUuid)) {
+      await this.getDoc(docUuid, docName, docTitle, username);
+    }
+
+    const document = this.documents.get(docUuid);
+    if (!document) {
+      const error = new Error('Document is not available for element command execution');
+      error.error_code = 'document_not_found';
+      throw error;
+    }
+
+    const elementCommandManager = new ElementCommandManager();
+    const plan = elementCommandManager.prepare(document, request);
+    const version = document.version + 1;
+
+    document.setLastModifyUser({ username });
+    document.setValue(plan.elements, version);
+
+    const operationsManager = OperationsManager.getInstance();
+    operationsManager.addOperations(docUuid, plan.operations, version, { username }).catch(err => {
+      logger.error('Save element command operations to database error:', document.docUuid, plan.operations, err);
+    });
+
+    return { version, plan };
+  };
+
   removeDocs(docUuids) {
     for (let docUuid of docUuids) {
       if (this.documents.has(docUuid)) {
@@ -300,14 +328,10 @@ class DocumentManager {
       return Promise.resolve(result);
     }
 
-    if (isExecuteSuccess) {
-      const operationsManager = OperationsManager.getInstance();
-      // Database persistence is deliberately asynchronous. The document has
-      // already advanced in memory, and the operation is cached before the
-      // write starts, so a transient database failure cannot invalidate the
-      // live document state or block other clients.
-      operationsManager.addOperations(doc_uuid, operations, document.version, user);
-    }
+    const operationsManager = OperationsManager.getInstance();
+    operationsManager.addOperations(doc_uuid, operations, document.version, user).catch(err => {
+      logger.error('Save operations to database error:', document.docUuid, operations, err);
+    });
 
     // execute operations success
     const result = {
