@@ -4,10 +4,16 @@ jest.mock('../../src/modules/sdoc/dao/operation-log', () => ({
   queryOperationCount: jest.fn(),
 }));
 
+jest.mock('../../src/modules/sdoc/api/sea-server-api', () => ({
+  getDocContent: jest.fn(),
+  saveDocContent: jest.fn(),
+}));
+
 import Document from '../../src/modules/sdoc/models/document';
 import DocumentManager from '../../src/modules/sdoc/managers/document-manager';
 import OperationsManager from '../../src/modules/sdoc/managers/operations-manager';
-import { recordOperations } from '../../src/modules/sdoc/dao/operation-log';
+import seaServerAPI from '../../src/modules/sdoc/api/sea-server-api';
+import { listPendingOperationsByDoc, recordOperations } from '../../src/modules/sdoc/dao/operation-log';
 
 const deferred = () => {
   let resolve;
@@ -40,8 +46,13 @@ describe('DocumentManager element command commits', () => {
   beforeEach(() => {
     documentManager = DocumentManager.getInstance();
     documentManager.documents.clear();
+    documentManager.documentLoadPromises.clear();
     OperationsManager.getInstance().operationListMap.clear();
+    listPendingOperationsByDoc.mockReset();
+    listPendingOperationsByDoc.mockResolvedValue([]);
     recordOperations.mockReset();
+    seaServerAPI.getDocContent.mockReset();
+    seaServerAPI.saveDocContent.mockReset();
     documentManager.documents.set('doc-1', makeDocument());
   });
 
@@ -102,6 +113,30 @@ describe('DocumentManager element command commits', () => {
     write.resolve();
   });
 
+  it('uses the loaded document instance for a cold Socket update', async () => {
+    documentManager.documents.clear();
+    recordOperations.mockResolvedValue();
+    seaServerAPI.getDocContent.mockResolvedValue({
+      data: {
+        version: 4,
+        format_version: 4,
+        last_modify_user: '',
+        elements: [{ id: 'p1', type: 'paragraph', children: [{ id: 't1', text: 'before' }] }],
+      },
+    });
+
+    const result = await documentManager.execOperationsBySocket({
+      doc_uuid: 'doc-1',
+      version: 4,
+      operations: [{ type: 'insert_text', path: [0, 0], offset: 6, text: '!' }],
+      user: { username: 'writer@example.com' },
+    }, 'test.sdoc');
+
+    expect(result).toEqual({ success: true, version: 5 });
+    expect(documentManager.documents.get('doc-1').elements[0].children[0].text).toBe('before!');
+    expect(recordOperations).toHaveBeenCalledWith('doc-1', expect.any(Array), 5, { username: 'writer@example.com' });
+  });
+
   it('uses the current document state without requiring a caller version', async () => {
     recordOperations.mockResolvedValue();
     const document = documentManager.documents.get('doc-1');
@@ -112,5 +147,51 @@ describe('DocumentManager element command commits', () => {
     expect(document.version).toBe(6);
     expect(document.elements[0].children[0].text).toBe('applied to current content');
     expect(recordOperations).toHaveBeenCalledWith('doc-1', expect.any(Array), 6, { username: 'writer@example.com' });
+  });
+
+  it('shares a cold load and applies concurrent commands to the current document instance', async () => {
+    documentManager.documents.clear();
+    recordOperations.mockResolvedValue();
+    const load = deferred();
+    seaServerAPI.getDocContent.mockReturnValue(load.promise);
+
+    const first = applyCommands(documentManager, [replaceCommand('first')]);
+    const second = applyCommands(documentManager, [replaceCommand('second')]);
+
+    expect(seaServerAPI.getDocContent).toHaveBeenCalledTimes(1);
+    load.resolve({
+      data: {
+        version: 4,
+        format_version: 4,
+        last_modify_user: '',
+        elements: [{ id: 'p1', type: 'paragraph', children: [{ id: 't1', text: 'before' }] }],
+      },
+    });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      expect.objectContaining({ version: 5 }),
+      expect.objectContaining({ version: 6 }),
+    ]);
+
+    const document = documentManager.documents.get('doc-1');
+    expect(document.version).toBe(6);
+    expect(document.elements[0].children[0].text).toBe('second');
+    expect(recordOperations).toHaveBeenNthCalledWith(1, 'doc-1', expect.any(Array), 5, { username: 'writer@example.com' });
+    expect(recordOperations).toHaveBeenNthCalledWith(2, 'doc-1', expect.any(Array), 6, { username: 'writer@example.com' });
+  });
+
+  it('does not commit a rejected text-leaf deletion', async () => {
+    const document = documentManager.documents.get('doc-1');
+    const originalElements = JSON.parse(JSON.stringify(document.elements));
+
+    await expect(applyCommands(documentManager, [{
+      kind: 'delete_element', target_element_id: 't1',
+    }])).rejects.toMatchObject({ error_code: 'unsupported_element_type', command_index: 0 });
+
+    expect(document.version).toBe(4);
+    expect(document.elements).toEqual(originalElements);
+    expect(document.getMeta().need_save).toBe(false);
+    expect(recordOperations).not.toHaveBeenCalled();
+    expect(OperationsManager.getInstance().operationListMap.has('doc-1')).toBe(false);
   });
 });

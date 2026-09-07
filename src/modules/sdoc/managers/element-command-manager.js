@@ -7,13 +7,15 @@ import { applyOperations } from '../utils/slate-utils';
 const ROOT_TYPES = ['paragraph', 'header1', 'header2', 'header3', 'header4', 'header5', 'header6', 'ordered_list', 'unordered_list'];
 const LIST_TYPES = ['ordered_list', 'unordered_list'];
 const TEXT_TYPES = ['paragraph', 'header1', 'header2', 'header3', 'header4', 'header5', 'header6'];
-const REPLACE_TEXT_TYPES = ['title', ...TEXT_TYPES];
 const INSERT_TYPES = [...TEXT_TYPES, ...LIST_TYPES, 'list_item'];
 const HEADER_TYPES = ['header1', 'header2', 'header3', 'header4', 'header5', 'header6'];
+const HEADER_INLINE_TYPES = ['link', 'sdoc_link', 'file_link', 'wiki_link'];
+const NON_ADDRESSABLE_ELEMENT_TYPES = ['code_line', 'table_row', 'table_cell', 'column'];
 
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 const isObject = value => value && typeof value === 'object' && !Array.isArray(value);
 const isString = value => typeof value === 'string';
+const isNonEmptyString = value => isString(value) && value.length > 0;
 
 export class ElementCommandError extends Error {
   constructor(errorCode, commandIndex = null) {
@@ -33,7 +35,7 @@ const buildIndex = elements => {
   const byId = new Map();
   let valid = true;
   const visit = (node, path, parent) => {
-    if (!node || !isString(node.id) || byId.has(node.id)) {
+    if (!node || !isNonEmptyString(node.id) || byId.has(node.id)) {
       valid = false;
       return;
     }
@@ -46,9 +48,12 @@ const buildIndex = elements => {
   return { byId, valid };
 };
 
-const isTextLeaf = node => isObject(node) && isString(node.id) && isString(node.text) && !hasOwn(node, 'type') && !hasOwn(node, 'children');
+const isTextLeaf = node => isObject(node) && isNonEmptyString(node.id) && isString(node.text) && !hasOwn(node, 'type') && !hasOwn(node, 'children');
 
 const childrenAreSimpleText = node => Array.isArray(node.children) && node.children.length > 0 && node.children.every(isTextLeaf);
+
+const childrenAreValidForHeader = node => Array.isArray(node.children) && node.children.length > 0 &&
+  node.children.every(child => isTextLeaf(child) || HEADER_INLINE_TYPES.includes(child.type));
 
 const isAllowedChild = (parent, childType) => {
   if (!parent) return ROOT_TYPES.includes(childType);
@@ -61,7 +66,7 @@ const validateDocument = elements => {
   if (!Array.isArray(elements) || elements.length === 0) return false;
   const ids = new Set();
   const visit = (node, parent, isRoot) => {
-    if (!node || !isString(node.id) || ids.has(node.id)) return false;
+    if (!node || !isNonEmptyString(node.id) || ids.has(node.id)) return false;
     ids.add(node.id);
     if (hasOwn(node, 'text')) return isTextLeaf(node);
     if (!isString(node.type) || !Array.isArray(node.children) || node.children.length === 0) return false;
@@ -116,7 +121,7 @@ class ElementCommandManager {
     const clientRefs = new Map();
     const operations = [];
     const commandResults = [];
-    const elementIdMappings = {};
+    const elementIdMappings = Object.create(null);
     const afterAnchorInsertions = new Map();
     const prependInsertions = new Map();
 
@@ -164,10 +169,10 @@ class ElementCommandManager {
     };
   }
 
-  resolveTarget(command, commandIndex, elements, clientRefs) {
+  resolveTarget(command, commandIndex, elements, clientRefs, unsupportedErrorCode = 'unsupported_element_type') {
     const hasId = hasOwn(command, 'target_element_id');
     const hasRef = hasOwn(command, 'target_ref');
-    if (hasId === hasRef || (hasId && !isString(command.target_element_id)) || (hasRef && !isString(command.target_ref))) invalid(commandIndex);
+    if (hasId === hasRef || (hasId && !isNonEmptyString(command.target_element_id)) || (hasRef && !isNonEmptyString(command.target_ref))) invalid(commandIndex);
     const id = hasId ? command.target_element_id : clientRefs.get(command.target_ref);
     if (!id) {
       if (hasRef) invalid(commandIndex);
@@ -176,6 +181,7 @@ class ElementCommandManager {
     const index = buildIndex(elements);
     const target = index.byId.get(id);
     if (!target) throw new ElementCommandError('element_not_found', commandIndex);
+    this.assertDirectlyAddressableTarget(target, commandIndex, unsupportedErrorCode);
     return target;
   }
 
@@ -200,7 +206,7 @@ class ElementCommandManager {
 
     const hasParentId = hasOwn(command, 'parent_element_id');
     const hasParentRef = hasOwn(command, 'parent_ref');
-    if (hasParentId === hasParentRef || (hasParentId && command.parent_element_id !== null && !isString(command.parent_element_id)) || (hasParentRef && !isString(command.parent_ref))) invalid(commandIndex);
+    if (hasParentId === hasParentRef || (hasParentId && command.parent_element_id !== null && !isNonEmptyString(command.parent_element_id)) || (hasParentRef && !isNonEmptyString(command.parent_ref))) invalid(commandIndex);
     const parentId = hasParentRef ? clientRefs.get(command.parent_ref) : command.parent_element_id;
     if (hasParentRef && !parentId) invalid(commandIndex);
     const index = buildIndex(elements);
@@ -228,7 +234,7 @@ class ElementCommandManager {
       }
     } else {
       const anchorId = hasOwn(command, 'before_element_id') ? command.before_element_id : command.after_element_id;
-      if (!isString(anchorId) || !initialIds.has(anchorId)) throw new ElementCommandError('invalid_anchor', commandIndex);
+      if (!isNonEmptyString(anchorId) || !initialIds.has(anchorId)) throw new ElementCommandError('invalid_anchor', commandIndex);
       const anchor = index.byId.get(anchorId);
       if (!anchor || anchor.parent !== (parent && parent.node)) throw new ElementCommandError('invalid_anchor', commandIndex);
       const anchorIndex = siblings.indexOf(anchor.node);
@@ -264,10 +270,6 @@ class ElementCommandManager {
   prepareDelete(command, commandIndex, elements, clientRefs, operations, commandResults) {
     this.assertCommandKeys(command, commandIndex, ['kind', 'target_element_id', 'target_ref']);
     const target = this.resolveTarget(command, commandIndex, elements, clientRefs);
-    if (target.node.type === 'table_row' || target.node.type === 'table_cell' ||
-      (target.node.type === 'group' && target.parent && ['table', 'table_row'].includes(target.parent.type))) {
-      throw new ElementCommandError('unsupported_element_type', commandIndex);
-    }
     if (!target.parent) {
       elements.splice(target.path[0], 1);
     } else {
@@ -281,8 +283,8 @@ class ElementCommandManager {
     this.assertCommandKeys(command, commandIndex, ['kind', 'target_element_id', 'target_ref', 'payload']);
     if (!isObject(command.payload) || !isString(command.payload.text) || Object.keys(command.payload).length !== 1) invalid(commandIndex);
     if (byteLength(command.payload.text) > ELEMENT_COMMAND_LIMITS.MAX_TEXT_BYTES) throw new ElementCommandError('batch_limit_exceeded', commandIndex);
-    const target = this.resolveTarget(command, commandIndex, elements, clientRefs);
-    if (![...REPLACE_TEXT_TYPES, 'table_cell'].includes(target.node.type)) throw new ElementCommandError('unsupported_content', commandIndex);
+    const target = this.resolveTarget(command, commandIndex, elements, clientRefs, 'unsupported_content');
+    if (!TEXT_TYPES.includes(target.node.type)) throw new ElementCommandError('unsupported_content', commandIndex);
     if (!childrenAreSimpleText(target.node)) throw new ElementCommandError('unsupported_content', commandIndex);
     const oldChildren = target.node.children;
     for (let index = oldChildren.length - 1; index >= 0; index--) {
@@ -304,6 +306,9 @@ class ElementCommandManager {
     const listConversion = LIST_TYPES.includes(oldType) && LIST_TYPES.includes(newType);
     if (!textConversion && !listConversion) throw new ElementCommandError('unsupported_element_type', commandIndex);
     if (!isAllowedChild(target.parent, newType)) throw new ElementCommandError('invalid_parent_child', commandIndex);
+    if (HEADER_TYPES.includes(newType) && !childrenAreValidForHeader(target.node)) {
+      throw new ElementCommandError('unsupported_content', commandIndex);
+    }
     target.node.type = newType;
     operations.push({ type: 'set_node', path: target.path, properties: { type: oldType }, newProperties: { type: newType } });
     commandResults.push({ command_index: commandIndex, target_element_id: target.node.id });
@@ -311,6 +316,15 @@ class ElementCommandManager {
 
   assertCommandKeys(command, commandIndex, allowedKeys) {
     if (Object.keys(command).some(key => !allowedKeys.includes(key))) invalid(commandIndex);
+  }
+
+  assertDirectlyAddressableTarget(target, commandIndex, unsupportedErrorCode) {
+    // Text leaves and structural internals are managed through their owning element's command.
+    const { node, parent } = target;
+    if (isTextLeaf(node) || !isString(node.type) || NON_ADDRESSABLE_ELEMENT_TYPES.includes(node.type) ||
+      (node.type === 'group' && parent && ['table', 'table_row'].includes(parent.type))) {
+      throw new ElementCommandError(unsupportedErrorCode, commandIndex);
+    }
   }
 }
 
