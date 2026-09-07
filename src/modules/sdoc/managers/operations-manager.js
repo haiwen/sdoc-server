@@ -17,12 +17,8 @@ class OperationsManager {
     return this.instance;
   };
 
-  addOperations = async (docUuid, operations, version, user) => {
-    // Save current operations into database
-    await recordOperations(docUuid, operations, version, user);
-    this.operationCountSinceUp++;
-
-    // Record current operations into memory
+  addOperations = (docUuid, operations, version, user) => {
+    // Keep recent operations available for version catch-up immediately.
     let operationList = this.operationListMap.get(docUuid) || [];
     let item = {operations, version};
     operationList.push(item);
@@ -30,6 +26,15 @@ class OperationsManager {
       operationList = operationList.slice(OPERATIONS_CACHE_LIMIT / 10);
     }
     this.operationListMap.set(docUuid, operationList);
+
+    // Persist in the background. Callers deliberately do not wait for this.
+    try {
+      return Promise.resolve(recordOperations(docUuid, operations, version, user)).then(() => {
+        this.operationCountSinceUp++;
+      });
+    } catch (error) {
+      return Promise.reject(error);
+    }
   };
 
   getLoseOperationList = async (docUuid, version) => {

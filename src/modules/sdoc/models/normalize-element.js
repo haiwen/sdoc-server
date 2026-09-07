@@ -56,6 +56,17 @@ export const FIRST_LEVEL_ELEMENT_TYPES = [
   'divider',
 ];
 
+// These structural child types are normalized without filtering. They are also
+// used by APIs that must validate existing documents without normalizing them.
+export const STRUCTURAL_CHILD_TYPES = {
+  ordered_list: ['list_item', 'group'],
+  unordered_list: ['list_item', 'group'],
+  list_item: ['paragraph', 'unordered_list', 'ordered_list', 'group', 'code_block'],
+  code_block: ['code_line', 'group'],
+  table: ['table_row', 'group'],
+  table_row: ['table_cell', 'group'],
+};
+
 const TOGGLE_CONTENT_CHILDREN_TYPES = FIRST_LEVEL_ELEMENT_TYPES.filter(item => {
   return !['toggle_content', 'toggle_header1', 'toggle_header2', 'toggle_header3'].includes(item);
 });
@@ -71,8 +82,7 @@ const isElementNeedChildrenAttributes = (element) => {
  * @param {*} childType child type
  * @returns
  */
-const formatElementChildren = (children, childType) => {
-  const validChildrenTypes = [childType, 'group'];
+const formatElementChildren = (children, childType, validChildrenTypes = [childType, 'group']) => {
   const defaultChildren = [{
     id: v4(),
     type: childType,
@@ -94,7 +104,7 @@ const formatListItemChildren = (children) => {
   if (!children || !Array.isArray(children) || children.length === 0) {
     return defaultChildren;
   }
-  const types = ['paragraph', 'unordered_list', 'ordered_list', 'group', 'code_block'];
+  const types = STRUCTURAL_CHILD_TYPES.list_item;
   const newChildren = children.filter(item => item.type && types.includes(item.type));
   return newChildren.length === 0 ? defaultChildren : newChildren;
 };
@@ -217,7 +227,7 @@ export const normalizeElement = (element) => {
     }
     case 'ordered_list':
     case 'unordered_list': {
-      const validChildren = formatElementChildren(children, 'list_item');
+      const validChildren = formatElementChildren(children, 'list_item', STRUCTURAL_CHILD_TYPES[type]);
       element.children = validChildren.map(element => normalizeElement(element));
       break;
     }
@@ -232,7 +242,7 @@ export const normalizeElement = (element) => {
       break;
     }
     case 'code_block': {
-      const validChildren = formatElementChildren(children, 'code_line');
+      const validChildren = formatElementChildren(children, 'code_line', STRUCTURAL_CHILD_TYPES[type]);
       element.children = validChildren.map(element => normalizeElement(element));
       break;
     }
@@ -242,12 +252,12 @@ export const normalizeElement = (element) => {
       break;
     }
     case 'table': {
-      const validChildren = formatElementChildren(children, 'table_row');
+      const validChildren = formatElementChildren(children, 'table_row', STRUCTURAL_CHILD_TYPES[type]);
       element.children = validChildren.map(element => normalizeElement(element));
       break;
     }
     case 'table_row': {
-      const validChildren = formatElementChildren(children, 'table_cell');
+      const validChildren = formatElementChildren(children, 'table_cell', STRUCTURAL_CHILD_TYPES[type]);
       element.children = validChildren.map(element => normalizeElement(element));
       break;
     }

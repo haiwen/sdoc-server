@@ -7,6 +7,53 @@ import IOHelper from "../wio/io-helper";
 
 class DocumentController {
 
+  async applyElementCommands(req, res) {
+    const { doc_uuid: docUuid } = req.params;
+    const { file_uuid: fileUuid, permission, username, filename: docName, default_title: docTitle } = req.payload || {};
+
+    if (fileUuid !== docUuid || permission !== 'rw' || !username) {
+      res.status(403).send({
+        error_code: 'permission_denied',
+        command_index: null,
+      });
+      return;
+    }
+
+    const documentManager = DocumentManager.getInstance();
+    try {
+      const result = await documentManager.applyElementCommands(docUuid, docName, docTitle, username, req.body);
+
+      if (IOHelper.hasInstance()) {
+        try {
+          const ioHelper = IOHelper.getInstance();
+          ioHelper.sendDocumentUpdate(docUuid, {
+            operations: result.plan.operations,
+            version: result.version,
+            user: { username },
+          });
+        } catch (err) {
+          logger.error(`Broadcast element command update for ${docUuid} failed`, err);
+        }
+      }
+
+      res.status(200).send({
+        applied_document_version: result.version,
+        command_results: result.plan.commandResults,
+        element_id_mappings: result.plan.elementIdMappings,
+      });
+    } catch (err) {
+      const errorCode = err.error_code || 'apply_failed';
+      const status = errorCode === 'document_not_found' ? 404 : errorCode === 'apply_failed' ? 500 : 400;
+      if (errorCode === 'apply_failed') {
+        logger.error(err.message);
+      }
+      res.status(status).send({
+        error_code: errorCode,
+        command_index: err.command_index === undefined ? null : err.command_index,
+      });
+    }
+  }
+
   async loadDocContent(req, res) {
     const { file_uuid: docUuid, filename: docName, username, default_title: docTitle } = req.payload;
     try {
