@@ -17,14 +17,12 @@ app.use(elementCommandPath, (err, req, res, next) => {
   if (err.type === 'entity.too.large') {
     res.status(413).send({
       error_code: 'batch_limit_exceeded',
-      command_index: null,
     });
     return;
   }
   if (err.type === 'entity.parse.failed') {
     res.status(400).send({
       error_code: 'invalid_request',
-      command_index: null,
     });
     return;
   }

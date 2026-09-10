@@ -27,6 +27,22 @@ const HEADER_TYPES = ['header1', 'header2', 'header3', 'header4', 'header5', 'he
 const HEADER_INLINE_TYPES = ['link', 'sdoc_link', 'file_link', 'wiki_link'];
 const NON_ADDRESSABLE_ELEMENT_TYPES = ['code_line', 'table_row', 'table_cell', 'column'];
 const MEDIA_ELEMENT_TYPES = ['image', 'image_block', 'video', 'file_view', 'embed_link'];
+const DELETE_TARGET_TYPES = [
+  ...TEXT_TYPES,
+  ...LIST_TYPES,
+  'list_item',
+  ...BLOCK_CONTAINER_TYPES,
+  'check_list_item',
+  'code_block',
+  'table',
+  'multi_column',
+  ...MEDIA_ELEMENT_TYPES,
+  'link',
+  'sdoc_link',
+  'file_link',
+  'wiki_link',
+  'mention',
+];
 const CALLOUT_BACKGROUND_COLORS = [
   '#f1f3f6', '#e1e9fe', '#def0ff', '#e7f9ee', '#eaf7d6',
   '#fef7e0', '#fff1e8', '#ffe6e3', '#ffe9f2', '#fde8ff',
@@ -36,6 +52,10 @@ const CODE_LANGUAGES = [
   'java', 'json', 'php', 'python', 'ruby', 'sql', 'swift', 'typescript', 'xml', 'yaml',
 ];
 const CODE_WHITE_SPACES = ['nowrap', 'normal'];
+const ELEMENT_COMMAND_STRUCTURAL_CHILD_TYPES = {
+  ...STRUCTURAL_CHILD_TYPES,
+  multi_column: ['column'],
+};
 
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 const isObject = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -99,10 +119,10 @@ const validateDocument = elements => {
   const visit = (node, parent, isRoot) => {
     if (!node || !isNonEmptyString(node.id) || ids.has(node.id)) return false;
     ids.add(node.id);
-    if (hasOwn(node, 'text')) return isTextLeaf(node);
+    if (hasOwn(node, 'text')) return !isRoot && isTextLeaf(node);
     if (!isString(node.type) || !Array.isArray(node.children) || node.children.length === 0) return false;
-    if (isRoot && !FIRST_LEVEL_ELEMENT_TYPES.includes(node.type)) return false;
-    const allowedChildTypes = STRUCTURAL_CHILD_TYPES[node.type];
+    if (isRoot && (!FIRST_LEVEL_ELEMENT_TYPES.includes(node.type) || node.type === 'column')) return false;
+    const allowedChildTypes = ELEMENT_COMMAND_STRUCTURAL_CHILD_TYPES[node.type];
     if (allowedChildTypes && !node.children.every(child => allowedChildTypes.includes(child.type))) return false;
     return node.children.every(child => visit(child, node, false));
   };
@@ -353,6 +373,9 @@ class ElementCommandManager {
   prepareDelete(command, commandIndex, elements, clientRefs, operations, commandResults) {
     this.assertCommandKeys(command, commandIndex, ['kind', 'target_element_id', 'target_ref']);
     const target = this.resolveTarget(command, commandIndex, elements, clientRefs);
+    if (!DELETE_TARGET_TYPES.includes(target.node.type)) {
+      throw new ElementCommandError('unsupported_element_type', commandIndex);
+    }
     if (!target.parent) {
       elements.splice(target.path[0], 1);
     } else {

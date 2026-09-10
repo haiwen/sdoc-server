@@ -235,6 +235,70 @@ describe('ElementCommandManager', () => {
     expect(document.version).toBe(3);
   });
 
+  it('validates multi-column structure without exposing columns as direct targets', () => {
+    const multiColumn = {
+      id: 'multi-column',
+      type: 'multi_column',
+      children: [{
+        id: 'column',
+        type: 'column',
+        children: [
+          paragraph('column-paragraph', 'column'),
+          {
+            id: 'column-list',
+            type: 'unordered_list',
+            children: [{ id: 'column-list-item', type: 'list_item', children: [paragraph('column-list-paragraph', 'item')] }],
+          },
+          {
+            id: 'column-callout',
+            type: 'callout',
+            children: [paragraph('column-callout-paragraph', 'note')],
+          },
+          {
+            id: 'column-code-block',
+            type: 'code_block',
+            children: [{ id: 'column-code-line', type: 'code_line', children: [text('column-code-text', 'code')] }],
+          },
+        ],
+      }],
+    };
+    const validDocument = makeDocument([paragraph('p1', 'one'), multiColumn]);
+    const plan = prepare(validDocument, [{
+      kind: 'replace_element_content', target_element_id: 'p1', payload: { text: 'updated' },
+    }]);
+
+    expect(plan.elements[0].children[0].text).toBe('updated');
+    expect(plan.elements[1]).toEqual(multiColumn);
+    expectError(() => prepare(validDocument, [{
+      kind: 'delete_element', target_element_id: 'column',
+    }]), 'unsupported_element_type', 0);
+  });
+
+  it.each([
+    ['a paragraph directly under multi-column', [
+      paragraph('p1', 'one'),
+      { id: 'multi-column', type: 'multi_column', children: [paragraph('invalid-child', 'invalid')] },
+    ]],
+    ['a root-level column', [
+      paragraph('p1', 'one'),
+      { id: 'column', type: 'column', children: [paragraph('column-paragraph', 'column')] },
+    ]],
+    ['a root-level text leaf', [
+      paragraph('p1', 'one'),
+      text('root-text', 'invalid'),
+    ]],
+  ])('rejects documents with %s without side effects', (description, elements) => {
+    const document = makeDocument(elements);
+    const originalElements = deepCopy(document.elements);
+
+    expectError(() => prepare(document, [{
+      kind: 'replace_element_content', target_element_id: 'p1', payload: { text: 'updated' },
+    }]), 'apply_failed', null);
+
+    expect(document.elements).toEqual(originalElements);
+    expect(document.version).toBe(3);
+  });
+
   it('applies direct-target restrictions to targets resolved by client reference', () => {
     const manager = new ElementCommandManager();
     const elements = [{ id: 'code-block', type: 'code_block', children: [{ id: 'code-line', type: 'code_line', children: [text('code-text', 'code')] }] }];
@@ -350,6 +414,18 @@ describe('ElementCommandManager', () => {
     const plan = prepare(document, [{ kind: 'delete_element', target_element_id: 'video' }]);
     expect(plan.elements.map(element => element.id)).toEqual(['p1', 'image-paragraph']);
     expect(plan.operations).toEqual([expect.objectContaining({ type: 'remove_node', path: [2] })]);
+  });
+
+  it('rejects direct deletion of groups and element types outside the delete allowlist', () => {
+    const group = { id: 'group', type: 'group', children: [paragraph('group-p', 'group')] };
+    const whiteboard = { id: 'whiteboard', type: 'whiteboard', children: [text('whiteboard-text', '')] };
+    const document = makeDocument([paragraph('p1', 'one'), group, whiteboard]);
+
+    ['group', 'whiteboard'].forEach(targetElementId => {
+      expectError(() => prepare(document, [{
+        kind: 'delete_element', target_element_id: targetElementId,
+      }]), 'unsupported_element_type', 0);
+    });
   });
 
   it('creates blockquotes, callouts, checklist items and code blocks with canonical structures', () => {

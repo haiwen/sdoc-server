@@ -11,10 +11,9 @@ class DocumentController {
     const { doc_uuid: docUuid } = req.params;
     const { file_uuid: fileUuid, permission, username, filename: docName, default_title: docTitle } = req.payload || {};
 
-    if (fileUuid !== docUuid || permission !== 'rw' || !username) {
+    if (fileUuid !== docUuid || permission !== 'rw' || typeof username !== 'string' || username.length === 0) {
       res.status(403).send({
         error_code: 'permission_denied',
-        command_index: null,
       });
       return;
     }
@@ -47,10 +46,11 @@ class DocumentController {
       if (errorCode === 'apply_failed') {
         logger.error(err.message);
       }
-      res.status(status).send({
-        error_code: errorCode,
-        command_index: err.command_index === undefined ? null : err.command_index,
-      });
+      const response = { error_code: errorCode };
+      if (Number.isInteger(err.command_index)) {
+        response.command_index = err.command_index;
+      }
+      res.status(status).send(response);
     }
   }
 

@@ -2,7 +2,7 @@ import http from 'http';
 import app from '../src/app';
 import { BASE_URL_VERSION1, ELEMENT_COMMAND_LIMITS } from '../src/modules/sdoc/constants';
 
-const postJson = (server, path, body) => new Promise((resolve, reject) => {
+const postJson = (server, path, body, headers = {}) => new Promise((resolve, reject) => {
   const address = server.address();
   const request = http.request({
     hostname: '127.0.0.1',
@@ -12,6 +12,7 @@ const postJson = (server, path, body) => new Promise((resolve, reject) => {
     headers: {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body),
+      ...headers,
     },
   }, response => {
     let responseBody = '';
@@ -46,7 +47,6 @@ describe('Element Command request body limit', () => {
     expect(response.status).toBe(413);
     expect(JSON.parse(response.body)).toEqual({
       error_code: 'batch_limit_exceeded',
-      command_index: null,
     });
   });
 
@@ -56,7 +56,6 @@ describe('Element Command request body limit', () => {
     expect(response.status).toBe(400);
     expect(JSON.parse(response.body)).toEqual({
       error_code: 'invalid_request',
-      command_index: null,
     });
   });
 
@@ -66,5 +65,30 @@ describe('Element Command request body limit', () => {
     const response = await postJson(server, `${BASE_URL_VERSION1}/doc-1/element-commands`, body);
 
     expect(response.status).toBe(403);
+    expect(JSON.parse(response.body)).toEqual({ error_code: 'permission_denied' });
   });
+
+  it('returns the route-specific permission error for an invalid token', async () => {
+    const body = JSON.stringify({ commands: [] });
+
+    const response = await postJson(server, `${BASE_URL_VERSION1}/doc-1/element-commands`, body, {
+      Authorization: 'Bearer invalid-token',
+    });
+
+    expect(response.status).toBe(403);
+    expect(JSON.parse(response.body)).toEqual({ error_code: 'permission_denied' });
+  });
+
+  it.each([
+    [`${BASE_URL_VERSION1}/doc-1/element-commands?source=test`, { error_code: 'permission_denied' }],
+    [`${BASE_URL_VERSION1}/doc-1/element-commands/`, { error_code: 'permission_denied' }],
+    ['/api/v1/files/doc-1/element-commands', { error_msg: 'You don\'t have permission to access.' }],
+    [`${BASE_URL_VERSION1}/doc-1/`, { error_msg: 'You don\'t have permission to access.' }],
+  ])('uses the expected authentication error for %s', async (path, expectedBody) => {
+    const response = await postJson(server, path, JSON.stringify({ commands: [] }));
+
+    expect(response.status).toBe(403);
+    expect(JSON.parse(response.body)).toEqual(expectedBody);
+  });
+
 });
