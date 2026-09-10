@@ -356,21 +356,16 @@ class DocumentManager {
       return Promise.resolve(result);
     }
 
-    try {
-      const operationsManager = OperationsManager.getInstance();
-      await operationsManager.addOperations(doc_uuid, operations, document.version, user);
-    } catch(e) {
+    const appliedVersion = document.version;
+    const operationsManager = OperationsManager.getInstance();
+    operationsManager.addOperationsInBackground(doc_uuid, operations, appliedVersion, user).catch(() => {
       logger.error('Save operations to database error:', document.docUuid, operations);
-      return Promise.resolve({
-        success: false,
-        error_type: 'save_operations_to_database_error',
-      });
-    }
+    });
 
     // execute operations success
     const result = {
       success: true,
-      version: document.version,
+      version: appliedVersion,
     };
     return Promise.resolve(result);
 

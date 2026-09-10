@@ -18,12 +18,12 @@ import OperationsManager from '../../src/modules/sdoc/managers/operations-manage
 
 describe('DocumentManager operation handling', () => {
   let documentManager;
-  let addOperations;
+  let addOperationsInBackground;
 
   beforeEach(() => {
     documentManager = new DocumentManager();
-    addOperations = jest.fn(() => new Promise(() => {}));
-    OperationsManager.getInstance.mockReturnValue({addOperations});
+    addOperationsInBackground = jest.fn(() => new Promise(() => {}));
+    OperationsManager.getInstance.mockReturnValue({addOperationsInBackground});
   });
 
   it('returns success and keeps the advanced document state while persistence runs asynchronously', async () => {
@@ -45,7 +45,7 @@ describe('DocumentManager operation handling', () => {
       version: 8,
     });
     expect(document.version).toBe(8);
-    expect(addOperations).toHaveBeenCalledWith(
+    expect(addOperationsInBackground).toHaveBeenCalledWith(
       'doc-1',
       [{type: 'insert_text', text: 'hello'}],
       8,

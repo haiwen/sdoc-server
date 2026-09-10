@@ -17,10 +17,12 @@ import { listPendingOperationsByDoc, recordOperations } from '../../src/modules/
 
 const deferred = () => {
   let resolve;
-  const promise = new Promise(resolvePromise => {
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
     resolve = resolvePromise;
+    reject = rejectPromise;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 };
 
 const makeDocument = () => new Document('doc-1', 'test.sdoc', {
@@ -97,28 +99,28 @@ describe('DocumentManager element command commits', () => {
     expect(OperationsManager.getInstance().operationListMap.has('doc-1')).toBe(true);
   });
 
-  it('waits for operation log persistence before returning Socket success', async () => {
+  it('returns Socket success immediately and preserves in-memory version order while persistence is pending', async () => {
     const write = deferred();
     recordOperations.mockReturnValue(write.promise);
 
-    let settled = false;
     const resultPromise = documentManager.execOperationsBySocket({
       doc_uuid: 'doc-1',
       version: 4,
       operations: [{ type: 'insert_text', path: [0, 0], offset: 6, text: '!' }],
       user: { username: 'writer@example.com' },
     }, 'test.sdoc');
-    resultPromise.then(() => { settled = true; });
 
-    await Promise.resolve();
-    expect(recordOperations).toHaveBeenCalledTimes(1);
-    expect(settled).toBe(false);
-    write.resolve();
     await expect(resultPromise).resolves.toEqual({ success: true, version: 5 });
+    expect(recordOperations).toHaveBeenCalledTimes(1);
+    await expect(applyCommands(documentManager, [replaceCommand('after')])).resolves.toMatchObject({ version: 6 });
+    expect(OperationsManager.getInstance().operationListMap.get('doc-1').map(item => item.version)).toEqual([5, 6]);
+
+    write.resolve();
   });
 
-  it('returns the existing Socket persistence error when recording operations fails', async () => {
-    recordOperations.mockRejectedValue(new Error('database unavailable'));
+  it('keeps Socket success and the in-memory operation when background persistence fails', async () => {
+    const write = deferred();
+    recordOperations.mockReturnValue(write.promise);
 
     const result = await documentManager.execOperationsBySocket({
       doc_uuid: 'doc-1',
@@ -127,7 +129,12 @@ describe('DocumentManager element command commits', () => {
       user: { username: 'writer@example.com' },
     }, 'test.sdoc');
 
-    expect(result).toEqual({ success: false, error_type: 'save_operations_to_database_error' });
+    expect(result).toEqual({ success: true, version: 5 });
+    expect(documentManager.documents.get('doc-1').elements[0].children[0].text).toBe('before!');
+    expect(OperationsManager.getInstance().operationListMap.get('doc-1').map(item => item.version)).toEqual([5]);
+
+    write.reject(new Error('database unavailable'));
+    await Promise.resolve();
   });
 
   it('uses the loaded document instance for a cold Socket update', async () => {
