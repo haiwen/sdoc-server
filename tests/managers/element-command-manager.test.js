@@ -327,6 +327,156 @@ describe('ElementCommandManager', () => {
     }]), 'unsupported_content', 0);
   });
 
+  it('preserves the media boundary while allowing document-node deletion', () => {
+    const inlineImage = { id: 'image', type: 'image', data: { src: 'image.png' }, children: [text('image-text', '')] };
+    const imageParagraph = {
+      id: 'image-paragraph',
+      type: 'paragraph',
+      children: [text('before-image', 'before'), inlineImage, text('after-image', 'after')],
+    };
+    const video = { id: 'video', type: 'video', data: { src: 'video.mp4' }, children: [text('video-text', '')] };
+    const document = makeDocument([paragraph('p1', 'one'), imageParagraph, video]);
+
+    expectError(() => prepare(document, [{
+      kind: 'insert_element', parent_element_id: null, position: 'append', payload: { type: 'image_block' },
+    }]), 'unsupported_element_type', 0);
+    expectError(() => prepare(document, [{
+      kind: 'replace_element_content', target_element_id: 'image', payload: { text: 'replacement' },
+    }]), 'unsupported_content', 0);
+    expectError(() => prepare(document, [{
+      kind: 'update_element_attributes', target_element_id: 'video', payload: { type: 'paragraph' },
+    }]), 'unsupported_element_type', 0);
+
+    const plan = prepare(document, [{ kind: 'delete_element', target_element_id: 'video' }]);
+    expect(plan.elements.map(element => element.id)).toEqual(['p1', 'image-paragraph']);
+    expect(plan.operations).toEqual([expect.objectContaining({ type: 'remove_node', path: [2] })]);
+  });
+
+  it('creates blockquotes, callouts, checklist items and code blocks with canonical structures', () => {
+    const plan = prepare(makeDocument(), [
+      { kind: 'insert_element', client_ref: 'quote', parent_element_id: null, position: 'append', payload: { type: 'blockquote', text: 'Quoted text' } },
+      { kind: 'insert_element', client_ref: 'callout', parent_element_id: null, position: 'append', payload: { type: 'callout', text: 'Important', background_color: '#e1e9fe' } },
+      { kind: 'insert_element', client_ref: 'task', parent_element_id: null, position: 'append', payload: { type: 'check_list_item', text: 'Ship it', checked: true } },
+      { kind: 'insert_element', client_ref: 'code', parent_element_id: null, position: 'append', payload: { type: 'code_block', text: 'const a = 1;\n\nreturn a;', language: 'javascript', white_space: 'normal' } },
+    ]);
+    const [blockquote, callout, checklist, codeBlock] = plan.elements.slice(-4);
+
+    expect(blockquote).toEqual(expect.objectContaining({
+      type: 'blockquote',
+      children: [expect.objectContaining({ type: 'paragraph', children: [expect.objectContaining({ text: 'Quoted text' })] })],
+    }));
+    expect(callout).toEqual(expect.objectContaining({
+      type: 'callout',
+      style: { background_color: '#e1e9fe' },
+      children: [expect.objectContaining({ type: 'paragraph', children: [expect.objectContaining({ text: 'Important' })] })],
+    }));
+    expect(checklist).toEqual(expect.objectContaining({
+      type: 'check_list_item', checked: true, children: [expect.objectContaining({ text: 'Ship it' })],
+    }));
+    expect(codeBlock).toEqual(expect.objectContaining({
+      type: 'code_block',
+      language: 'javascript',
+      style: { white_space: 'normal' },
+    }));
+    expect(codeBlock.children.map(line => line.children[0].text)).toEqual(['const a = 1;', '', 'return a;']);
+  });
+
+  it('uses specification defaults for callouts, checklist items and code blocks', () => {
+    const plan = prepare(makeDocument(), [
+      { kind: 'insert_element', parent_element_id: null, position: 'append', payload: { type: 'callout', text: '' } },
+      { kind: 'insert_element', parent_element_id: null, position: 'append', payload: { type: 'check_list_item', text: '' } },
+      { kind: 'insert_element', parent_element_id: null, position: 'append', payload: { type: 'code_block', text: '' } },
+    ]);
+    const [callout, checklist, codeBlock] = plan.elements.slice(-3);
+
+    expect(callout.style).toEqual({ background_color: '#fef7e0' });
+    expect(checklist.checked).toBe(false);
+    expect(codeBlock.language).toBe('plaintext');
+    expect(codeBlock.style).toEqual({ white_space: 'nowrap' });
+    expect(codeBlock.children).toHaveLength(1);
+    expect(codeBlock.children[0].children[0].text).toBe('');
+  });
+
+  it('replaces simple content in blockquotes, callouts, checklist items and code blocks', () => {
+    const blockquote = { id: 'quote', type: 'blockquote', children: [paragraph('quote-p', 'old quote')] };
+    const callout = { id: 'callout', type: 'callout', style: { background_color: '#fef7e0' }, children: [paragraph('callout-p', 'old callout')] };
+    const checklist = { id: 'task', type: 'check_list_item', checked: false, children: [text('task-text', 'old task')] };
+    const codeBlock = {
+      id: 'code', type: 'code_block', language: 'plaintext', style: { white_space: 'nowrap' },
+      children: [{ id: 'line', type: 'code_line', children: [text('line-text', 'old code')] }],
+    };
+    const document = makeDocument([blockquote, callout, checklist, codeBlock]);
+    const plan = prepare(document, [
+      { kind: 'replace_element_content', target_element_id: 'quote', payload: { text: 'new quote' } },
+      { kind: 'replace_element_content', target_element_id: 'callout', payload: { text: 'new callout' } },
+      { kind: 'replace_element_content', target_element_id: 'task', payload: { text: 'new task' } },
+      { kind: 'replace_element_content', target_element_id: 'code', payload: { text: 'line one\nline two' } },
+    ]);
+
+    expect(plan.elements[0].children[0].children[0].text).toBe('new quote');
+    expect(plan.elements[1].children[0].children[0].text).toBe('new callout');
+    expect(plan.elements[2].children[0].text).toBe('new task');
+    expect(plan.elements[3].children.map(line => line.children[0].text)).toEqual(['line one', 'line two']);
+
+    const replay = {
+      version: document.version,
+      elements: deepCopy(document.elements),
+      setLastModifyUser: () => {},
+      setValue(elements) {
+        this.elements = elements;
+      },
+    };
+    expect(applyOperations(replay, deepCopy(plan.operations), { username: 'writer@example.com' })).toBe(true);
+    expect(replay.elements).toEqual(plan.elements);
+  });
+
+  it('updates checklist, callout and code-block attributes through type-specific whitelists', () => {
+    const callout = { id: 'callout', type: 'callout', style: { background_color: '#fef7e0' }, children: [paragraph('callout-p', 'note')] };
+    const checklist = { id: 'task', type: 'check_list_item', checked: false, children: [text('task-text', 'task')] };
+    const codeBlock = {
+      id: 'code', type: 'code_block', language: 'plaintext', style: { white_space: 'nowrap' },
+      children: [{ id: 'line', type: 'code_line', children: [text('line-text', 'code')] }],
+    };
+    const plan = prepare(makeDocument([callout, checklist, codeBlock]), [
+      { kind: 'update_element_attributes', target_element_id: 'callout', payload: { background_color: '#ffe6e3' } },
+      { kind: 'update_element_attributes', target_element_id: 'task', payload: { checked: true } },
+      { kind: 'update_element_attributes', target_element_id: 'code', payload: { language: 'python', white_space: 'normal' } },
+    ]);
+
+    expect(plan.elements[0].style.background_color).toBe('#ffe6e3');
+    expect(plan.elements[1].checked).toBe(true);
+    expect(plan.elements[2]).toEqual(expect.objectContaining({ language: 'python', style: { white_space: 'normal' } }));
+    expect(plan.operations.slice(-3)).toEqual([
+      expect.objectContaining({ type: 'set_node', newProperties: { style: { background_color: '#ffe6e3' } } }),
+      expect.objectContaining({ type: 'set_node', newProperties: { checked: true } }),
+      expect.objectContaining({ type: 'set_node', newProperties: { language: 'python', style: { white_space: 'normal' } } }),
+    ]);
+  });
+
+  it('rejects invalid extended-format payloads and complex container content', () => {
+    const complexQuote = {
+      id: 'quote',
+      type: 'blockquote',
+      children: [paragraph('quote-p-1', 'one'), paragraph('quote-p-2', 'two')],
+    };
+    const invalidCommands = [
+      { kind: 'insert_element', parent_element_id: null, position: 'append', payload: { type: 'blockquote' } },
+      { kind: 'insert_element', parent_element_id: null, position: 'append', payload: { type: 'callout', text: 'note', background_color: '#ffffff' } },
+      { kind: 'insert_element', parent_element_id: null, position: 'append', payload: { type: 'check_list_item', text: 'task', checked: 'yes' } },
+      { kind: 'insert_element', parent_element_id: null, position: 'append', payload: { type: 'code_block', text: 'code', language: 'unknown' } },
+      { kind: 'insert_element', parent_element_id: null, position: 'append', payload: { type: 'code_block', text: 'code', white_space: 'pre' } },
+    ];
+    invalidCommands.forEach(command => {
+      expectError(() => prepare(makeDocument(), [command]), 'invalid_request', 0);
+    });
+    expectError(() => prepare(makeDocument([complexQuote]), [{
+      kind: 'replace_element_content', target_element_id: 'quote', payload: { text: 'replacement' },
+    }]), 'unsupported_content', 0);
+    expectError(() => prepare(makeDocument(), [{
+      kind: 'update_element_attributes', target_element_id: 'p1', payload: { checked: true },
+    }]), 'unsupported_element_type', 0);
+  });
+
   it('creates ordered and unordered lists with one standard initial list item', () => {
     const plan = prepare(makeDocument(), [
       { kind: 'insert_element', client_ref: 'ordered', parent_element_id: null, position: 'append', payload: { type: 'ordered_list', text: 'First item' } },
