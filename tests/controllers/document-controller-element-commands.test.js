@@ -22,16 +22,25 @@ describe('DocumentController element command permissions', () => {
     [{ file_uuid: 'other-doc', permission: 'rw', username: 'writer@example.com' }],
     [{ file_uuid: 'doc-1', permission: 'r', username: 'writer@example.com' }],
     [{ file_uuid: 'doc-1', permission: 'rw' }],
+    [{ file_uuid: 'doc-1', permission: 'rw', username: '' }],
+    [{ file_uuid: 'doc-1', permission: 'rw', username: {} }],
+    [{ file_uuid: 'doc-1', permission: 'rw', username: 42 }],
   ])('rejects an invalid write identity', async payload => {
     const response = makeResponse();
+    const applyElementCommands = jest.fn();
+    const sendDocumentUpdate = jest.fn();
+    DocumentManager.getInstance.mockReturnValue({ applyElementCommands });
+    IOHelper.hasInstance.mockReturnValue(true);
+    IOHelper.getInstance.mockReturnValue({ sendDocumentUpdate });
 
     await documentController.applyElementCommands({ params: { doc_uuid: 'doc-1' }, payload, body: {} }, response);
 
     expect(response.status).toHaveBeenCalledWith(403);
     expect(response.send).toHaveBeenCalledWith({
       error_code: 'permission_denied',
-      command_index: null,
     });
+    expect(applyElementCommands).not.toHaveBeenCalled();
+    expect(sendDocumentUpdate).not.toHaveBeenCalled();
   });
 
   it('commits commands then broadcasts the existing update-document payload', async () => {
@@ -98,7 +107,6 @@ describe('DocumentController element command permissions', () => {
     expect(response.status).toHaveBeenCalledWith(400);
     expect(response.send).toHaveBeenCalledWith({
       error_code: 'invalid_request',
-      command_index: null,
     });
   });
 
@@ -209,7 +217,6 @@ describe('DocumentController element command permissions', () => {
     expect(response.status).toHaveBeenCalledWith(404);
     expect(response.send).toHaveBeenCalledWith({
       error_code: 'document_not_found',
-      command_index: null,
     });
   });
 

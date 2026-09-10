@@ -97,9 +97,28 @@ describe('DocumentManager element command commits', () => {
     expect(OperationsManager.getInstance().operationListMap.has('doc-1')).toBe(true);
   });
 
-  it('returns the Socket success result before operation log persistence completes', async () => {
+  it('waits for operation log persistence before returning Socket success', async () => {
     const write = deferred();
     recordOperations.mockReturnValue(write.promise);
+
+    let settled = false;
+    const resultPromise = documentManager.execOperationsBySocket({
+      doc_uuid: 'doc-1',
+      version: 4,
+      operations: [{ type: 'insert_text', path: [0, 0], offset: 6, text: '!' }],
+      user: { username: 'writer@example.com' },
+    }, 'test.sdoc');
+    resultPromise.then(() => { settled = true; });
+
+    await Promise.resolve();
+    expect(recordOperations).toHaveBeenCalledTimes(1);
+    expect(settled).toBe(false);
+    write.resolve();
+    await expect(resultPromise).resolves.toEqual({ success: true, version: 5 });
+  });
+
+  it('returns the existing Socket persistence error when recording operations fails', async () => {
+    recordOperations.mockRejectedValue(new Error('database unavailable'));
 
     const result = await documentManager.execOperationsBySocket({
       doc_uuid: 'doc-1',
@@ -108,9 +127,7 @@ describe('DocumentManager element command commits', () => {
       user: { username: 'writer@example.com' },
     }, 'test.sdoc');
 
-    expect(result).toEqual({ success: true, version: 5 });
-    expect(recordOperations).toHaveBeenCalledTimes(1);
-    write.resolve();
+    expect(result).toEqual({ success: false, error_type: 'save_operations_to_database_error' });
   });
 
   it('uses the loaded document instance for a cold Socket update', async () => {
@@ -180,6 +197,19 @@ describe('DocumentManager element command commits', () => {
     expect(recordOperations).toHaveBeenNthCalledWith(2, 'doc-1', expect.any(Array), 6, { username: 'writer@example.com' });
   });
 
+  it('maps an upstream 404 during cold load to document_not_found', async () => {
+    documentManager.documents.clear();
+    seaServerAPI.getDocContent.mockRejectedValue({
+      message: 'Request failed with status code 404',
+      response: { status: 404 },
+    });
+
+    await expect(applyCommands(documentManager, [replaceCommand('after')])).rejects.toMatchObject({
+      error_code: 'document_not_found',
+    });
+    expect(recordOperations).not.toHaveBeenCalled();
+  });
+
   it('does not commit a rejected text-leaf deletion', async () => {
     const document = documentManager.documents.get('doc-1');
     const originalElements = JSON.parse(JSON.stringify(document.elements));
@@ -187,6 +217,29 @@ describe('DocumentManager element command commits', () => {
     await expect(applyCommands(documentManager, [{
       kind: 'delete_element', target_element_id: 't1',
     }])).rejects.toMatchObject({ error_code: 'unsupported_element_type', command_index: 0 });
+
+    expect(document.version).toBe(4);
+    expect(document.elements).toEqual(originalElements);
+    expect(document.getMeta().need_save).toBe(false);
+    expect(recordOperations).not.toHaveBeenCalled();
+    expect(OperationsManager.getInstance().operationListMap.has('doc-1')).toBe(false);
+  });
+
+  it.each([
+    ['a paragraph directly under multi-column', {
+      id: 'multi-column', type: 'multi_column', children: [{ id: 'invalid', type: 'paragraph', children: [{ id: 'invalid-text', text: 'invalid' }] }],
+    }],
+    ['a root-level column', {
+      id: 'column', type: 'column', children: [{ id: 'column-paragraph', type: 'paragraph', children: [{ id: 'column-text', text: 'column' }] }],
+    }],
+  ])('does not commit a document with %s', async (description, invalidElement) => {
+    const document = documentManager.documents.get('doc-1');
+    document.elements.push(invalidElement);
+    const originalElements = JSON.parse(JSON.stringify(document.elements));
+
+    await expect(applyCommands(documentManager, [replaceCommand('after')])).rejects.toMatchObject({
+      error_code: 'apply_failed',
+    });
 
     expect(document.version).toBe(4);
     expect(document.elements).toEqual(originalElements);

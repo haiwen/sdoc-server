@@ -3,10 +3,20 @@ import logger from '../loggers';
 import { SEADOC_PRIVATE_KEY } from '../config/config';
 import { getDocUuidFromUrl } from '../utils';
 
+const isElementCommandRequest = req => {
+  const path = req.originalUrl.split('?')[0].replace(/\/+$/, '');
+  return /^\/api\/v1\/docs\/[^/]+\/element-commands$/.test(path);
+};
+
+const rejectRequest = (req, res, message) => {
+  const body = isElementCommandRequest(req) ? { error_code: 'permission_denied' } : { error_msg: message };
+  res.status(403).send(body);
+};
+
 const auth = (req, res, next) => {
   const authorization = req.headers.authorization;
   if (!authorization || !authorization.split(' ')[1]) {
-    res.status(403).send({"error_msg": 'You don\'t have permission to access.'});
+    rejectRequest(req, res, 'You don\'t have permission to access.');
     return;
   }
 
@@ -15,10 +25,10 @@ const auth = (req, res, next) => {
     if (err || !decoded) {
       logger.error(err.message);
       if (err.name === 'TokenExpiredError') {
-        res.status(403).send({"error_msg": 'Token expired.'});
+        rejectRequest(req, res, 'Token expired.');
         return;
       } else {
-        res.status(403).send({"error_msg": 'You don\'t have permission to access.'});
+        rejectRequest(req, res, 'You don\'t have permission to access.');
         return;
       }
     }
@@ -36,7 +46,7 @@ const auth = (req, res, next) => {
       if (docUuid !== doc_uuid) {
         const message = `doc_uuid in token doesn't match the accessed doc. doc_uuid in token: ${docUuid}, accessed doc_uuid: ${doc_uuid}`;
         logger.info(message);
-        res.status(403).send({"error_msg": 'You don\'t have permission to access.'});
+        rejectRequest(req, res, 'You don\'t have permission to access.');
         return;
       }
 

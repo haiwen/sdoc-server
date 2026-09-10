@@ -138,6 +138,9 @@ class DocumentManager {
       errorHandle(err);
       const error = new Error('The content of the document loaded error');
       error.error_type = 'content_load_invalid';
+      if (err.response && err.response.status === 404) {
+        error.error_code = 'document_not_found';
+      }
       error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/content/${docUuid}/`;
       throw error;
     }
@@ -251,7 +254,7 @@ class DocumentManager {
     document.setValue(plan.elements, version);
 
     const operationsManager = OperationsManager.getInstance();
-    operationsManager.addOperations(docUuid, plan.operations, version, { username }).catch(err => {
+    operationsManager.addOperationsInBackground(docUuid, plan.operations, version, { username }).catch(err => {
       logger.error('Save element command operations to database error:', document.docUuid, plan.operations, err);
     });
 
@@ -353,10 +356,16 @@ class DocumentManager {
       return Promise.resolve(result);
     }
 
-    const operationsManager = OperationsManager.getInstance();
-    operationsManager.addOperations(doc_uuid, operations, document.version, user).catch(err => {
-      logger.error('Save operations to database error:', document.docUuid, operations, err);
-    });
+    try {
+      const operationsManager = OperationsManager.getInstance();
+      await operationsManager.addOperations(doc_uuid, operations, document.version, user);
+    } catch(e) {
+      logger.error('Save operations to database error:', document.docUuid, operations);
+      return Promise.resolve({
+        success: false,
+        error_type: 'save_operations_to_database_error',
+      });
+    }
 
     // execute operations success
     const result = {

@@ -19,7 +19,10 @@ class OperationsManager {
 
   recordOperationInMemory = (docUuid, operations, version) => {
     this.operationCountSinceUp++;
+    this.cacheOperations(docUuid, operations, version);
+  };
 
+  cacheOperations = (docUuid, operations, version) => {
     let operationList = this.operationListMap.get(docUuid) || [];
     const item = {operations, version};
     operationList.push(item);
@@ -28,11 +31,12 @@ class OperationsManager {
     }
     this.operationListMap.set(docUuid, operationList);
   };
-
   addOperations = (docUuid, operations, version, user) => {
-    this.recordOperationInMemory(docUuid, operations, version);
+    return this.addOperationsInBackground(docUuid, operations, version, user);
+  };
 
-    // Persist in the background. Callers deliberately do not wait for this.
+  addOperationsInBackground = (docUuid, operations, version, user) => {
+    this.recordOperationInMemory(docUuid, operations, version);
     try {
       return Promise.resolve(recordOperations(docUuid, operations, version, user));
     } catch (error) {
