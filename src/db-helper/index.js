@@ -26,4 +26,29 @@ const DBHelper = async function (sql, values) {
   }
 };
 
+export const withTransaction = async (callback) => {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const result = await callback((sql, values) => connection.query(sql, values));
+    await connection.commit();
+    return result;
+  } catch (err) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        // Preserve the original database error.
+      }
+    }
+    const error = new Error(err.message && err.message.includes('connect') ? 'Error connecting to Database' : 'Query data from Database error');
+    error.error_type = 'database_error';
+    error.originalError = err;
+    throw error;
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
 export default DBHelper;

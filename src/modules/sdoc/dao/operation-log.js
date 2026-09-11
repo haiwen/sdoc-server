@@ -1,10 +1,10 @@
 import DBHelper from "../../../db-helper";
 
-export const recordOperations = (docUuid, operations, version, user) => {
+export const recordOperations = (docUuid, operations, version, user, executor = DBHelper) => {
   const sql = 'INSERT INTO `sdoc_operation_log` \
     (doc_uuid, op_id, op_time, operations, author) VALUES (?, ?, ?, ?, ?)';
   const values = [docUuid, version, Date.now(), JSON.stringify(operations), user.username];
-  return DBHelper(sql, values);
+  return executor(sql, values);
 };
 
 export const listPendingOperationsByDoc = (docUuid, version) => {

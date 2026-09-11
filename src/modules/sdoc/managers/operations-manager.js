@@ -17,9 +17,16 @@ class OperationsManager {
     return this.instance;
   };
 
-  addOperations = async (docUuid, operations, version, user) => {
+  addOperations = async (docUuid, operations, version, user, options = {}) => {
     // Save current operations into database
-    await recordOperations(docUuid, operations, version, user);
+    await recordOperations(
+      docUuid, operations, version, user,
+      options.executor,
+    );
+    if (!options.deferCache) this.addOperationsToCache(docUuid, operations, version);
+  };
+
+  addOperationsToCache = (docUuid, operations, version) => {
     this.operationCountSinceUp++;
 
     // Record current operations into memory
