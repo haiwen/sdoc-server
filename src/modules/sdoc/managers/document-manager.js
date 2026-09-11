@@ -12,6 +12,7 @@ import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
 import OperationsManager from './operations-manager';
 import UsersManager from './users-manager';
+import ElementCommandManager from './element-command-manager';
 
 class DocumentManager {
 
@@ -19,6 +20,7 @@ class DocumentManager {
     this.instance = null;
     this.users = [];
     this.documents = new Map();
+    this.documentLoadPromises = new Map();
 
     // save infos
     this.isSaving = false;
@@ -113,6 +115,22 @@ class DocumentManager {
       return document.toJson();
     }
 
+    let loadPromise = this.documentLoadPromises.get(docUuid);
+    if (!loadPromise) {
+      loadPromise = this.loadDocFromServer(docUuid, docName, docTitle, username);
+      this.documentLoadPromises.set(docUuid, loadPromise);
+    }
+
+    try {
+      return await loadPromise;
+    } finally {
+      if (this.documentLoadPromises.get(docUuid) === loadPromise) {
+        this.documentLoadPromises.delete(docUuid);
+      }
+    }
+  };
+
+  loadDocFromServer = async (docUuid, docName, docTitle, username) => {
     let result = null;
     try {
       result = await seaServerAPI.getDocContent(docUuid);
@@ -120,6 +138,9 @@ class DocumentManager {
       errorHandle(err);
       const error = new Error('The content of the document loaded error');
       error.error_type = 'content_load_invalid';
+      if (err.response && err.response.status === 404) {
+        error.error_code = 'document_not_found';
+      }
       error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/content/${docUuid}/`;
       throw error;
     }
@@ -213,6 +234,33 @@ class DocumentManager {
     return this.documents.has(docUuid);
   };
 
+  applyElementCommands = async (docUuid, docName, docTitle, username, request) => {
+    if (!this.documents.get(docUuid)) {
+      await this.getDoc(docUuid, docName, docTitle, username);
+    }
+
+    const document = this.documents.get(docUuid);
+    if (!document) {
+      const error = new Error('Document is not available for element command execution');
+      error.error_code = 'document_not_found';
+      throw error;
+    }
+
+    const elementCommandManager = new ElementCommandManager();
+    const plan = elementCommandManager.prepare(document, request);
+    const version = document.version + 1;
+
+    document.setLastModifyUser({ username });
+    document.setValue(plan.elements, version);
+
+    const operationsManager = OperationsManager.getInstance();
+    operationsManager.addOperationsInBackground(docUuid, plan.operations, version, { username }).catch(err => {
+      logger.error('Save element command operations to database error:', document.docUuid, plan.operations, err);
+    });
+
+    return { version, plan };
+  };
+
   removeDocs(docUuids) {
     for (let docUuid of docUuids) {
       if (this.documents.has(docUuid)) {
@@ -251,11 +299,12 @@ class DocumentManager {
   execOperationsBySocket = async (params, docName) => {
     const { doc_uuid, version: clientVersion, operations, user } = params;
 
-    const document = this.documents.get(doc_uuid);
+    let document = this.documents.get(doc_uuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
         await this.getDoc(doc_uuid, docName);
+        document = this.documents.get(doc_uuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${docName}(${doc_uuid}) doc content error`);
         const result = {
@@ -264,6 +313,13 @@ class DocumentManager {
         };
         return Promise.resolve(result);
       }
+    }
+
+    if (!document) {
+      return Promise.resolve({
+        success: false,
+        error_type: 'load_document_content_error',
+      });
     }
 
     const { version: serverVersion } = document;
@@ -300,24 +356,16 @@ class DocumentManager {
       return Promise.resolve(result);
     }
 
-    if (isExecuteSuccess) {
-      try {
-        const operationsManager = OperationsManager.getInstance();
-        await operationsManager.addOperations(doc_uuid, operations, document.version, user);
-      } catch(e) {
-        logger.error('Save operations to database error:', document.docUuid, operations);
-        const result = {
-          success: false,
-          error_type: 'save_operations_to_database_error',
-        };
-        return Promise.resolve(result);
-      }
-    }
+    const appliedVersion = document.version;
+    const operationsManager = OperationsManager.getInstance();
+    operationsManager.addOperationsInBackground(doc_uuid, operations, appliedVersion, user).catch(() => {
+      logger.error('Save operations to database error:', document.docUuid, operations);
+    });
 
     // execute operations success
     const result = {
       success: true,
-      version: document.version,
+      version: appliedVersion,
     };
     return Promise.resolve(result);
 
