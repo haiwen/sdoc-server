@@ -15,6 +15,7 @@ class ExcalidrawManager {
   constructor() {
     this.instance = null;
     this.documents = new Map();
+    this.inflightOperations = new Map();
     // save infos
     this.isSaving = false;
     this.lastSavingInfo = {};
@@ -201,7 +202,46 @@ class ExcalidrawManager {
   };
 
   execOperationsBySocket = async (params, exdrawName) => {
-    const { doc_uuid: docUuid, version: clientVersion, user, elements } = params;
+    const { doc_uuid: docUuid, operation_id: operationId } = params;
+    const operationKey = `${docUuid}:${operationId}`;
+    const existingOperation = this.inflightOperations.get(operationKey);
+
+    if (existingOperation) {
+      const result = await existingOperation;
+      return {
+        ...result,
+        operation_id: operationId,
+        is_duplicate: true,
+      };
+    }
+
+    const operationPromise = this.execOperationOnce(params, exdrawName);
+    this.inflightOperations.set(operationKey, operationPromise);
+
+    try {
+      return await operationPromise;
+    } finally {
+      this.inflightOperations.delete(operationKey);
+    }
+  };
+
+  execOperationOnce = async (params, exdrawName) => {
+    const {
+      doc_uuid: docUuid,
+      version: clientVersion,
+      user,
+      elements,
+      operation_id: operationId,
+    } = params;
+
+    if (!operationId) {
+      return {
+        success: false,
+        error_type: 'invalid_operation_id',
+        operation_id: operationId,
+      };
+    }
+
     const document = this.documents.get(docUuid);
     if (!document) {
       try {
@@ -212,21 +252,33 @@ class ExcalidrawManager {
         const result = {
           success: false,
           error_type: 'load_document_content_error',
+          operation_id: operationId,
         };
         return Promise.resolve(result);
       }
     }
 
-    const { version: serverVersion } = document;
+    const currentDocument = this.documents.get(docUuid);
+    const cachedResult = currentDocument.getOperationResult(operationId);
+    if (cachedResult) {
+      return {
+        ...cachedResult,
+        operation_id: operationId,
+        is_duplicate: true,
+      };
+    }
+
+    const { version: serverVersion } = currentDocument;
     if (serverVersion !== clientVersion) {
       const result = {
         success: false,
         error_type: 'version_behind_server',
-        elements: document.elements,
+        elements: currentDocument.elements,
         version: serverVersion,
+        operation_id: operationId,
       };
       logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
-      logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s', document.docUuid, user.username);
+      logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s', currentDocument.docUuid, user.username);
       return Promise.resolve(result);
     }
 
@@ -235,9 +287,9 @@ class ExcalidrawManager {
     try {
       // Prevent copying of references
       const newElements = deepCopy(elements);
-      isExecuteSuccess = syncElementsToCurrentDocument(document, newElements, user);
+      isExecuteSuccess = syncElementsToCurrentDocument(currentDocument, newElements, user);
     } catch (e) {
-      logger.error('apply operations failed.', document.docUuid, elements);
+      logger.error('apply operations failed.', currentDocument.docUuid, elements);
       isExecuteSuccess = false;
     }
 
@@ -245,6 +297,7 @@ class ExcalidrawManager {
       const result = {
         success: false,
         error_type: 'execute_client_operations_error',
+        operation_id: operationId,
       };
       return Promise.resolve(result);
     }
@@ -252,8 +305,10 @@ class ExcalidrawManager {
     // execute operations success
     const result = {
       success: true,
-      version: document.version,
+      version: currentDocument.version,
+      operation_id: operationId,
     };
+    currentDocument.setOperationResult(operationId, result);
     return Promise.resolve(result);
 
   };

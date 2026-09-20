@@ -51,6 +51,7 @@ class ExdrawIOHandler {
         const result = {
           success: false,
           error_type: 'token_expired',
+          operation_id: params?.operation_id,
         };
         callback && callback(result);
         return;
@@ -59,7 +60,7 @@ class ExdrawIOHandler {
       const { doc_uuid: docUuid, ...rest } = params;
       const excalidrawManager = ExcalidrawManager.getInstance();
       const result = await excalidrawManager.execOperationsBySocket(params);
-      if (result.success) {
+      if (result.success && !result.is_duplicate) {
         const { version } = result;
         rest.version = version;
         this.ioHelper.sendElementsMessageToRoom(socket, docUuid, rest);
