@@ -34,6 +34,10 @@ class IOHelper {
     socket.to(roomId).emit('mouse-location-updated', {...params});
   };
 
+  sendPreviewElementsMessageToRoom = (socket, roomId, params) => {
+    socket.to(roomId).volatile.emit('elements-preview', {...params});
+  };
+
   sendJoinRoomMessage = (socket, roomId, userInfo) => {
     socket.to(roomId).emit('join-room', userInfo);
   };
