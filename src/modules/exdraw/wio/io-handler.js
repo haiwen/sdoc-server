@@ -24,10 +24,13 @@ class ExdrawIOHandler {
   onConnection(socket) {
     // todo permission check
     this.ioHelper.sendInitRoomToPrivate(socket.id);
-    socket.on('join-room', async (params) => {
-      // join room
-      const { doc_uuid: docUuid, user: userInfo } = params;
-      socket.join(docUuid);
+    socket.on('join-room', async () => {
+      // The document and user are bound to the authenticated socket.
+      const docUuid = socket.docUuid;
+      const userInfo = socket.userInfo;
+      if (!docUuid) return;
+
+      await socket.join(docUuid);
 
       const usersManager = UsersManager.getInstance();
       if (!usersManager.getUser(docUuid, socket.id)) {
@@ -45,7 +48,17 @@ class ExdrawIOHandler {
       this.ioHelper.sendRoomUserChangeMessage(socket, docUuid, users);
     });
 
-    socket.on('elements-updated', async (params, callback) => {
+    socket.on('elements-updated', async (params = {}, callback) => {
+      const docUuid = socket.docUuid;
+      if (!docUuid || !socket.rooms || !socket.rooms.has(docUuid)) {
+        callback && callback({
+          success: false,
+          error_type: 'room_not_joined',
+          operation_id: params?.operation_id,
+        });
+        return;
+      }
+
       const isValid = checkPermission(socket);
       if (!isValid) {
         const result = {
@@ -57,9 +70,15 @@ class ExdrawIOHandler {
         return;
       }
 
-      const { doc_uuid: docUuid, ...rest } = params;
+      const authorizedParams = {
+        ...params,
+        doc_uuid: docUuid,
+        user: socket.userInfo,
+      };
+      const rest = { ...authorizedParams };
+      delete rest.doc_uuid;
       const excalidrawManager = ExcalidrawManager.getInstance();
-      const result = await excalidrawManager.execOperationsBySocket(params);
+      const result = await excalidrawManager.execOperationsBySocket(authorizedParams);
       if (result.success && !result.is_duplicate) {
         const { version } = result;
         rest.version = version;
@@ -68,13 +87,20 @@ class ExdrawIOHandler {
       callback && callback(result);
     });
 
-    socket.on('mouse-location-updated', async (params) => {
-      const { doc_uuid: docUuid, ...rest } = params;
+    socket.on('mouse-location-updated', async (params = {}) => {
+      const docUuid = socket.docUuid;
+      if (!docUuid || !socket.rooms || !socket.rooms.has(docUuid)) return;
+
+      const rest = { ...params, user: socket.userInfo };
+      delete rest.doc_uuid;
       this.ioHelper.sendMouseMessageToRoom(socket, docUuid, rest);
     });
 
-    socket.on('server-volatile-broadcast', (params) => {
-      const { doc_uuid: docUuid, elements } = params;
+    socket.on('server-volatile-broadcast', (params = {}) => {
+      const docUuid = socket.docUuid;
+      if (!docUuid || !socket.rooms || !socket.rooms.has(docUuid)) return;
+
+      const { elements } = params;
       this.ioHelper.sendMessageToRoom(socket, docUuid, { elements });
     });
 
