@@ -97,6 +97,15 @@ class ExcalidrawManager {
       error.from_url = `${SEAHUB_SERVER}/api/v2.1/exdraw/content/${exdrawUuid}/`;
       throw error;
     }
+
+    // Another request may have loaded the document while this request was
+    // waiting for the server response. Reuse the existing instance instead
+    // of replacing it with a stale snapshot.
+    const existingDocument = this.documents.get(exdrawUuid);
+    if (existingDocument) {
+      return existingDocument.toJson();
+    }
+
     const docContent = result.data ? result.data : defineSceneConfig;
     if (!isHasProperty(docContent, 'version')) {
       docContent.version = 0;

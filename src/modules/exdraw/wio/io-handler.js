@@ -29,8 +29,10 @@ class ExdrawIOHandler {
       const docUuid = socket.docUuid;
       const userInfo = socket.userInfo;
       if (!docUuid) return;
+      if (socket.exdrawRoomJoined) return;
 
       await socket.join(docUuid);
+      socket.exdrawRoomJoined = true;
 
       const usersManager = UsersManager.getInstance();
       if (!usersManager.getUser(docUuid, socket.id)) {
@@ -50,7 +52,7 @@ class ExdrawIOHandler {
 
     socket.on('elements-updated', async (params = {}, callback) => {
       const docUuid = socket.docUuid;
-      if (!docUuid || !socket.rooms || !socket.rooms.has(docUuid)) {
+      if (!docUuid || !socket.exdrawRoomJoined || !socket.rooms || !socket.rooms.has(docUuid)) {
         callback && callback({
           success: false,
           error_type: 'room_not_joined',
@@ -91,7 +93,7 @@ class ExdrawIOHandler {
 
     socket.on('mouse-location-updated', async (params = {}) => {
       const docUuid = socket.docUuid;
-      if (!docUuid || !socket.rooms || !socket.rooms.has(docUuid)) return;
+      if (!docUuid || !socket.exdrawRoomJoined || !socket.rooms || !socket.rooms.has(docUuid)) return;
 
       const rest = { ...params, user: socket.userInfo };
       delete rest.doc_uuid;
@@ -100,7 +102,7 @@ class ExdrawIOHandler {
 
     socket.on('server-volatile-broadcast', (params = {}) => {
       const docUuid = socket.docUuid;
-      if (!docUuid || !socket.rooms || !socket.rooms.has(docUuid)) return;
+      if (!docUuid || !socket.exdrawRoomJoined || !socket.rooms || !socket.rooms.has(docUuid)) return;
 
       const { elements } = params;
       this.ioHelper.sendMessageToRoom(socket, docUuid, { elements });
@@ -117,6 +119,16 @@ class ExdrawIOHandler {
 
     handleDisconnect = async (socket) => {
       const { docUuid } = socket;
+      const isRoomJoined = socket.exdrawRoomJoined || socket.rooms?.has(docUuid);
+      if (!docUuid || !isRoomJoined) return;
+
+      // Mark the socket as left before awaiting any cleanup so concurrent
+      // events cannot submit more operations during the leave flow.
+      socket.exdrawRoomJoined = false;
+      if (socket.rooms?.has(docUuid)) {
+        await socket.leave(docUuid);
+      }
+
       const usersManager = UsersManager.getInstance();
       const user = usersManager.getUser(docUuid, socket.id);
       if (user) {
