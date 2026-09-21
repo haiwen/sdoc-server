@@ -201,8 +201,22 @@ class ExcalidrawManager {
     return Promise.resolve(result);
   };
 
-  execOperationsBySocket = async (params, exdrawName) => {
-    const { doc_uuid: docUuid, operation_id: operationId } = params;
+  execOperationsBySocket = async (socket, params = {}) => {
+    const { docUuid, docName, userInfo } = socket || {};
+    const { operation_id: operationId } = params;
+    if (!docUuid || !userInfo?.username) {
+      return {
+        success: false,
+        error_type: 'invalid_socket_identity',
+        operation_id: operationId,
+      };
+    }
+
+    const authorizedParams = {
+      ...params,
+      doc_uuid: docUuid,
+      user: userInfo,
+    };
     const operationKey = `${docUuid}:${operationId}`;
     const existingOperation = this.inflightOperations.get(operationKey);
 
@@ -215,7 +229,7 @@ class ExcalidrawManager {
       };
     }
 
-    const operationPromise = this.execOperationOnce(params, exdrawName);
+    const operationPromise = this.execOperationOnce(authorizedParams, docName);
     this.inflightOperations.set(operationKey, operationPromise);
 
     try {

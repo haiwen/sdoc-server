@@ -70,19 +70,21 @@ class ExdrawIOHandler {
         return;
       }
 
-      const authorizedParams = {
-        ...params,
-        doc_uuid: docUuid,
-        user: socket.userInfo,
+      const { elements, version, operation_id: operationId } = params;
+      const operationParams = {
+        elements,
+        version,
+        operation_id: operationId,
       };
-      const rest = { ...authorizedParams };
-      delete rest.doc_uuid;
       const excalidrawManager = ExcalidrawManager.getInstance();
-      const result = await excalidrawManager.execOperationsBySocket(authorizedParams);
+      const result = await excalidrawManager.execOperationsBySocket(socket, operationParams);
       if (result.success && !result.is_duplicate) {
-        const { version } = result;
-        rest.version = version;
-        this.ioHelper.sendElementsMessageToRoom(socket, docUuid, rest);
+        this.ioHelper.sendElementsMessageToRoom(socket, docUuid, {
+          elements,
+          version: result.version,
+          operation_id: operationId,
+          user: socket.userInfo,
+        });
       }
       callback && callback(result);
     });
