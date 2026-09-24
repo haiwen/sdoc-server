@@ -301,17 +301,12 @@ class DocumentManager {
     }
 
     if (isExecuteSuccess) {
-      try {
-        const operationsManager = OperationsManager.getInstance();
-        await operationsManager.addOperations(doc_uuid, operations, document.version, user);
-      } catch(e) {
-        logger.error('Save operations to database error:', document.docUuid, operations);
-        const result = {
-          success: false,
-          error_type: 'save_operations_to_database_error',
-        };
-        return Promise.resolve(result);
-      }
+      const operationsManager = OperationsManager.getInstance();
+      // Database persistence is deliberately asynchronous. The document has
+      // already advanced in memory, and the operation is cached before the
+      // write starts, so a transient database failure cannot invalidate the
+      // live document state or block other clients.
+      operationsManager.addOperations(doc_uuid, operations, document.version, user);
     }
 
     // execute operations success

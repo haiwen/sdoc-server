@@ -17,19 +17,23 @@ class OperationsManager {
     return this.instance;
   };
 
-  addOperations = async (docUuid, operations, version, user) => {
-    // Save current operations into database
-    await recordOperations(docUuid, operations, version, user);
+  recordOperationInMemory = (docUuid, operations, version) => {
     this.operationCountSinceUp++;
 
-    // Record current operations into memory
     let operationList = this.operationListMap.get(docUuid) || [];
-    let item = {operations, version};
+    const item = {operations, version};
     operationList.push(item);
     if (operationList.length >= OPERATIONS_CACHE_LIMIT) {
       operationList = operationList.slice(OPERATIONS_CACHE_LIMIT / 10);
     }
     this.operationListMap.set(docUuid, operationList);
+  };
+
+  addOperations = (docUuid, operations, version, user) => {
+    this.recordOperationInMemory(docUuid, operations, version);
+
+    // Do not wait for operation-log persistence in the document operation path.
+    recordOperations(docUuid, operations, version, user);
   };
 
   getLoseOperationList = async (docUuid, version) => {
