@@ -10,6 +10,7 @@ export default function(socket, next) {
     socket.docName = decoded.filename;
     socket.userInfo = {
       username: decoded.username,
+      _username: decoded.username,
       permission: decoded.permission,
       name: decoded.name,
       avatar_url: decoded.avatar_url

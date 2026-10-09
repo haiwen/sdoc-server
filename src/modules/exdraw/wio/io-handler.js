@@ -24,10 +24,15 @@ class ExdrawIOHandler {
   onConnection(socket) {
     // todo permission check
     this.ioHelper.sendInitRoomToPrivate(socket.id);
-    socket.on('join-room', async (params) => {
-      // join room
-      const { doc_uuid: docUuid, user: userInfo } = params;
-      socket.join(docUuid);
+    socket.on('join-room', async () => {
+      // The document and user are bound to the authenticated socket.
+      const docUuid = socket.docUuid;
+      const userInfo = socket.userInfo;
+      if (!docUuid) return;
+      if (socket.exdrawRoomJoined) return;
+
+      await socket.join(docUuid);
+      socket.exdrawRoomJoined = true;
 
       const usersManager = UsersManager.getInstance();
       if (!usersManager.getUser(docUuid, socket.id)) {
@@ -45,35 +50,61 @@ class ExdrawIOHandler {
       this.ioHelper.sendRoomUserChangeMessage(socket, docUuid, users);
     });
 
-    socket.on('elements-updated', async (params, callback) => {
+    socket.on('elements-updated', async (params = {}, callback) => {
+      const docUuid = socket.docUuid;
+      if (!docUuid || !socket.exdrawRoomJoined || !socket.rooms || !socket.rooms.has(docUuid)) {
+        callback && callback({
+          success: false,
+          error_type: 'room_not_joined',
+          operation_id: params?.operation_id,
+        });
+        return;
+      }
+
       const isValid = checkPermission(socket);
       if (!isValid) {
         const result = {
           success: false,
           error_type: 'token_expired',
+          operation_id: params?.operation_id,
         };
         callback && callback(result);
         return;
       }
 
-      const { doc_uuid: docUuid, ...rest } = params;
+      const { elements, version, operation_id: operationId } = params;
+      const operationParams = {
+        elements,
+        version,
+        operation_id: operationId,
+      };
       const excalidrawManager = ExcalidrawManager.getInstance();
-      const result = await excalidrawManager.execOperationsBySocket(params);
-      if (result.success) {
-        const { version } = result;
-        rest.version = version;
-        this.ioHelper.sendElementsMessageToRoom(socket, docUuid, rest);
+      const result = await excalidrawManager.execOperationsBySocket(socket, operationParams);
+      if (result.success && !result.is_duplicate) {
+        this.ioHelper.sendElementsMessageToRoom(socket, docUuid, {
+          elements,
+          version: result.version,
+          operation_id: operationId,
+          user: socket.userInfo,
+        });
       }
       callback && callback(result);
     });
 
-    socket.on('mouse-location-updated', async (params) => {
-      const { doc_uuid: docUuid, ...rest } = params;
+    socket.on('mouse-location-updated', async (params = {}) => {
+      const docUuid = socket.docUuid;
+      if (!docUuid || !socket.exdrawRoomJoined || !socket.rooms || !socket.rooms.has(docUuid)) return;
+
+      const rest = { ...params, user: socket.userInfo };
+      delete rest.doc_uuid;
       this.ioHelper.sendMouseMessageToRoom(socket, docUuid, rest);
     });
 
-    socket.on('server-volatile-broadcast', (params) => {
-      const { doc_uuid: docUuid, elements } = params;
+    socket.on('server-volatile-broadcast', (params = {}) => {
+      const docUuid = socket.docUuid;
+      if (!docUuid || !socket.exdrawRoomJoined || !socket.rooms || !socket.rooms.has(docUuid)) return;
+
+      const { elements } = params;
       this.ioHelper.sendMessageToRoom(socket, docUuid, { elements });
     });
 
@@ -88,6 +119,16 @@ class ExdrawIOHandler {
 
     handleDisconnect = async (socket) => {
       const { docUuid } = socket;
+      const isRoomJoined = socket.exdrawRoomJoined || socket.rooms?.has(docUuid);
+      if (!docUuid || !isRoomJoined) return;
+
+      // Mark the socket as left before awaiting any cleanup so concurrent
+      // events cannot submit more operations during the leave flow.
+      socket.exdrawRoomJoined = false;
+      if (socket.rooms?.has(docUuid)) {
+        await socket.leave(docUuid);
+      }
+
       const usersManager = UsersManager.getInstance();
       const user = usersManager.getUser(docUuid, socket.id);
       if (user) {
