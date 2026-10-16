@@ -1,6 +1,4 @@
 import { generateNKeysBetween } from "../fractional-indexing";
-import { mutateElement } from "./mutateElement";
-import { arrayToMap } from "../common/utils";
 
 const generateIndices = (elements, indicesGroups) => {
   const elementsUpdates = new Map();
@@ -181,12 +179,13 @@ const getInvalidIndicesGroups = elements => {
 
 
 export const syncInvalidIndices = elements => {
-  const elementsMap = arrayToMap(elements);
   const indicesGroups = getInvalidIndicesGroups(elements);
   const elementsUpdates = generateIndices(elements, indicesGroups);
 
   for (const [element, { index }] of elementsUpdates) {
-    mutateElement(element, elementsMap, { index });
+    // Server-side index repair is normalization, not a client edit. Preserve
+    // revision metadata so an unacknowledged repair cannot reject the next edit.
+    element.index = index;
   }
 
   return elements;

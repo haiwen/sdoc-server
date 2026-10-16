@@ -96,6 +96,12 @@ class ExcalidrawManager {
       error.from_url = `${SEAHUB_SERVER}/api/v2.1/exdraw/content/${exdrawUuid}/`;
       throw error;
     }
+    // A concurrent load may already have populated and updated this document.
+    const loadedDocument = this.documents.get(exdrawUuid);
+    if (loadedDocument) {
+      return loadedDocument.toJson();
+    }
+
     const docContent = result.data ? result.data : defineSceneConfig;
     if (!isHasProperty(docContent, 'version')) {
       docContent.version = 0;
@@ -201,12 +207,20 @@ class ExcalidrawManager {
   };
 
   execOperationsBySocket = async (params, exdrawName) => {
-    const { doc_uuid: docUuid, version: clientVersion, user, elements } = params;
-    const document = this.documents.get(docUuid);
+    const { doc_uuid: docUuid, user, elements } = params;
+    if (!Array.isArray(elements)) {
+      return {
+        success: false,
+        error_type: 'execute_client_operations_error',
+      };
+    }
+
+    let document = this.documents.get(docUuid);
     if (!document) {
       try {
         // Load the document before executing op to avoid the document not being loaded into the memory after disconnection and reconnection
         await this.getSceneDoc(docUuid, exdrawName);
+        document = this.documents.get(docUuid);
       } catch(e) {
         logger.error(`SOCKET_MESSAGE: Load ${exdrawName}(${docUuid}) doc content error`);
         const result = {
@@ -217,27 +231,14 @@ class ExcalidrawManager {
       }
     }
 
-    const { version: serverVersion } = document;
-    if (serverVersion !== clientVersion) {
-      const result = {
-        success: false,
-        error_type: 'version_behind_server',
-        elements: document.elements,
-        version: serverVersion,
-      };
-      logger.warn('Version do not match: clientVersion: %s, serverVersion: %s', clientVersion, serverVersion);
-      logger.warn('apply operations failed: sdoc uuid is %s, modified user is %s', document.docUuid, user.username);
-      return Promise.resolve(result);
-    }
-
-        // execute operations success
+    // Element versions resolve conflicts; the document version only numbers commits.
     let isExecuteSuccess = false;
     try {
       // Prevent copying of references
       const newElements = deepCopy(elements);
       isExecuteSuccess = syncElementsToCurrentDocument(document, newElements, user);
     } catch (e) {
-      logger.error('apply operations failed.', document.docUuid, elements);
+      logger.error('apply operations failed.', docUuid, e);
       isExecuteSuccess = false;
     }
 
