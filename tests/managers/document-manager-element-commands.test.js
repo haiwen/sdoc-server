@@ -9,11 +9,29 @@ jest.mock('../../src/modules/sdoc/api/sea-server-api', () => ({
   saveDocContent: jest.fn(),
 }));
 
+jest.mock('../../src/modules/sdoc/dao/review-apply', () => ({
+  listPendingReviewSaveRegistrations: jest.fn().mockResolvedValue([]),
+  getReviewApplyRegistration: jest.fn(),
+  createReviewApplyRegistration: jest.fn(),
+}));
+
+jest.mock('../../src/db-helper', () => ({
+  withTransaction: jest.fn(callback => callback({transaction: true})),
+}));
+
+jest.mock('../../src/modules/sdoc/wio/io-helper', () => ({
+  __esModule: true,
+  default: {getInstance: () => ({sendDocumentUpdateToRoom: jest.fn()})},
+}));
+
 import Document from '../../src/modules/sdoc/models/document';
 import DocumentManager from '../../src/modules/sdoc/managers/document-manager';
 import OperationsManager from '../../src/modules/sdoc/managers/operations-manager';
 import seaServerAPI from '../../src/modules/sdoc/api/sea-server-api';
 import { listPendingOperationsByDoc, recordOperations } from '../../src/modules/sdoc/dao/operation-log';
+import { getReviewApplyRegistration, createReviewApplyRegistration } from '../../src/modules/sdoc/dao/review-apply';
+import { buildDocumentContext } from '../../src/modules/sdoc/utils/agent-context';
+import { applyPayloadDigest, selectionDigest } from '../../src/modules/sdoc/utils/sdoc-canonical';
 
 const deferred = () => {
   let resolve;
@@ -56,6 +74,83 @@ describe('DocumentManager element command commits', () => {
     seaServerAPI.getDocContent.mockReset();
     seaServerAPI.saveDocContent.mockReset();
     documentManager.documents.set('doc-1', makeDocument());
+  });
+
+  it('executes a signed review through element commands atomically and replays its durable receipt', async () => {
+    const document = documentManager.documents.get('doc-1');
+    const fileUuid = '00000000-0000-4000-8000-000000000001';
+    const taskId = '00000000-0000-4000-8000-000000000002';
+    const decisionId = '00000000-0000-4000-8000-000000000003';
+    const changesetId = '00000000-0000-4000-8000-000000000004';
+    const itemId = '00000000-0000-4000-8000-000000000005';
+    const attemptId = '00000000-0000-4000-8000-000000000006';
+    documentManager.documents.set(fileUuid, document);
+    const projection = buildDocumentContext({
+      elements: document.elements, version: document.version, fileUuid,
+      documentIncarnation: document.document_incarnation, snapshotId: taskId,
+    });
+    const block = projection.blocks[0];
+    const item = {
+      item_id: itemId, kind: 'replace_block_text',
+      target: {block_id: block.block_id, text_node_id: block.text_node_id,
+        block_type: block.type, ancestor_path: block.ancestor_path},
+      precondition: {canonical_before_hash: block.canonical_before_hash,
+        before_leaf_text: block.before_leaf_text, hash_algorithm: 'SHA-256',
+        hash_schema_version: 'sdoc-canonical/v1', projection_version: 'sdoc-agent-context/v1'},
+      after_text: 'reviewed',
+    };
+    const selection = selectionDigest({taskId, cardRevision: 1, changesetRevision: 1,
+      decisionKind: 'approved', selectedChangeItemIds: [itemId]});
+    const digest = applyPayloadDigest({taskId, reviewDecisionId: decisionId,
+      cardRevision: 1, changesetRevisionId: changesetId, changesetRevision: 1,
+      selectionDigestValue: selection, selectedItems: [item]});
+    const params = {
+      apply_attempt_id: attemptId, task_id: taskId, review_decision_id: decisionId,
+      file_uuid: fileUuid, doc_uuid: fileUuid, snapshot_id: taskId,
+      document_incarnation: document.document_incarnation, card_revision: 1,
+      changeset_revision_id: changesetId, changeset_revision: 1, decision_kind: 'approved',
+      selected_change_item_ids: [itemId], selected_items: [item],
+      selection_digest: selection, apply_payload_digest: digest,
+    };
+    getReviewApplyRegistration.mockResolvedValue(null);
+    createReviewApplyRegistration.mockResolvedValue(undefined);
+    recordOperations.mockResolvedValue(undefined);
+    const save = jest.spyOn(documentManager, 'saveDoc').mockResolvedValue(true);
+    try {
+      const mismatched = await documentManager.applyReviewChangeSet(
+        fileUuid, 'test.sdoc', {...params, apply_attempt_id: taskId},
+        'writer@example.com', [replaceCommand('unsigned content')]);
+      expect(mismatched).toMatchObject({status: 'failed_precommit', error_code: 'invalid_selection_payload'});
+      expect(document.version).toBe(4);
+      expect(recordOperations).not.toHaveBeenCalled();
+      document.elements[0].children[0].text = 'concurrent edit';
+      const conflicted = await documentManager.applyReviewChangeSet(
+        fileUuid, 'test.sdoc', {...params, apply_attempt_id: decisionId},
+        'writer@example.com', [replaceCommand('reviewed')]);
+      expect(conflicted).toMatchObject({status: 'preflight_conflicted',
+        conflicts: [{item_id: itemId, conflict_code: 'before_hash_mismatch'}]});
+      expect(recordOperations).not.toHaveBeenCalled();
+      document.elements[0].children[0].text = 'before';
+      const result = await documentManager.applyReviewChangeSet(
+        fileUuid, 'test.sdoc', params, 'writer@example.com', [replaceCommand('reviewed')]);
+      expect(result).toMatchObject({status: 'applied', applied_sdoc_version: 5});
+      expect(document.elements[0].children[0]).toMatchObject({text: 'reviewed'});
+      expect(document.elements[0].children[0].id).not.toBe('t1');
+      expect(recordOperations).toHaveBeenCalledWith(fileUuid, expect.arrayContaining([
+        expect.objectContaining({type: 'remove_node'}),
+        expect.objectContaining({type: 'insert_node'}),
+      ]), 5, {username: 'writer@example.com'}, {transaction: true});
+      expect(createReviewApplyRegistration).toHaveBeenCalledWith(
+        expect.objectContaining({applyAttemptId: attemptId, status: 'applied'}), {transaction: true});
+      getReviewApplyRegistration.mockResolvedValue({doc_uuid: fileUuid,
+        apply_payload_digest: digest, status: 'applied', result});
+      documentManager.documents.delete(fileUuid);
+      await expect(documentManager.applyReviewChangeSet(fileUuid, 'test.sdoc', params,
+        'writer@example.com', [replaceCommand('reviewed')])).resolves.toEqual(result);
+      expect(recordOperations).toHaveBeenCalledTimes(1);
+    } finally {
+      save.mockRestore();
+    }
   });
 
   it('updates the in-memory document before recording operations', async () => {
@@ -182,6 +277,8 @@ describe('DocumentManager element command commits', () => {
     const first = applyCommands(documentManager, [replaceCommand('first')]);
     const second = applyCommands(documentManager, [replaceCommand('second')]);
 
+    await Promise.resolve();
+    await Promise.resolve();
     expect(seaServerAPI.getDocContent).toHaveBeenCalledTimes(1);
     load.resolve({
       data: {

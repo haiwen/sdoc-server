@@ -8,12 +8,13 @@ axios.defaults.timeout = 60 * 1000;
 
 class SeaServerAPI {
 
-  generateJwtToken = (docUuid, username) => {
+  generateJwtToken = (docUuid, username, claims = {}) => {
     // TODO: update file_uuid to doc_uuid
     let payload = {
       exp: Math.floor(Date.now() / 1000) + (5 * 60),
       permission: 'rw',
       file_uuid: docUuid,
+      ...claims,
     };
     if (username) {
       payload.username = username;
@@ -58,6 +59,42 @@ class SeaServerAPI {
 
     const config = this.getConfig(docUuid);
     return axios.post(uploadLink, formData, config);
+  };
+
+  sendReviewSaveResult = (saveResult) => {
+    const {
+      docUuid, applyAttemptId, operationLogCorrelationId, documentIncarnation,
+      appliedVersion, approvedBy, outcome, savedVersion,
+    } = saveResult;
+    const claims = {
+      purpose: 'sdoc_agent_save_result',
+      apply_attempt_id: applyAttemptId,
+      operation_log_correlation_id: operationLogCorrelationId,
+      doc_uuid: docUuid,
+      document_incarnation: documentIncarnation,
+      applied_sdoc_version: appliedVersion,
+      approved_by: approvedBy,
+      outcome,
+    };
+    if (outcome === 'persisted') {
+      claims.saved_sdoc_version = savedVersion;
+    }
+    const token = this.generateJwtToken(docUuid, '', claims);
+    const config = {
+      baseURL: SEAHUB_SERVER,
+      headers: { 'Authorization': 'Token ' + token },
+    };
+    return axios.post('/api/v2.1/ai/internal/sdoc-review-save-result/', {
+      apply_attempt_id: applyAttemptId,
+      operation_log_correlation_id: operationLogCorrelationId,
+      file_uuid: docUuid,
+      doc_uuid: docUuid,
+      document_incarnation: documentIncarnation,
+      applied_sdoc_version: appliedVersion,
+      approved_by: approvedBy,
+      outcome,
+      saved_sdoc_version: savedVersion,
+    }, config);
   };
 
   listComments = (docUuid) => {

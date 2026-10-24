@@ -22,6 +22,23 @@ class OperationsManager {
     this.cacheOperations(docUuid, operations, version);
   };
 
+  addOperations = async (docUuid, operations, version, user, options = {}) => {
+    if (!options.executor) {
+      return this.addOperationsInBackground(docUuid, operations, version, user);
+    }
+    // Save current operations into database
+    await recordOperations(
+      docUuid, operations, version, user,
+      options.executor,
+    );
+    if (!options.deferCache) this.addOperationsToCache(docUuid, operations, version);
+  };
+
+  addOperationsToCache = (docUuid, operations, version) => {
+    this.operationCountSinceUp++;
+    this.cacheOperations(docUuid, operations, version);
+  };
+
   cacheOperations = (docUuid, operations, version) => {
     let operationList = this.operationListMap.get(docUuid) || [];
     const item = {operations, version};
@@ -31,10 +48,6 @@ class OperationsManager {
     }
     this.operationListMap.set(docUuid, operationList);
   };
-  addOperations = (docUuid, operations, version, user) => {
-    return this.addOperationsInBackground(docUuid, operations, version, user);
-  };
-
   addOperationsInBackground = (docUuid, operations, version, user) => {
     this.recordOperationInMemory(docUuid, operations, version);
     try {
