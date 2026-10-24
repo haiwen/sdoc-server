@@ -3,7 +3,7 @@ import { Text } from '@seafile/slate';
 import logger from '../../../loggers';
 
 const TEXT_BLOCK_TYPES = new Set([
-  'title', 'subtitle', 'header1', 'header2', 'header3', 'header4', 'header5', 'header6', 'paragraph',
+  'header1', 'header2', 'header3', 'header4', 'header5', 'header6', 'paragraph',
 ]);
 // Section headings (chapter/section structure). title/subtitle are document
 // metadata and do NOT become part of a block's ancestor_path.
@@ -68,7 +68,9 @@ export function buildDocumentContext({elements, version, fileUuid, documentIncar
   };
 
   const addBlock = ({node, extraAncestors = [], kind = SUPPORTED_KIND}) => {
-    const leafCheck = isSinglePlainTextLeaf(node.children);
+    const leafCheck = TEXT_BLOCK_TYPES.has(node.type)
+      ? isSinglePlainTextLeaf(node.children)
+      : {supported: false, reason: 'unsupported_element_type'};
     if (!leafCheck.supported) {
       blocks.push({
         block_id: node.id,
@@ -170,7 +172,7 @@ export function buildDocumentContext({elements, version, fileUuid, documentIncar
     if (SECTION_HEADER_TYPES.has(node.type)) {
       pushHeader(node);
     }
-    if (TEXT_BLOCK_TYPES.has(node.type)) {
+    if (TEXT_BLOCK_TYPES.has(node.type) || node.type === 'title' || node.type === 'subtitle') {
       addBlock({node});
     } else if (LIST_TYPES.has(node.type)) {
       lists.push({

@@ -146,26 +146,26 @@ describe('SDoc review apply idempotency', () => {
   it('shares one cold-document load between Apply and ordinary callers', async () => {
     const manager = DocumentManager.getInstance();
     const originalDocuments = manager.documents;
-    const originalLoads = manager.docLoadPromises;
-    const originalLoadDoc = manager.loadDoc;
+    const originalLoads = manager.documentLoadPromises;
+    const originalLoadDoc = manager.loadDocFromServer;
     let resolveLoad;
     const loadPromise = new Promise(resolve => {
       resolveLoad = resolve;
     });
     manager.documents = new Map();
-    manager.docLoadPromises = new Map();
-    manager.loadDoc = jest.fn(() => loadPromise);
+    manager.documentLoadPromises = new Map();
+    manager.loadDocFromServer = jest.fn(() => loadPromise);
 
     try {
       const first = manager.getDoc('doc-uuid', 'Document');
       const second = manager.getDoc('doc-uuid', 'Document');
-      expect(manager.loadDoc).toHaveBeenCalledTimes(1);
+      expect(manager.loadDocFromServer).toHaveBeenCalledTimes(1);
       resolveLoad({version: 1});
       await expect(Promise.all([first, second])).resolves.toEqual([{version: 1}, {version: 1}]);
     } finally {
       manager.documents = originalDocuments;
-      manager.docLoadPromises = originalLoads;
-      manager.loadDoc = originalLoadDoc;
+      manager.documentLoadPromises = originalLoads;
+      manager.loadDocFromServer = originalLoadDoc;
     }
   });
 
@@ -231,32 +231,32 @@ describe('SDoc review apply idempotency', () => {
   it('makes concurrent document reads join an in-progress reload', async () => {
     const manager = DocumentManager.getInstance();
     const originalDocs = manager.documents;
-    const originalLoads = manager.docLoadPromises;
+    const originalLoads = manager.documentLoadPromises;
     const originalRemove = manager.removeDocFromMemoryUnsafe;
-    const originalLoad = manager.loadDoc;
+    const originalLoad = manager.loadDocFromServer;
     let finishLoad;
     const loadPromise = new Promise(resolve => {
       finishLoad = resolve;
     });
     manager.documents = new Map();
-    manager.docLoadPromises = new Map();
+    manager.documentLoadPromises = new Map();
     manager.removeDocFromMemoryUnsafe = jest.fn().mockResolvedValue(undefined);
-    manager.loadDoc = jest.fn().mockReturnValue(loadPromise);
+    manager.loadDocFromServer = jest.fn().mockReturnValue(loadPromise);
 
     try {
       const reload = manager.reloadDocUnsafe('doc-uuid', 'Document');
       await Promise.resolve();
       const concurrentRead = manager.getDoc('doc-uuid', 'Document', 'Document');
-      expect(manager.loadDoc).toHaveBeenCalledTimes(1);
+      expect(manager.loadDocFromServer).toHaveBeenCalledTimes(1);
 
       finishLoad({version: 2});
       await expect(reload).resolves.toEqual({version: 2});
       await expect(concurrentRead).resolves.toEqual({version: 2});
     } finally {
       manager.documents = originalDocs;
-      manager.docLoadPromises = originalLoads;
+      manager.documentLoadPromises = originalLoads;
       manager.removeDocFromMemoryUnsafe = originalRemove;
-      manager.loadDoc = originalLoad;
+      manager.loadDocFromServer = originalLoad;
     }
   });
 

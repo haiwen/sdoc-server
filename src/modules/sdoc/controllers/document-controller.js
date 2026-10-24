@@ -19,6 +19,9 @@ const statusToHttp = (result) => {
 class DocumentController {
 
   async applyElementCommands(req, res) {
+    if (req.payload && req.payload.purpose === 'sdoc_agent_apply') {
+      return documentController.applyReviewChangeSet(req, res);
+    }
     const { doc_uuid: docUuid } = req.params;
     const { file_uuid: fileUuid, permission, username, filename: docName, default_title: docTitle } = req.payload || {};
 
@@ -219,8 +222,10 @@ class DocumentController {
 
   async applyReviewChangeSet(req, res) {
     const { doc_uuid: requestedDocUuid } = req.params;
-    const { file_uuid: docUuid, filename: docName, purpose } = req.payload;
-    if (purpose !== 'sdoc_agent_apply') {
+    const { file_uuid: docUuid, filename: docName, purpose, permission, username } = req.payload;
+    if (purpose !== 'sdoc_agent_apply' || permission !== 'rw'
+        || typeof username !== 'string' || !username
+        || username !== req.payload.approved_by) {
       res.status(403).send({error_code: 'permission_denied'});
       return;
     }
@@ -229,7 +234,12 @@ class DocumentController {
       return;
     }
 
-    const params = req.body || {};
+    const {commands, review: params} = req.body || {};
+    if (!params || typeof params !== 'object' || !Array.isArray(commands)
+        || Object.keys(req.body).some(key => !['commands', 'review'].includes(key))) {
+      res.status(400).send({error_code: 'invalid_request'});
+      return;
+    }
     const requiredClaims = [
       'apply_attempt_id', 'task_id', 'review_decision_id', 'snapshot_id',
       'document_incarnation', 'changeset_revision_id', 'selection_digest',
@@ -254,7 +264,7 @@ class DocumentController {
 
     try {
       const documentManager = DocumentManager.getInstance();
-      const result = await documentManager.applyReviewChangeSet(docUuid, docName, params, req.payload.approved_by);
+      const result = await documentManager.applyReviewChangeSet(docUuid, docName, params, req.payload.approved_by, commands);
       res.status(statusToHttp(result)).send(result);
     } catch (error) {
       logger.error('Apply review change set failed:', error.message);

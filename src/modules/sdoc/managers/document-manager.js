@@ -20,35 +20,12 @@ import UsersManager from './users-manager';
 import ElementCommandManager from './element-command-manager';
 import IOHelper from '../wio/io-helper';
 import { buildDocumentContext } from '../utils/agent-context';
-import { applyPayloadDigest, selectionDigest, setBlockTypeHash, setListTypeHash, CanonicalizationError } from '../utils/sdoc-canonical';
+import { applyPayloadDigest, canonicalJsonDumps, selectionDigest, setBlockTypeHash, setListTypeHash, CanonicalizationError } from '../utils/sdoc-canonical';
 import { withTransaction } from '../../../db-helper';
 
-const REVIEW_BLOCK_TYPES = new Set([
-  'title', 'subtitle', 'header1', 'header2', 'header3', 'header4', 'header5', 'header6', 'paragraph', 'table_cell',
-]);
 const REVIEW_SAVE_RESULT_RETRY_INITIAL_DELAY = 5000;
 const REVIEW_SAVE_RESULT_RETRY_MAX_DELAY = 60000;
 const APPLY_REGISTRATION_LIMIT = 1000;
-
-const resolveLeafPath = (elements, blockId, textNodeId) => {
-  let result = null;
-
-  const visit = (node, path, block) => {
-    if (result || !node) return;
-    if (node.id === textNodeId && typeof node.text === 'string') {
-      if (block && block.id === blockId) {
-        result = {path};
-      }
-      return;
-    }
-    if (!Array.isArray(node.children)) return;
-    const nextBlock = REVIEW_BLOCK_TYPES.has(node.type) ? node : block;
-    node.children.forEach((child, index) => visit(child, path.concat(index), nextBlock));
-  };
-
-  elements.forEach((element, index) => visit(element, [index], null));
-  return result;
-};
 
 const buildApplyResult = (params, approvedBy, partial) => {
   return {
@@ -176,7 +153,7 @@ class DocumentManager {
   };
 
   reloadDocUnsafe = async (docUuid, docName) => {
-    const loading = this.docLoadPromises.get(docUuid);
+    const loading = this.documentLoadPromises.get(docUuid);
     if (loading) {
       return loading;
     }
@@ -188,19 +165,21 @@ class DocumentManager {
       await this.removeDocFromMemoryUnsafe(docUuid);
       // Reuse the ordinary load path so committed operation-log rows are
       // replayed before the replacement snapshot becomes visible in memory.
-      return this.loadDoc(docUuid, docName, docName);
+      return this.loadDocFromServer(docUuid, docName, docName);
     })();
-    this.docLoadPromises.set(docUuid, reloadPromise);
+    this.documentLoadPromises.set(docUuid, reloadPromise);
     try {
       return await reloadPromise;
     } finally {
-      if (this.docLoadPromises.get(docUuid) === reloadPromise) {
-        this.docLoadPromises.delete(docUuid);
+      if (this.documentLoadPromises.get(docUuid) === reloadPromise) {
+        this.documentLoadPromises.delete(docUuid);
       }
     }
   };
 
   getDoc = async (docUuid, docName, docTitle, username) => {
+    const loading = this.documentLoadPromises.get(docUuid);
+    if (loading) return loading;
     const document = this.documents.get(docUuid);
     if (document) {
       return document.toJson();
@@ -322,7 +301,7 @@ class DocumentManager {
   enqueueDocWrite = (docUuid, callback) => {
     const previous = this.docWriteQueues.get(docUuid) || Promise.resolve();
     const next = previous.catch(() => {}).then(callback);
-    const tracked = next.finally(() => {
+    const tracked = next.catch(() => {}).finally(() => {
       if (this.docWriteQueues.get(docUuid) === tracked) {
         this.docWriteQueues.delete(docUuid);
       }
@@ -491,7 +470,7 @@ class DocumentManager {
     return result;
   };
 
-  applyReviewChangeSet = async (docUuid, docName, params, approvedBy) => {
+  applyReviewChangeSet = async (docUuid, docName, params, approvedBy, requestedCommands) => {
     return this.enqueueDocWrite(docUuid, async () => {
       // Recompute both digests before preflight; mismatch is fail-closed.
       try {
@@ -562,7 +541,7 @@ class DocumentManager {
       const listById = new Map((projection.lists || []).map(list => [list.block_id, list]));
 
       const conflicts = [];
-      const operations = [];
+      const commands = [];
       for (const item of params.selected_items) {
         const target = item.target || {};
         const precondition = item.precondition || {};
@@ -600,12 +579,10 @@ class DocumentManager {
             conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
             continue;
           }
-          operations.push({
-            type: 'set_node',
-            path: [blockIndex],
-            node_id: target.block_id,
-            properties: {type: listNode.type},
-            newProperties: {type: item.after_type},
+          commands.push({
+            kind: 'update_element_attributes',
+            target_element_id: target.block_id,
+            payload: {type: item.after_type},
           });
           continue;
         }
@@ -649,12 +626,10 @@ class DocumentManager {
             conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
             continue;
           }
-          operations.push({
-            type: 'set_node',
-            path: [blockIndex],
-            node_id: target.block_id,
-            properties: {type: block.type},
-            newProperties: {type: item.after_type},
+          commands.push({
+            kind: 'update_element_attributes',
+            target_element_id: target.block_id,
+            payload: {type: item.after_type},
           });
           continue;
         }
@@ -675,15 +650,15 @@ class DocumentManager {
           conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
           continue;
         }
-        const resolved = resolveLeafPath(document.elements, target.block_id, target.text_node_id);
-        if (!resolved) {
-          conflicts.push({item_id: item.item_id, conflict_code: 'target_not_found'});
+        if (item.kind !== 'replace_block_text') {
+          conflicts.push({item_id: item.item_id, conflict_code: 'unsupported_content'});
           continue;
         }
-        operations.push(
-          {type: 'remove_text', path: resolved.path, node_id: target.text_node_id, offset: 0, text: precondition.before_leaf_text},
-          {type: 'insert_text', path: resolved.path, node_id: target.text_node_id, offset: 0, text: item.after_text},
-        );
+        commands.push({
+          kind: 'replace_element_content',
+          target_element_id: target.block_id,
+          payload: {text: item.after_text},
+        });
       }
 
       if (conflicts.length) {
@@ -691,16 +666,22 @@ class DocumentManager {
         return this.persistApplyResult(docUuid, params, result);
       }
 
-      const draft = new Document(docUuid, docName, {
-        version: document.version,
-        format_version: document.format_version,
-        elements: deepCopy(document.elements),
-        last_modify_user: document.last_modify_user,
-      });
-      if (!applyOperations(draft, deepCopy(operations), {username: approvedBy})) {
-        const result = buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'preflight_validation_failed'});
+      // Commands must describe exactly the signed approval, never arbitrary
+      // operations supplied alongside an otherwise valid review token.
+      if (requestedCommands && canonicalJsonDumps(requestedCommands) !== canonicalJsonDumps(commands)) {
+        const result = buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'invalid_selection_payload'});
         return this.persistApplyResult(docUuid, params, result);
       }
+      let plan;
+      try {
+        plan = new ElementCommandManager().prepare(document, {commands});
+      } catch (error) {
+        if (!error.error_code) throw error;
+        const result = buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: error.error_code});
+        return this.persistApplyResult(docUuid, params, result);
+      }
+      const operations = plan.operations;
+      const appliedVersion = document.version + 1;
 
       // The queue serializes normal unload/reload paths. Keep a final identity
       // fence immediately before the durable commit so a future caller cannot
@@ -721,7 +702,7 @@ class DocumentManager {
 
       const result = buildApplyResult(params, approvedBy, {
         status: 'applied',
-        applied_sdoc_version: draft.version,
+        applied_sdoc_version: appliedVersion,
         operation_log_correlation_id: params.apply_attempt_id,
         persistence_status: 'not_requested',
       });
@@ -735,12 +716,12 @@ class DocumentManager {
             status: result.status,
             result,
           }, executor);
-          await operationsManager.addOperations(docUuid, operations, draft.version, {username: approvedBy}, {
+          await operationsManager.addOperations(docUuid, operations, appliedVersion, {username: approvedBy}, {
             executor,
             deferCache: true,
           });
         });
-        operationsManager.addOperationsToCache(docUuid, operations, draft.version);
+        operationsManager.addOperationsToCache(docUuid, operations, appliedVersion);
       } catch (error) {
         const existingResult = await this.getPersistedApplyResult(docUuid, params, approvedBy);
         if (existingResult) return existingResult;
@@ -751,20 +732,18 @@ class DocumentManager {
         return this.persistApplyResult(docUuid, params, failedResult);
       }
 
-      document.elements = draft.elements;
-      document.version = draft.version;
-      document.last_modify_user = draft.last_modify_user;
-      document.setMeta({need_save: true});
+      document.setLastModifyUser({username: approvedBy});
+      document.setValue(plan.elements, appliedVersion);
       this.registerReviewSaveTask(docUuid, {
         applyAttemptId: params.apply_attempt_id,
         operationLogCorrelationId: params.apply_attempt_id,
-        appliedVersion: draft.version,
+        appliedVersion,
         documentIncarnation: params.document_incarnation,
         approvedBy,
       });
       IOHelper.getInstance().sendDocumentUpdateToRoom(docUuid, {
         operations,
-        version: draft.version,
+        version: appliedVersion,
         user: {username: approvedBy},
         selection: null,
         cursor_data: null,
@@ -779,12 +758,15 @@ class DocumentManager {
   getApplyResult = async (docUuid, applyAttemptId) => {
     return this.enqueueDocWrite(docUuid, async () => {
       const persisted = await getReviewApplyRegistration(applyAttemptId);
+      if (persisted && persisted.doc_uuid !== docUuid) {
+        return {error_code: 'attempt_not_found'};
+      }
       if (persisted && persisted.doc_uuid === docUuid) {
         this.setApplyRegistration(applyAttemptId, {status: persisted.status, result: persisted.result});
         return persisted.result;
       }
       const registration = this.applyRegistrations.get(applyAttemptId);
-      if (!registration) {
+      if (!registration || registration.result.doc_uuid !== docUuid) {
         return {error_code: 'attempt_not_found'};
       }
       return registration.result;
@@ -824,7 +806,7 @@ class DocumentManager {
   };
 
   removeDocFromMemoryUnsafe = async (docUuid) => {
-    this.docLoadPromises.delete(docUuid);
+    this.documentLoadPromises.delete(docUuid);
     if (this.documents.has(docUuid)) {
       logger.info('Removed doc ', docUuid, ' from memory');
       const operationsManager = OperationsManager.getInstance();
@@ -839,6 +821,10 @@ class DocumentManager {
   };
 
   applyElementCommands = async (docUuid, docName, docTitle, username, request) => {
+    return this.enqueueDocWrite(docUuid, () => this.applyElementCommandsUnsafe(docUuid, docName, docTitle, username, request));
+  };
+
+  applyElementCommandsUnsafe = async (docUuid, docName, docTitle, username, request) => {
     if (!this.documents.get(docUuid)) {
       await this.getDoc(docUuid, docName, docTitle, username);
     }

@@ -23,6 +23,9 @@ class OperationsManager {
   };
 
   addOperations = async (docUuid, operations, version, user, options = {}) => {
+    if (!options.executor) {
+      return this.addOperationsInBackground(docUuid, operations, version, user);
+    }
     // Save current operations into database
     await recordOperations(
       docUuid, operations, version, user,

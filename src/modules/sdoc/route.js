@@ -11,8 +11,7 @@ router.delete(`${BASE_URL_VERSION1}/:doc_uuid/`, documentController.removeConten
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/normalize-sdoc`, documentController.normalizeSdoc);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/save/`, formdata.none(), documentController.saveDoc);
 router.get(`${BASE_URL_VERSION1}/:doc_uuid/review-snapshot/`, documentController.getReviewSnapshot);
-router.post(`${BASE_URL_VERSION1}/:doc_uuid/apply-change-set/`, formdata.none(), documentController.applyReviewChangeSet);
-router.get(`${BASE_URL_VERSION1}/:doc_uuid/agent-applies/:apply_attempt_id/`, documentController.getApplyResult);
+router.get(`${BASE_URL_VERSION1}/:doc_uuid/element-commands/:apply_attempt_id/`, documentController.getApplyResult);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/publish/`, formdata.fields([{name: 'origin_doc_uuid', maxCount: 1}, {name: 'origin_doc_name', maxCount: 1}]), documentController.publishDoc);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/replace/`, formdata.single('doc_name'), documentController.reloadDoc);
 router.post(`${BASE_URL_VERSION1}/:doc_uuid/element-commands`, documentController.applyElementCommands);
