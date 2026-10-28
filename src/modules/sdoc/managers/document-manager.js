@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { v4 } from "uuid";
+import { v4, v5 } from "uuid";
 import deepCopy from 'deep-copy';
 import { SAVE_INTERVAL, SEAHUB_SERVER } from "../../../config/config";
 import logger from "../../../loggers";
@@ -10,9 +10,48 @@ import Document from '../models/document';
 import { generateDefaultDocContent, isSdocContentValid, normalizeChildren } from '../models/document-utils';
 import { applyOperations } from '../utils/slate-utils';
 import { listPendingOperationsByDoc } from '../dao/operation-log';
+import {
+  getReviewApplyRegistration, createReviewApplyRegistration,
+  listPendingReviewSaveRegistrations, markReviewApplyPersistence,
+  listPendingReviewSaveDocUuids,
+} from '../dao/review-apply';
 import OperationsManager from './operations-manager';
 import UsersManager from './users-manager';
 import ElementCommandManager from './element-command-manager';
+import IOHelper from '../wio/io-helper';
+import { buildDocumentContext } from '../utils/agent-context';
+import { applyPayloadDigest, canonicalJsonDumps, selectionDigest, CanonicalizationError } from '../utils/sdoc-canonical';
+import { withTransaction } from '../../../db-helper';
+
+const REVIEW_SAVE_RESULT_RETRY_INITIAL_DELAY = 5000;
+const REVIEW_SAVE_RESULT_RETRY_MAX_DELAY = 60000;
+const APPLY_REGISTRATION_LIMIT = 1000;
+
+const buildApplyResult = (params, approvedBy, partial) => {
+  return {
+    schema_version: 'sdoc-apply-result/v1',
+    apply_attempt_id: params.apply_attempt_id,
+    task_id: params.task_id,
+    review_decision_id: params.review_decision_id,
+    snapshot_id: params.snapshot_id,
+    document_incarnation: params.document_incarnation,
+    file_uuid: params.file_uuid,
+    doc_uuid: params.doc_uuid,
+    changeset_revision_id: params.changeset_revision_id,
+    changeset_revision: params.changeset_revision,
+    card_revision: params.card_revision,
+    decision_kind: params.decision_kind,
+    selection_digest: params.selection_digest,
+    apply_payload_digest: params.apply_payload_digest,
+    approved_by: approvedBy,
+    status: partial.status,
+    conflicts: partial.conflicts || [],
+    applied_sdoc_version: partial.applied_sdoc_version ?? null,
+    operation_log_correlation_id: partial.operation_log_correlation_id ?? null,
+    persistence_status: partial.persistence_status || 'not_requested',
+    error_code: partial.error_code || null,
+  };
+};
 
 class DocumentManager {
 
@@ -21,6 +60,11 @@ class DocumentManager {
     this.users = [];
     this.documents = new Map();
     this.documentLoadPromises = new Map();
+    this.docWriteQueues = new Map();
+    this.reviewSaveTasks = new Map();
+    this.reviewSaveRetryStates = new Map();
+    this.applyRegistrations = new Map();
+    this.pendingReviewCommits = new Map();
 
     // save infos
     this.isSaving = false;
@@ -36,13 +80,15 @@ class DocumentManager {
   };
 
   startSaveTimer = () => {
+    this.recoverReviewSaveResults().catch(error => logger.error('Recover SDoc review save results failed:', error.message));
     this.saveTimer = setInterval(() => {
-      this.saveAllDocs();
+      this.saveAllDocs().catch(error => logger.error('Save SDoc documents failed:', error.message));
+      this.recoverReviewSaveResults().catch(error => logger.error('Recover SDoc review save results failed:', error.message));
     }, SAVE_INTERVAL);
 
     process.on('SIGTERM', () => {
       logger.info('Exiting server process:', process.pid);
-      this.saveAllDocs();
+      this.saveAllDocs().catch(error => logger.error('Save SDoc documents failed:', error.message));
       setInterval(() => {
         clearInterval(this.saveTimer);
         process.kill(process.pid, 'SIGKILL');
@@ -61,55 +107,89 @@ class DocumentManager {
     let savedDocs = [];
     let unsavedDocs = [];
     const startTime = Date.now();
-    const docUuids = this.documents.keys();
-    for (let docUuid of docUuids) {
-      // Save document
-      const saveFlag = await this.saveDoc(docUuid);
-      if (saveFlag) {
-        savedDocs.push(docUuid);
-      } else {
-        unsavedDocs.push(docUuid);
+    try {
+      const docUuids = this.documents.keys();
+      for (let docUuid of docUuids) {
+        try {
+          const saveFlag = await this.saveDoc(docUuid);
+          if (saveFlag) {
+            savedDocs.push(docUuid);
+          } else {
+            unsavedDocs.push(docUuid);
+          }
+        } catch (error) {
+          // A fenced document must not stop unrelated documents from saving.
+          // Leave it in memory for reconciliation on the next pass.
+          logger.error('Save SDoc failed:', docUuid, error.message);
+        }
+      }
+      await this.removeDocsWithNoAccess(unsavedDocs);
+    } finally {
+      this.isSaving = false;
+      this.lastSavingInfo.count = savedDocs.length;
+      this.lastSavingInfo.startTime = startTime;
+      this.lastSavingInfo.endTime = Date.now();
+      logger.info(`${savedDocs.length} docs saved.`);
+    }
+  };
+
+  recoverReviewSaveResults = async () => {
+    const docUuids = await listPendingReviewSaveDocUuids();
+    for (const docUuid of docUuids) {
+      try {
+        const result = await seaServerAPI.getDocContent(docUuid);
+        const savedVersion = result && result.data && result.data.version;
+        if (typeof savedVersion === 'number') {
+          await this.sendReviewSaveResults(docUuid, savedVersion, 'persisted');
+        }
+      } catch (error) {
+        const message = getErrorMessage(error);
+        if (message && message.status === 404) {
+          await this.sendReviewSaveResults(docUuid, 0, 'file_unavailable');
+        } else {
+          logger.error('Recover SDoc review save result failed:', error.message);
+        }
       }
     }
-    // record saving message
-    const count = savedDocs.length;
-    logger.info(`${count} docs saved.`);
-
-    this.isSaving = false;
-    this.lastSavingInfo.count = count;
-    this.lastSavingInfo.startTime = startTime;
-    this.lastSavingInfo.endTime = Date.now();
-
-    this.removeDocsWithNoAccess(unsavedDocs);
   };
 
   reloadDoc = async (docUuid, docName) => {
-    this.removeDocFromMemory(docUuid);
+    return this.enqueueDocWrite(docUuid, () => this.reloadDocUnsafe(docUuid, docName));
+  };
 
-    let result = null;
+  reloadDocUnsafe = async (docUuid, docName) => {
+    const loading = this.documentLoadPromises.get(docUuid);
+
+    // Publish the reload promise before removing the cached document. A
+    // concurrent getDoc() then joins this reload instead of loading an older
+    // snapshot in parallel and later replacing the post-Apply document.
+    const reloadPromise = Promise.resolve().then(async () => {
+      if (loading) {
+        // An old cold load is not the requested reload. Even if it failed,
+        // fetch the replacement and replay its committed operations.
+        await loading.catch(error => logger.error('Load before SDoc reload failed:', docUuid, error.message));
+      }
+      await this.removeDocFromMemoryUnsafe(docUuid, true);
+      // Reuse the ordinary load path so committed operation-log rows are
+      // replayed before the replacement snapshot becomes visible in memory.
+      return this.loadDocFromServer(docUuid, docName, docName);
+    });
+    this.documentLoadPromises.set(docUuid, reloadPromise);
     try {
-      result = await seaServerAPI.getDocContent(docUuid);
-    } catch (err) {
-      errorHandle(err);
-      const error = new Error('The content of the document loaded error');
-      error.error_type = 'content_load_invalid';
-      error.from_url = `${SEAHUB_SERVER}/api/v2.1/seadoc/content/${docUuid}/`;
-      throw error;
+      return await reloadPromise;
+    } finally {
+      if (this.documentLoadPromises.get(docUuid) === reloadPromise) {
+        this.documentLoadPromises.delete(docUuid);
+      }
     }
-
-    const docContent = result.data ? result.data : generateDefaultDocContent(docName);
-    if (!isSdocContentValid(docContent)) {
-      const error = new Error('The content of the document does not conform to the sdoc specification');
-      error.error_type = 'content_invalid';
-      throw error;
-    }
-    const doc = new Document(docUuid, docName, docContent);
-
-    this.documents.set(docUuid, doc);
-    return doc.toJson();
   };
 
   getDoc = async (docUuid, docName, docTitle, username) => {
+    if (this.pendingReviewCommits.has(docUuid)) {
+      return this.enqueueDocWrite(docUuid, () => this.getDoc(docUuid, docName, docTitle, username));
+    }
+    const loading = this.documentLoadPromises.get(docUuid);
+    if (loading) return loading;
     const document = this.documents.get(docUuid);
     if (document) {
       return document.toJson();
@@ -153,6 +233,7 @@ class DocumentManager {
 
     }
     const doc = new Document(docUuid, docName, docContent);
+    const persistedVersion = doc.version;
 
     // apply pending operations
     const results = await listPendingOperationsByDoc(docUuid, doc.version);
@@ -162,15 +243,21 @@ class DocumentManager {
     }
 
     this.documents.set(docUuid, doc);
+    this.sendReviewSaveResults(docUuid, persistedVersion, 'persisted')
+      .catch(error => logger.error('Recover SDoc review save result failed:', error.message));
     // save doc when content is empty
     if (!result.data) {
       doc.setMeta({need_save: true});
-      await this.saveDoc(docUuid);
+      await this.saveDocUnsafe(docUuid);
     }
     return doc.toJson();
   };
 
   saveDoc = async (docUuid) => {
+    return this.enqueueDocWrite(docUuid, () => this.saveDocUnsafe(docUuid));
+  };
+
+  saveDocUnsafe = async (docUuid) => {
     const document = this.documents.get(docUuid);
     // The save function is an asynchronous function, which does not affect the normal execution of other programs,
     // and there is a possibility that the file has been deleted when the next file is saved
@@ -186,41 +273,633 @@ class DocumentManager {
     document.setMeta({is_saving: true});
 
     // Get save info
-    const { version, format_version, elements, docName, last_modify_user = '' } = document;
-    const docContent = { version, format_version, elements, last_modify_user };
+    const { version: savingVersion, format_version, elements, docName, last_modify_user = '' } = document;
+    const docContent = { version: savingVersion, format_version, elements, last_modify_user };
 
     let saveFlag = false;
+    let saveErrorMessage = null;
     const tempPath = `/tmp/` + v4();
     fs.writeFileSync(tempPath, JSON.stringify(docContent), { flag: 'w+' });
     try {
       await seaServerAPI.saveDocContent(docUuid, {path: tempPath}, docContent.last_modify_user);
       saveFlag = true;
       logger.info(`${docName}(${docUuid}) saved`);
+      await this.sendReviewSaveResults(docUuid, savingVersion, 'persisted');
     } catch(err) {
       saveFlag = false;
       const message = getErrorMessage(err);
+      saveErrorMessage = message;
       if (message.status && message.status === 404) {
         logger.info(`${docName}(${docUuid}) save failed`);
         logger.info(JSON.stringify(message));
-        await this.removeDoc(docUuid);
+        await this.sendReviewSaveResults(docUuid, savingVersion, 'file_unavailable');
+        await this.removeDocFromMemoryUnsafe(docUuid);
       } else {
         logger.error(`${docName}(${docUuid}) save failed`);
         logger.error(JSON.stringify(message));
+        await this.sendReviewSaveResults(docUuid, savingVersion, 'save_pending');
       }
     } finally {
       deleteDir(tempPath);
     }
 
-    document.setMeta({is_saving: false, need_save: false});
+    const needSave = saveFlag ? document.version !== savingVersion : !(saveErrorMessage && saveErrorMessage.status === 404);
+    document.setMeta({is_saving: false, need_save: needSave});
     return Promise.resolve(saveFlag);
   };
 
-  removeDoc = async (docUuid) => {
-    const removeFlag = await this.removeDocFromMemory(docUuid);
-    return Promise.resolve(removeFlag);
+  enqueueDocWrite = (docUuid, callback) => {
+    const previous = this.docWriteQueues.get(docUuid) || Promise.resolve();
+    const next = previous.catch(() => {}).then(async () => {
+      // An uncertain commit must be reconciled before any writer (including
+      // saves, reloads and eviction) can use the old in-memory baseline.
+      if (this.pendingReviewCommits.has(docUuid)) {
+        await this.recoverReviewCommit(docUuid);
+      }
+      return callback();
+    });
+    const tracked = next.catch(() => {}).finally(() => {
+      if (this.docWriteQueues.get(docUuid) === tracked) {
+        this.docWriteQueues.delete(docUuid);
+      }
+    });
+    this.docWriteQueues.set(docUuid, tracked);
+    return next;
   };
 
-  removeDocFromMemory = async (docUuid) => {
+  registerReviewSaveTask = (docUuid, task) => {
+    const tasks = this.reviewSaveTasks.get(docUuid) || [];
+    if (!tasks.some(item => item.applyAttemptId === task.applyAttemptId && item.appliedVersion === task.appliedVersion)) {
+      tasks.push(task);
+      this.reviewSaveTasks.set(docUuid, tasks);
+    }
+  };
+
+  clearReviewSaveResultRetry = (docUuid) => {
+    const state = this.reviewSaveRetryStates.get(docUuid);
+    if (state && state.timer) {
+      clearTimeout(state.timer);
+    }
+    this.reviewSaveRetryStates.delete(docUuid);
+  };
+
+  scheduleReviewSaveResultRetry = (docUuid, savedVersion, outcome) => {
+    const previous = this.reviewSaveRetryStates.get(docUuid);
+    const delay = previous
+      ? Math.min(previous.delay * 2, REVIEW_SAVE_RESULT_RETRY_MAX_DELAY)
+      : REVIEW_SAVE_RESULT_RETRY_INITIAL_DELAY;
+    if (previous && previous.timer) {
+      clearTimeout(previous.timer);
+    }
+    const timer = setTimeout(() => {
+      this.reviewSaveRetryStates.set(docUuid, {...this.reviewSaveRetryStates.get(docUuid), timer: null});
+      this.sendReviewSaveResults(docUuid, savedVersion, outcome, true)
+        .catch(error => logger.error('Retry SDoc review save result failed:', error.message));
+    }, delay);
+    this.reviewSaveRetryStates.set(docUuid, {timer, delay, savedVersion, outcome});
+  };
+
+  sendReviewSaveResults = async (docUuid, savedVersion, outcome, isRetry = false) => {
+    if (!isRetry) {
+      this.clearReviewSaveResultRetry(docUuid);
+    }
+    let persistedRegistrations = [];
+    try {
+      persistedRegistrations = await listPendingReviewSaveRegistrations(
+        docUuid, outcome === 'persisted' ? savedVersion : null);
+    } catch (error) {
+      logger.error('Load pending SDoc review save results failed:', error.message);
+    }
+    const taskByAttemptId = new Map();
+    for (const task of this.reviewSaveTasks.get(docUuid) || []) {
+      taskByAttemptId.set(task.applyAttemptId, task);
+    }
+    for (const registration of persistedRegistrations) {
+      const result = registration.result || {};
+      taskByAttemptId.set(registration.apply_attempt_id, {
+        applyAttemptId: registration.apply_attempt_id,
+        operationLogCorrelationId: result.operation_log_correlation_id,
+        documentIncarnation: result.document_incarnation,
+        appliedVersion: registration.applied_sdoc_version,
+        approvedBy: result.approved_by,
+      });
+    }
+    const tasks = Array.from(taskByAttemptId.values());
+    const remaining = [];
+    let deliveryFailed = false;
+    for (const task of tasks) {
+      if (outcome === 'persisted' && task.appliedVersion > savedVersion) {
+        remaining.push(task);
+        continue;
+      }
+      try {
+        await seaServerAPI.sendReviewSaveResult({
+          docUuid,
+          applyAttemptId: task.applyAttemptId,
+          operationLogCorrelationId: task.operationLogCorrelationId,
+          documentIncarnation: task.documentIncarnation,
+          appliedVersion: task.appliedVersion,
+          approvedBy: task.approvedBy,
+          outcome,
+          savedVersion,
+        });
+        if (outcome === 'persisted') {
+          await markReviewApplyPersistence(task.applyAttemptId, 'persisted');
+        } else if (outcome === 'file_unavailable') {
+          await markReviewApplyPersistence(task.applyAttemptId, 'file_unavailable');
+        }
+        if (outcome === 'save_pending') {
+          remaining.push(task);
+        }
+      } catch (error) {
+        logger.error('Send SDoc review save result failed:', error.message);
+        remaining.push(task);
+        deliveryFailed = true;
+      }
+    }
+    if (remaining.length) {
+      this.reviewSaveTasks.set(docUuid, remaining);
+    } else {
+      this.reviewSaveTasks.delete(docUuid);
+    }
+    // A successful file upload must not depend on need_save remaining true in
+    // order to deliver its Review result. Retry the callback independently.
+    // This intentionally provides process-local recovery only.
+    if (deliveryFailed && outcome !== 'save_pending') {
+      this.scheduleReviewSaveResultRetry(docUuid, savedVersion, outcome);
+    } else {
+      this.clearReviewSaveResultRetry(docUuid);
+    }
+  };
+
+  setApplyRegistration = (applyAttemptId, registration) => {
+    if (!this.applyRegistrations.has(applyAttemptId)
+        && this.applyRegistrations.size >= APPLY_REGISTRATION_LIMIT) {
+      for (const [registeredAttemptId, registered] of this.applyRegistrations) {
+        if (this.applyRegistrations.size < APPLY_REGISTRATION_LIMIT) {
+          break;
+        }
+        if (registered.status !== 'committing') {
+          this.applyRegistrations.delete(registeredAttemptId);
+        }
+      }
+    }
+    this.applyRegistrations.set(applyAttemptId, registration);
+  };
+
+  getPersistedApplyResult = async (docUuid, params, approvedBy) => {
+    const registration = await getReviewApplyRegistration(params.apply_attempt_id);
+    if (!registration) return null;
+    if (registration.doc_uuid !== docUuid || registration.apply_payload_digest !== params.apply_payload_digest) {
+      return buildApplyResult(params, approvedBy, {
+        status: 'failed_precommit', error_code: 'invalid_selection_payload',
+      });
+    }
+    this.setApplyRegistration(params.apply_attempt_id, {
+      status: registration.status,
+      result: registration.result,
+    });
+    return registration.result;
+  };
+
+  persistApplyResult = async (docUuid, params, result) => {
+    try {
+      await createReviewApplyRegistration({
+        applyAttemptId: params.apply_attempt_id,
+        docUuid,
+        applyPayloadDigest: params.apply_payload_digest,
+        status: result.status,
+        result,
+      });
+    } catch (error) {
+      const existing = await getReviewApplyRegistration(params.apply_attempt_id);
+      if (!existing) throw error;
+      if (existing.doc_uuid !== docUuid || existing.apply_payload_digest !== params.apply_payload_digest) {
+        throw error;
+      }
+      this.setApplyRegistration(params.apply_attempt_id, {
+        status: existing.status,
+        result: existing.result,
+      });
+      return existing.result;
+    }
+    this.setApplyRegistration(params.apply_attempt_id, {status: result.status, result});
+    return result;
+  };
+
+  finishReviewCommit = (docUuid, pending, result) => {
+    const {document, plan, params, approvedBy} = pending;
+    const appliedVersion = result.applied_sdoc_version;
+    // Only a locally retained, uninstalled plan enters here. Historical
+    // receipts use the ordinary operation-log replay path instead.
+    if (!pending.cacheInstalled) {
+      OperationsManager.getInstance().recordOperationInMemory(docUuid, plan.operations, appliedVersion);
+      pending.cacheInstalled = true;
+    }
+    if (!pending.documentInstalled) {
+      document.setLastModifyUser({username: approvedBy});
+      document.setValue(plan.elements, appliedVersion);
+      pending.documentInstalled = true;
+    }
+    this.registerReviewSaveTask(docUuid, {
+      applyAttemptId: params.apply_attempt_id,
+      operationLogCorrelationId: result.operation_log_correlation_id,
+      appliedVersion,
+      documentIncarnation: params.document_incarnation,
+      approvedBy,
+    });
+    if (!pending.broadcastSent) {
+      IOHelper.getInstance().sendDocumentUpdate(docUuid, {
+        operations: plan.operations,
+        version: appliedVersion,
+        user: {username: approvedBy},
+        selection: null,
+        cursor_data: null,
+      });
+      pending.broadcastSent = true;
+    }
+    this.saveDoc(docUuid).catch(error => logger.error('Save reviewed document failed:', error));
+    this.setApplyRegistration(params.apply_attempt_id, {status: 'applied', result});
+    this.pendingReviewCommits.delete(docUuid);
+    return result;
+  };
+
+  recoverReviewCommit = async (docUuid) => {
+    const pending = this.pendingReviewCommits.get(docUuid);
+    const {params, approvedBy} = pending;
+    // Locking/current read waits for the original INSERT's transaction to
+    // finish, including when COMMIT/ROLLBACK acknowledgements were lost.
+    // A failed query leaves the fence and plan intact for the next caller.
+    const registration = await withTransaction(executor =>
+      getReviewApplyRegistration(params.apply_attempt_id, executor, true));
+    if (registration) {
+      if (registration.doc_uuid !== docUuid || registration.apply_payload_digest !== params.apply_payload_digest) {
+        const result = buildApplyResult(params, approvedBy, {
+          status: 'failed_precommit', error_code: 'invalid_selection_payload',
+        });
+        this.setApplyRegistration(params.apply_attempt_id, {status: result.status, result});
+        this.pendingReviewCommits.delete(docUuid);
+        return result;
+      }
+      if (registration.status === 'applied') {
+        return this.finishReviewCommit(docUuid, pending, registration.result);
+      }
+      this.setApplyRegistration(params.apply_attempt_id, {status: registration.status, result: registration.result});
+      this.pendingReviewCommits.delete(docUuid);
+      return registration.result;
+    }
+    const result = await this.persistApplyResult(docUuid, params, buildApplyResult(params, approvedBy, {
+      status: 'failed_precommit', error_code: 'operation_log_failed',
+    }));
+    if (result.status === 'applied') return this.finishReviewCommit(docUuid, pending, result);
+    this.pendingReviewCommits.delete(docUuid);
+    return result;
+  };
+
+  applyReviewChangeSet = async (docUuid, docName, params, approvedBy, requestedCommands) => {
+    return this.enqueueDocWrite(docUuid, async () => {
+      // Recompute both digests before preflight; mismatch is fail-closed.
+      try {
+        const computedSelection = selectionDigest({
+          taskId: params.task_id,
+          cardRevision: params.card_revision,
+          changesetRevision: params.changeset_revision,
+          decisionKind: params.decision_kind,
+          selectedChangeItemIds: params.selected_change_item_ids,
+        });
+        if (computedSelection !== params.selection_digest) {
+          return buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'invalid_selection_payload'});
+        }
+        const computedPayload = applyPayloadDigest({
+          taskId: params.task_id,
+          reviewDecisionId: params.review_decision_id,
+          cardRevision: params.card_revision,
+          changesetRevisionId: params.changeset_revision_id,
+          changesetRevision: params.changeset_revision,
+          selectionDigestValue: params.selection_digest,
+          selectedItems: params.selected_items,
+        });
+        if (computedPayload !== params.apply_payload_digest) {
+          return buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'invalid_selection_payload'});
+        }
+      } catch (error) {
+        if (error instanceof CanonicalizationError) {
+          return buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'invalid_selection_payload'});
+        }
+        throw error;
+      }
+
+      const persistedResult = await this.getPersistedApplyResult(docUuid, params, approvedBy);
+      if (persistedResult) return persistedResult;
+
+      let document = this.documents.get(docUuid);
+      if (!document) {
+        try {
+          await this.getDoc(docUuid, docName);
+        } catch (error) {
+          if (error.error_code !== 'document_not_found') throw error;
+          return this.persistApplyResult(docUuid, params, buildApplyResult(params, approvedBy, {
+            status: 'failed_precommit', error_code: 'document_unavailable',
+          }));
+        }
+        document = this.documents.get(docUuid);
+      }
+      if (!document) {
+        const result = buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'document_unavailable'});
+        return this.persistApplyResult(docUuid, params, result);
+      }
+
+      const existing = this.applyRegistrations.get(params.apply_attempt_id);
+      if (existing) {
+        return existing.result;
+      }
+
+      if (document.document_incarnation !== params.document_incarnation) {
+        const result = buildApplyResult(params, approvedBy, {
+          status: 'preflight_conflicted',
+          conflicts: [{item_id: null, conflict_code: 'document_incarnation_changed'}],
+        });
+        return this.persistApplyResult(docUuid, params, result);
+      }
+
+      // Resolve each selected item against the current document projection.
+      const projection = buildDocumentContext({
+        elements: document.elements,
+        version: document.version,
+        fileUuid: docUuid,
+        documentIncarnation: document.document_incarnation,
+        snapshotId: params.snapshot_id,
+      });
+      const blockById = new Map(projection.blocks.map(block => [block.block_id, block]));
+      const listById = new Map((projection.lists || []).map(list => [list.block_id, list]));
+      const tableById = new Map((projection.tables || []).map(table => [table.block_id, table]));
+
+      const conflicts = [];
+      const commands = [];
+      for (const item of params.selected_items) {
+        const target = item.target || {};
+        const precondition = item.precondition || {};
+
+        if (item.kind === 'insert_block') {
+          const anchor = blockById.get(target.block_id) || listById.get(target.block_id);
+          if (!anchor) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'target_not_found'});
+            continue;
+          }
+          if (anchor.type !== target.block_type) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'block_type_mismatch'});
+            continue;
+          }
+          if ((anchor.container_path || []).length !== 0) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'invalid_anchor'});
+            continue;
+          }
+          if (canonicalJsonDumps(anchor.ancestor_path) !== canonicalJsonDumps(target.ancestor_path)) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'ancestor_path_mismatch'});
+            continue;
+          }
+          if (anchor.structure_before_hash !== precondition.canonical_before_hash) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
+            continue;
+          }
+          commands.push({
+            kind: 'insert_element',
+            parent_element_id: null,
+            [`${item.placement}_element_id`]: target.block_id,
+            payload: {type: item.after_type, text: item.after_text},
+          });
+          continue;
+        }
+
+        if (item.kind === 'delete_block') {
+          const node = blockById.get(target.block_id) || listById.get(target.block_id) || tableById.get(target.block_id);
+          if (!node) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'target_not_found'});
+            continue;
+          }
+          if (node.type !== target.block_type) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'block_type_mismatch'});
+            continue;
+          }
+          if (canonicalJsonDumps(node.ancestor_path) !== canonicalJsonDumps(target.ancestor_path)) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'ancestor_path_mismatch'});
+            continue;
+          }
+          if (node.structure_before_hash !== precondition.canonical_before_hash) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
+            continue;
+          }
+          commands.push({
+            kind: 'delete_element',
+            target_element_id: target.block_id,
+          });
+          continue;
+        }
+
+        if (item.kind === 'set_list_type') {
+          const listNode = listById.get(target.block_id);
+          if (!listNode) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'target_not_found'});
+            continue;
+          }
+          if (listNode.type !== target.block_type) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'block_type_mismatch'});
+            continue;
+          }
+          if (canonicalJsonDumps(listNode.ancestor_path) !== canonicalJsonDumps(target.ancestor_path)) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'ancestor_path_mismatch'});
+            continue;
+          }
+          if (listNode.canonical_before_hash !== precondition.canonical_before_hash) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
+            continue;
+          }
+          commands.push({
+            kind: 'update_element_attributes',
+            target_element_id: target.block_id,
+            payload: {type: item.after_type},
+          });
+          continue;
+        }
+
+        const block = blockById.get(target.block_id);
+        if (!block) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'target_not_found'});
+          continue;
+        }
+
+        if (item.kind === 'set_block_type') {
+          if (!(block.capabilities?.set_block_type?.allowed_types || []).includes(item.after_type)) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'unsupported_content'});
+            continue;
+          }
+          if (block.type !== target.block_type) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'block_type_mismatch'});
+            continue;
+          }
+          if (canonicalJsonDumps(block.ancestor_path) !== canonicalJsonDumps(target.ancestor_path)) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'ancestor_path_mismatch'});
+            continue;
+          }
+          const currentHash = block.type_before_hash;
+          if (currentHash !== precondition.canonical_before_hash) {
+            conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
+            continue;
+          }
+          commands.push({
+            kind: 'update_element_attributes',
+            target_element_id: target.block_id,
+            payload: {type: item.after_type},
+          });
+          continue;
+        }
+
+        if (!block.supported) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'unsupported_content'});
+          continue;
+        }
+        if (block.type !== target.block_type) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'block_type_mismatch'});
+          continue;
+        }
+        if (canonicalJsonDumps(block.ancestor_path) !== canonicalJsonDumps(target.ancestor_path)) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'ancestor_path_mismatch'});
+          continue;
+        }
+        if (block.canonical_before_hash !== precondition.canonical_before_hash || block.before_leaf_text !== precondition.before_leaf_text) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'before_hash_mismatch'});
+          continue;
+        }
+        const cell = item.kind === 'replace_table_cell_text';
+        if ((cell && block.type !== 'table_cell') || (!cell && item.kind !== 'replace_block_text') ||
+          (!cell && block.type === 'table_cell')) {
+          conflicts.push({item_id: item.item_id, conflict_code: 'unsupported_content'});
+          continue;
+        }
+        commands.push({
+          kind: 'replace_element_content',
+          target_element_id: target.block_id,
+          payload: {text: item.after_text},
+        });
+      }
+
+      if (conflicts.length) {
+        const result = buildApplyResult(params, approvedBy, {status: 'preflight_conflicted', conflicts});
+        return this.persistApplyResult(docUuid, params, result);
+      }
+
+      // Commands must describe exactly the signed approval, never arbitrary
+      // operations supplied alongside an otherwise valid review token.
+      if (requestedCommands && canonicalJsonDumps(requestedCommands) !== canonicalJsonDumps(commands)) {
+        const result = buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: 'invalid_selection_payload'});
+        return this.persistApplyResult(docUuid, params, result);
+      }
+      let plan;
+      try {
+        plan = new ElementCommandManager().prepare(document, {commands});
+      } catch (error) {
+        if (!error.error_code) throw error;
+        const result = buildApplyResult(params, approvedBy, {status: 'failed_precommit', error_code: error.error_code});
+        return this.persistApplyResult(docUuid, params, result);
+      }
+      const operations = plan.operations;
+      const appliedVersion = document.version + 1;
+
+      // The queue serializes normal unload/reload paths. Keep a final identity
+      // fence immediately before the durable commit so a future caller cannot
+      // accidentally commit against a document that is no longer active.
+      if (this.documents.get(docUuid) !== document
+          || document.document_incarnation !== params.document_incarnation) {
+        const result = buildApplyResult(params, approvedBy, {
+          status: 'preflight_conflicted',
+          conflicts: [{item_id: null, conflict_code: 'document_incarnation_changed'}],
+        });
+        return this.persistApplyResult(docUuid, params, result);
+      }
+
+      this.setApplyRegistration(params.apply_attempt_id, {
+        status: 'committing',
+        result: buildApplyResult(params, approvedBy, {status: 'in_progress'}),
+      });
+
+      const result = buildApplyResult(params, approvedBy, {
+        status: 'applied',
+        applied_sdoc_version: appliedVersion,
+        operation_log_correlation_id: params.apply_attempt_id,
+        persistence_status: 'not_requested',
+      });
+      const operationsManager = OperationsManager.getInstance();
+      const pending = {document, plan, params, approvedBy};
+      this.pendingReviewCommits.set(docUuid, pending);
+      try {
+        await withTransaction(async (executor) => {
+          await createReviewApplyRegistration({
+            applyAttemptId: params.apply_attempt_id,
+            docUuid,
+            applyPayloadDigest: params.apply_payload_digest,
+            status: result.status,
+            result,
+          }, executor);
+          await operationsManager.addOperations(docUuid, operations, appliedVersion, {username: approvedBy}, {
+            executor,
+            deferCache: true,
+          });
+        });
+      } catch (error) {
+        logger.error('Save review operations failed:', error);
+        return this.recoverReviewCommit(docUuid);
+      }
+
+      return this.finishReviewCommit(docUuid, pending, result);
+    });
+  };
+
+  getApplyResult = async (docUuid, applyAttemptId) => {
+    return this.enqueueDocWrite(docUuid, async () => {
+      const persisted = await getReviewApplyRegistration(applyAttemptId);
+      if (persisted && persisted.doc_uuid !== docUuid) {
+        return {error_code: 'attempt_not_found'};
+      }
+      if (persisted && persisted.doc_uuid === docUuid) {
+        this.setApplyRegistration(applyAttemptId, {status: persisted.status, result: persisted.result});
+        return persisted.result;
+      }
+      const registration = this.applyRegistrations.get(applyAttemptId);
+      if (!registration || registration.result.doc_uuid !== docUuid) {
+        return {error_code: 'attempt_not_found'};
+      }
+      return registration.result;
+    });
+  };
+
+  buildReviewSnapshot = async (docUuid, docName, fileUuid, docTitle, username) => {
+    return this.enqueueDocWrite(docUuid, async () => {
+      await this.getDoc(docUuid, docName, docTitle, username);
+      const document = this.documents.get(docUuid);
+      if (!document) {
+        throw new Error('load_document_content_error');
+      }
+      const snapshotId = v5(
+        `${fileUuid}:${document.document_incarnation}:${document.version}`,
+        v5.URL,
+      );
+      const projection = buildDocumentContext({
+        elements: document.elements,
+        version: document.version,
+        fileUuid,
+        documentIncarnation: document.document_incarnation,
+        snapshotId,
+      });
+      return projection;
+    });
+  };
+
+  removeDoc = async (docUuid) => {
+    return this.enqueueDocWrite(docUuid, () => this.removeDocFromMemoryUnsafe(docUuid));
+  };
+
+  removeDocFromMemoryUnsafe = async (docUuid, preserveLoading = false) => {
+    if (!preserveLoading) this.documentLoadPromises.delete(docUuid);
     if (this.documents.has(docUuid)) {
       logger.info('Removed doc ', docUuid, ' from memory');
       const operationsManager = OperationsManager.getInstance();
@@ -235,6 +914,10 @@ class DocumentManager {
   };
 
   applyElementCommands = async (docUuid, docName, docTitle, username, request) => {
+    return this.enqueueDocWrite(docUuid, () => this.applyElementCommandsUnsafe(docUuid, docName, docTitle, username, request));
+  };
+
+  applyElementCommandsUnsafe = async (docUuid, docName, docTitle, username, request) => {
     if (!this.documents.get(docUuid)) {
       await this.getDoc(docUuid, docName, docTitle, username);
     }
@@ -261,42 +944,47 @@ class DocumentManager {
     return { version, plan };
   };
 
-  removeDocs(docUuids) {
-    for (let docUuid of docUuids) {
-      if (this.documents.has(docUuid)) {
-        logger.info('Removed doc ', docUuid, ' from memory');
-        this.documents.delete(docUuid);
+  async removeDocs(docUuids) {
+    await Promise.all(docUuids.map(docUuid => this.removeDoc(docUuid)));
+  }
+
+  async removeDocsWithNoAccess(docUuids) {
+    for (const docUuid of docUuids) {
+      try {
+        await this.enqueueDocWrite(docUuid, async () => {
+          // Re-evaluate access after earlier writes complete; a collaborator may
+          // have reopened the document while cache cleanup was waiting.
+          const users = UsersManager.getInstance().getDocUsers(docUuid);
+          const document = this.documents.get(docUuid);
+          if (users.length > 0 || !document) {
+            return;
+          }
+          const meta = document.getMeta();
+          if (Date.now() - meta.last_access > DOC_CACHE_TIME) {
+            await this.removeDocFromMemoryUnsafe(docUuid);
+            logger.info(`Regularly clear files that no one has accessed: ${docUuid}`);
+          }
+        });
+      } catch (error) {
+        logger.error('Clear inactive SDoc failed:', docUuid, error.message);
       }
     }
   }
 
-  removeDocsWithNoAccess(docUuids) {
-    const usersManager = UsersManager.getInstance();
-    for (let i = 0; i < docUuids.length; i++) {
-      const docUuid = docUuids[i];
-      const users = usersManager.getDocUsers(docUuid);
-      if (users.length > 0) {
-        continue;
-      }
-      const document = this.documents.get(docUuid);
-      if (!document) {
-        continue;
-      }
-      const meta = document.getMeta();
-      const currentTime = new Date().getTime();
-      if (currentTime - meta.last_access > DOC_CACHE_TIME) {
-        this.removeDoc(docUuid);
-        logger.info(`Regularly clear files that no one has accessed: ${docUuid}`);
-      }
-    }
-  }
+  normalizeSdoc = async (docUuid) => {
+    return this.enqueueDocWrite(docUuid, () => this.normalizeSdocUnsafe(docUuid));
+  };
 
-  normalizeSdoc = (docUuid) => {
+  normalizeSdocUnsafe = (docUuid) => {
     const document = this.documents.get(docUuid);
     document.elements = normalizeChildren(document.elements);
   };
 
   execOperationsBySocket = async (params, docName) => {
+    return this.enqueueDocWrite(params.doc_uuid, () => this.execOperationsBySocketUnsafe(params, docName));
+  };
+
+  execOperationsBySocketUnsafe = async (params, docName) => {
     const { doc_uuid, version: clientVersion, operations, user } = params;
 
     let document = this.documents.get(doc_uuid);
