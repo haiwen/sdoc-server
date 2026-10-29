@@ -23,11 +23,87 @@ import DocumentManager from '../../src/modules/sdoc/managers/document-manager';
 import Document from '../../src/modules/sdoc/models/document';
 import OperationsManager from '../../src/modules/sdoc/managers/operations-manager';
 import seaServerAPI from '../../src/modules/sdoc/api/sea-server-api';
+import documentController from '../../src/modules/sdoc/controllers/document-controller';
+import IOHelper from '../../src/modules/sdoc/wio/io-helper';
 import {
   getReviewApplyRegistration, listPendingReviewSaveRegistrations,
   markReviewApplyPersistence,
 } from '../../src/modules/sdoc/dao/review-apply';
 import { applyPayloadDigest, selectionDigest } from '../../src/modules/sdoc/utils/sdoc-canonical';
+
+describe('Document replacement notifications during cold loading', () => {
+  it.each(['reloadDoc', 'publishDoc'])('%s waits for a cold load and installs the replacement', async entry => {
+    const manager = new DocumentManager();
+    let finishColdLoad;
+    const coldContent = new Promise(resolve => { finishColdLoad = resolve; });
+    const stale = {version: 1, text: 'stale', toJson() { return {version: this.version, text: this.text}; }};
+    const replacement = {version: 2, text: 'replacement', toJson() { return {version: this.version, text: this.text}; }};
+    manager.loadDocFromServer = jest.fn()
+      .mockImplementationOnce(async () => {
+        await coldContent;
+        manager.documents.set('origin', stale);
+        return stale.toJson();
+      })
+      .mockImplementationOnce(async () => {
+        manager.documents.set('origin', replacement);
+        return replacement.toJson();
+      });
+    const instance = jest.spyOn(DocumentManager, 'getInstance').mockReturnValue(manager);
+    const sendMessageToAllInRoom = jest.fn();
+    const io = jest.spyOn(IOHelper, 'getInstance').mockReturnValue({sendMessageToAllInRoom});
+    const originalOperations = OperationsManager.getInstance.getMockImplementation();
+    OperationsManager.getInstance.mockReturnValue({clearOperations: jest.fn()});
+    const response = {status: jest.fn(), send: jest.fn()};
+    response.status.mockReturnValue(response);
+    const request = entry === 'publishDoc'
+      ? {params: {doc_uuid: 'revision'}, body: {origin_doc_uuid: 'origin', origin_doc_name: 'origin.sdoc'}}
+      : {params: {doc_uuid: 'origin'}, body: {doc_name: 'origin.sdoc'}};
+    let notification;
+    const coldLoad = manager.getDoc('origin', 'origin.sdoc');
+    try {
+      expect(manager.isDocInMemory('origin')).toBe(false);
+      notification = documentController[entry](request, response);
+      for (let i = 0; i < 12; i++) await Promise.resolve();
+      expect(response.send).not.toHaveBeenCalled();
+      expect(manager.loadDocFromServer).toHaveBeenCalledTimes(1);
+      finishColdLoad();
+      await coldLoad;
+      await notification;
+      expect(manager.loadDocFromServer).toHaveBeenCalledTimes(2);
+      expect(await manager.getDoc('origin', 'origin.sdoc')).toEqual({version: 2, text: 'replacement'});
+      expect(response.status).toHaveBeenCalledWith(200);
+      expect(response.send).toHaveBeenCalledWith({success: true});
+      expect(sendMessageToAllInRoom).toHaveBeenCalledWith('origin', expect.any(String));
+    } finally {
+      finishColdLoad();
+      await Promise.all([coldLoad, notification]);
+      instance.mockRestore();
+      io.mockRestore();
+      OperationsManager.getInstance.mockImplementation(originalOperations);
+    }
+  });
+
+  it.each(['reloadDoc', 'publishDoc'])('%s does not load an unused document', async entry => {
+    const manager = new DocumentManager();
+    const reload = jest.spyOn(manager, 'reloadDoc');
+    const instance = jest.spyOn(DocumentManager, 'getInstance').mockReturnValue(manager);
+    const io = jest.spyOn(IOHelper, 'getInstance').mockReturnValue({sendMessageToAllInRoom: jest.fn()});
+    const response = {status: jest.fn(), send: jest.fn()};
+    response.status.mockReturnValue(response);
+    try {
+      await documentController[entry]({
+        params: {doc_uuid: 'revision'},
+        body: {doc_name: 'revision.sdoc', origin_doc_uuid: 'origin', origin_doc_name: 'origin.sdoc'},
+      }, response);
+      expect(reload).not.toHaveBeenCalled();
+      expect(response.status).toHaveBeenCalledWith(200);
+      expect(response.send).toHaveBeenCalledWith({success: true});
+    } finally {
+      instance.mockRestore();
+      io.mockRestore();
+    }
+  });
+});
 
 describe('DocumentManager operation handling', () => {
   let documentManager;

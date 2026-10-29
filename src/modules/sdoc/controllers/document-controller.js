@@ -315,7 +315,7 @@ class DocumentController {
       logger.error(`Doc ${docUuid} remove from memory failed`);
     }
 
-    if (!documentManager.isDocInMemory(originDocUuid)) {
+    if (!documentManager.isDocInMemoryOrLoading(originDocUuid)) {
       res.status(200).send({'success': true});
       return;
     }
@@ -340,7 +340,7 @@ class DocumentController {
     const documentManager = DocumentManager.getInstance();
     const ioHelper = IOHelper.getInstance();
 
-    if (!documentManager.isDocInMemory(docUuid)) {
+    if (!documentManager.isDocInMemoryOrLoading(docUuid)) {
       res.status(200).send({'success': true});
       return;
     }

@@ -913,6 +913,10 @@ class DocumentManager {
     return this.documents.has(docUuid);
   };
 
+  isDocInMemoryOrLoading = (docUuid) => {
+    return this.isDocInMemory(docUuid) || this.documentLoadPromises.has(docUuid);
+  };
+
   applyElementCommands = async (docUuid, docName, docTitle, username, request) => {
     return this.enqueueDocWrite(docUuid, () => this.applyElementCommandsUnsafe(docUuid, docName, docTitle, username, request));
   };
