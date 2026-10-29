@@ -104,6 +104,7 @@ describe('review commit recovery regressions', () => {
         status: value.status, result: value.result};
     });
     recordOperations.mockResolvedValue();
+    listPendingOperationsByDoc.mockReset();
     listPendingOperationsByDoc.mockResolvedValue([]);
     withTransaction.mockImplementation(callback => callback({transaction: true}));
     save = jest.spyOn(manager, 'saveDoc').mockResolvedValue(true);
@@ -159,6 +160,42 @@ describe('review commit recovery regressions', () => {
       params.apply_payload_digest, 'reviewer')).rejects.toThrow('database unavailable');
     expect(manager.applyRegistrations.has(params.apply_attempt_id)).toBe(false);
     expect(recordOperations).not.toHaveBeenCalled();
+  });
+
+  it('keeps replacement content and rejects suggestions from the retired document', async () => {
+    const content = makeDocument().toJson();
+    content.version = 2;
+    content.elements[0].children[0].text = 'history';
+    seaServerAPI.getDocContent.mockResolvedValueOnce({data: content});
+    listPendingOperationsByDoc.mockResolvedValueOnce([{
+      operations: JSON.stringify([{type: 'insert_text', path: [0, 0], offset: 7, text: '-later'}]),
+      op_id: 5, author: 'reviewer',
+    }]);
+    const notify = jest.spyOn(manager, 'sendReviewSaveResults');
+    await expect(manager.reloadDoc(params.doc_uuid, 'test.sdoc')).resolves.toMatchObject({version: 2});
+    expect(manager.documents.get(params.doc_uuid).elements[0].children[0].text).toBe('history');
+    expect(listPendingOperationsByDoc).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    await expect(apply()).resolves.toMatchObject({status: 'preflight_conflicted',
+      conflicts: [{conflict_code: 'document_incarnation_changed'}]});
+    expect(recordOperations).not.toHaveBeenCalled();
+  });
+
+  it('allows an explicit historical replacement to overwrite applied AI edits', async () => {
+    const applied = await apply();
+    seaServerAPI.getDocContent.mockResolvedValueOnce({data: makeDocument().toJson()});
+    await manager.reloadDoc(params.doc_uuid, 'test.sdoc');
+    await expect(apply()).resolves.toEqual(applied);
+    expect(manager.documents.get(params.doc_uuid).elements[0].children[0].text).toBe('before');
+    expect(recordOperations).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([null, {version: 2}])('rejects invalid replacement content %o without replaying logs', async content => {
+    seaServerAPI.getDocContent.mockResolvedValueOnce({data: content});
+    await expect(manager.reloadDoc(params.doc_uuid, 'test.sdoc')).rejects.toMatchObject({error_type: 'content_invalid'});
+    expect(listPendingOperationsByDoc).not.toHaveBeenCalled();
+    expect(manager.documents.has(params.doc_uuid)).toBe(false);
+    expect(manager.documentLoadPromises.has(params.doc_uuid)).toBe(false);
   });
 
   it('installs an acknowledged-late commit exactly once before the next queued writer', async () => {
@@ -655,9 +692,11 @@ describe('DocumentManager element command commits', () => {
       op_id: 5, author: 'reviewer',
     }]);
     replacement.resolve({data: content});
-    await expect(reloadResult).resolves.toMatchObject({version: 5});
-    await expect(readerResult).resolves.toMatchObject({version: 5});
-    expect(documentManager.documents.get('doc-1').elements[0].children[0].text).toBe('replacement!');
+    const replayCalls = listPendingOperationsByDoc.mock.calls.length;
+    await expect(reloadResult).resolves.toMatchObject({version: 4});
+    await expect(readerResult).resolves.toMatchObject({version: 4});
+    expect(listPendingOperationsByDoc).toHaveBeenCalledTimes(replayCalls);
+    expect(documentManager.documents.get('doc-1').elements[0].children[0].text).toBe('replacement');
     expect(documentManager.documentLoadPromises.has('doc-1')).toBe(false);
   });
 

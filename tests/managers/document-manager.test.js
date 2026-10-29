@@ -37,16 +37,13 @@ describe('Document replacement notifications during cold loading', () => {
     let finishColdLoad;
     const coldContent = new Promise(resolve => { finishColdLoad = resolve; });
     const stale = {version: 1, text: 'stale', toJson() { return {version: this.version, text: this.text}; }};
-    const replacement = {version: 2, text: 'replacement', toJson() { return {version: this.version, text: this.text}; }};
+    const replacement = {version: 2, format_version: 4, elements: [{id: 'p1', type: 'paragraph', children: [{text: 'replacement'}]}]};
+    const fetch = jest.spyOn(seaServerAPI, 'getDocContent').mockResolvedValue({data: replacement});
     manager.loadDocFromServer = jest.fn()
       .mockImplementationOnce(async () => {
         await coldContent;
         manager.documents.set('origin', stale);
         return stale.toJson();
-      })
-      .mockImplementationOnce(async () => {
-        manager.documents.set('origin', replacement);
-        return replacement.toJson();
       });
     const instance = jest.spyOn(DocumentManager, 'getInstance').mockReturnValue(manager);
     const sendMessageToAllInRoom = jest.fn();
@@ -69,8 +66,11 @@ describe('Document replacement notifications during cold loading', () => {
       finishColdLoad();
       await coldLoad;
       await notification;
-      expect(manager.loadDocFromServer).toHaveBeenCalledTimes(2);
-      expect(await manager.getDoc('origin', 'origin.sdoc')).toEqual({version: 2, text: 'replacement'});
+      expect(manager.loadDocFromServer).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith('origin');
+      const loaded = await manager.getDoc('origin', 'origin.sdoc');
+      expect(loaded.version).toBe(2);
+      expect(loaded.elements[0].children[0].text).toBe('replacement');
       expect(response.status).toHaveBeenCalledWith(200);
       expect(response.send).toHaveBeenCalledWith({success: true});
       expect(sendMessageToAllInRoom).toHaveBeenCalledWith('origin', expect.any(String));
@@ -79,6 +79,7 @@ describe('Document replacement notifications during cold loading', () => {
       await Promise.all([coldLoad, notification]);
       instance.mockRestore();
       io.mockRestore();
+      fetch.mockRestore();
       OperationsManager.getInstance.mockImplementation(originalOperations);
     }
   });
@@ -309,7 +310,7 @@ describe('SDoc review apply idempotency', () => {
     const originalDocs = manager.documents;
     const originalLoads = manager.documentLoadPromises;
     const originalRemove = manager.removeDocFromMemoryUnsafe;
-    const originalLoad = manager.loadDocFromServer;
+    const fetch = jest.spyOn(seaServerAPI, 'getDocContent');
     let finishLoad;
     const loadPromise = new Promise(resolve => {
       finishLoad = resolve;
@@ -317,7 +318,7 @@ describe('SDoc review apply idempotency', () => {
     manager.documents = new Map();
     manager.documentLoadPromises = new Map();
     manager.removeDocFromMemoryUnsafe = jest.fn().mockResolvedValue(undefined);
-    manager.loadDocFromServer = jest.fn().mockReturnValue(loadPromise);
+    fetch.mockReturnValue(loadPromise);
 
     try {
       const reload = manager.reloadDocUnsafe('doc-uuid', 'Document');
@@ -325,16 +326,16 @@ describe('SDoc review apply idempotency', () => {
       const concurrentRead = manager.getDoc('doc-uuid', 'Document', 'Document');
       // Reload publishes its promise before starting cache removal/loading.
       await Promise.resolve();
-      expect(manager.loadDocFromServer).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledTimes(1);
 
-      finishLoad({version: 2});
-      await expect(reload).resolves.toEqual({version: 2});
-      await expect(concurrentRead).resolves.toEqual({version: 2});
+      finishLoad({data: {version: 2, format_version: 4, elements: []}});
+      await expect(reload).resolves.toMatchObject({version: 2});
+      await expect(concurrentRead).resolves.toMatchObject({version: 2});
     } finally {
       manager.documents = originalDocs;
       manager.documentLoadPromises = originalLoads;
       manager.removeDocFromMemoryUnsafe = originalRemove;
-      manager.loadDocFromServer = originalLoad;
+      fetch.mockRestore();
     }
   });
 

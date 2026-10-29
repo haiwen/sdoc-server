@@ -166,13 +166,22 @@ class DocumentManager {
     const reloadPromise = Promise.resolve().then(async () => {
       if (loading) {
         // An old cold load is not the requested reload. Even if it failed,
-        // fetch the replacement and replay its committed operations.
+        // fetch the replacement, not the old in-flight snapshot.
         await loading.catch(error => logger.error('Load before SDoc reload failed:', docUuid, error.message));
       }
       await this.removeDocFromMemoryUnsafe(docUuid, true);
-      // Reuse the ordinary load path so committed operation-log rows are
-      // replayed before the replacement snapshot becomes visible in memory.
-      return this.loadDocFromServer(docUuid, docName, docName);
+      // Replacement deliberately discards later edits. Unlike an ordinary cold
+      // load, it must not replay operations from the replaced document.
+      const result = await seaServerAPI.getDocContent(docUuid);
+      const content = result.data;
+      if (!content || !isSdocContentValid(content)) {
+        const error = new Error('Invalid replacement document content');
+        error.error_type = 'content_invalid';
+        throw error;
+      }
+      const document = new Document(docUuid, docName, content);
+      this.documents.set(docUuid, document);
+      return document.toJson();
     });
     this.documentLoadPromises.set(docUuid, reloadPromise);
     try {
