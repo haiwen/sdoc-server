@@ -854,6 +854,20 @@ class DocumentManager {
     });
   };
 
+  abortReviewApply = async (docUuid, applyAttemptId, payloadDigest, approvedBy) => {
+    return this.enqueueDocWrite(docUuid, async () => {
+      const params = {apply_attempt_id: applyAttemptId, apply_payload_digest: payloadDigest,
+        doc_uuid: docUuid, file_uuid: docUuid};
+      const existing = await this.getPersistedApplyResult(docUuid, params, approvedBy);
+      if (existing) return existing;
+      // Persist a terminal receipt before acknowledging cancellation. A delayed
+      // original request will read this receipt before touching the document.
+      return this.persistApplyResult(docUuid, params, buildApplyResult(params, approvedBy, {
+        status: 'failed_precommit', error_code: 'apply_interrupted',
+      }));
+    });
+  };
+
   getApplyResult = async (docUuid, applyAttemptId) => {
     return this.enqueueDocWrite(docUuid, async () => {
       const persisted = await getReviewApplyRegistration(applyAttemptId);

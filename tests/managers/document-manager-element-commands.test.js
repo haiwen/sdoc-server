@@ -113,6 +113,54 @@ describe('review commit recovery regressions', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
+  it('durably aborts before apply and blocks the delayed original request after restart', async () => {
+    const result = await manager.abortReviewApply(params.doc_uuid, params.apply_attempt_id,
+      params.apply_payload_digest, 'reviewer');
+    expect(result).toMatchObject({status: 'failed_precommit', error_code: 'apply_interrupted'});
+    manager = new DocumentManager();
+    manager.documents.set(params.doc_uuid, document);
+    await expect(apply()).resolves.toEqual(result);
+    await expect(manager.getApplyResult(params.doc_uuid, params.apply_attempt_id)).resolves.toEqual(result);
+    expect(document.version).toBe(4);
+    expect(document.elements[0].children[0].text).toBe('before');
+    expect(recordOperations).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('returns an already applied receipt instead of cancelling applied changes', async () => {
+    const applied = await apply();
+    await expect(manager.abortReviewApply(params.doc_uuid, params.apply_attempt_id,
+      params.apply_payload_digest, 'reviewer')).resolves.toEqual(applied);
+    expect(applied.status).toBe('applied');
+    expect(recordOperations).toHaveBeenCalledTimes(1);
+  });
+
+  it('queues abort behind an executing apply', async () => {
+    const commit = deferred();
+    recordOperations.mockImplementationOnce(() => commit.promise);
+    const applying = apply();
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    const aborting = manager.abortReviewApply(params.doc_uuid, params.apply_attempt_id,
+      params.apply_payload_digest, 'reviewer');
+    let abortFinished = false;
+    aborting.then(() => { abortFinished = true; });
+    await Promise.resolve();
+    expect(abortFinished).toBe(false);
+    commit.resolve();
+    const applied = await applying;
+    await expect(aborting).resolves.toEqual(applied);
+    expect(applied.status).toBe('applied');
+    expect(createReviewApplyRegistration).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not acknowledge abort when the durable receipt cannot be stored', async () => {
+    createReviewApplyRegistration.mockRejectedValueOnce(new Error('database unavailable'));
+    await expect(manager.abortReviewApply(params.doc_uuid, params.apply_attempt_id,
+      params.apply_payload_digest, 'reviewer')).rejects.toThrow('database unavailable');
+    expect(manager.applyRegistrations.has(params.apply_attempt_id)).toBe(false);
+    expect(recordOperations).not.toHaveBeenCalled();
+  });
+
   it('installs an acknowledged-late commit exactly once before the next queued writer', async () => {
     withTransaction.mockImplementationOnce(async callback => {
       await callback({transaction: true});

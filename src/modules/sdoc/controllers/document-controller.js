@@ -272,6 +272,28 @@ class DocumentController {
     }
   }
 
+  async abortReviewApply(req, res) {
+    const {doc_uuid: docUuid, apply_attempt_id: attemptId} = req.params;
+    const payload = req.payload || {};
+    if (payload.purpose !== 'sdoc_agent_apply_abort' || payload.permission !== 'rw'
+        || payload.file_uuid !== docUuid || typeof payload.username !== 'string' || !payload.username
+        || String(payload.apply_attempt_id) !== String(attemptId)
+        || typeof payload.apply_payload_digest !== 'string'
+        || !/^[a-f0-9]{64}$/.test(payload.apply_payload_digest)) {
+      res.status(403).send({error_code: 'permission_denied'});
+      return;
+    }
+    try {
+      const result = await DocumentManager.getInstance().abortReviewApply(
+        docUuid, attemptId, payload.apply_payload_digest, payload.username);
+      // A durable failed_precommit receipt is a successful abort response.
+      res.status(200).send(result);
+    } catch (error) {
+      logger.error('Abort review apply failed:', error.message);
+      res.status(500).send({error_code: 'internal_error'});
+    }
+  }
+
   async getApplyResult(req, res) {
     const { doc_uuid: requestedDocUuid, apply_attempt_id: applyAttemptId } = req.params;
     const { file_uuid: docUuid, purpose } = req.payload;

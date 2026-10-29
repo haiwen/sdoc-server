@@ -18,6 +18,42 @@ const makeResponse = () => {
 };
 
 describe('DocumentController element command permissions', () => {
+  const abortPayload = {file_uuid: 'doc-1', purpose: 'sdoc_agent_apply_abort',
+    permission: 'rw', username: 'reviewer', apply_attempt_id: 'attempt', apply_payload_digest: 'a'.repeat(64)};
+
+  it.each([
+    {purpose: 'sdoc_agent_apply'}, {permission: 'r'}, {file_uuid: 'other-doc'},
+    {apply_attempt_id: 'other-attempt'}, {apply_payload_digest: ''}, {username: {}},
+  ])('rejects an abort with invalid claims %o', async invalid => {
+    const abortReviewApply = jest.fn();
+    DocumentManager.getInstance.mockReturnValue({abortReviewApply});
+    const response = makeResponse();
+    await documentController.abortReviewApply({params: {doc_uuid: 'doc-1', apply_attempt_id: 'attempt'},
+      payload: {...abortPayload, ...invalid}, body: {}}, response);
+    expect(response.status).toHaveBeenCalledWith(403);
+    expect(abortReviewApply).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges abort only after persisting its receipt', async () => {
+    const result = {status: 'failed_precommit', error_code: 'apply_interrupted'};
+    const abortReviewApply = jest.fn().mockResolvedValue(result);
+    DocumentManager.getInstance.mockReturnValue({abortReviewApply});
+    const response = makeResponse();
+    await documentController.abortReviewApply({params: {doc_uuid: 'doc-1', apply_attempt_id: 'attempt'},
+      payload: abortPayload, body: {}}, response);
+    expect(abortReviewApply).toHaveBeenCalledWith('doc-1', 'attempt', 'a'.repeat(64), 'reviewer');
+    expect(response.status).toHaveBeenCalledWith(200);
+    expect(response.send).toHaveBeenCalledWith(result);
+  });
+
+  it('does not acknowledge an abort when persistence fails', async () => {
+    DocumentManager.getInstance.mockReturnValue({abortReviewApply: jest.fn().mockRejectedValue(new Error('offline'))});
+    const response = makeResponse();
+    await documentController.abortReviewApply({params: {doc_uuid: 'doc-1', apply_attempt_id: 'attempt'},
+      payload: abortPayload, body: {}}, response);
+    expect(response.status).toHaveBeenCalledWith(500);
+  });
+
   it.each([
     [{ file_uuid: 'other-doc', permission: 'rw', username: 'writer@example.com' }],
     [{ file_uuid: 'doc-1', permission: 'r', username: 'writer@example.com' }],
