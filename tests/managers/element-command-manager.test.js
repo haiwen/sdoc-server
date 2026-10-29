@@ -369,26 +369,19 @@ describe('ElementCommandManager', () => {
     expect(plan.elements[7].children[0].children[0].children[0].text).toBe('list paragraph');
   });
 
-  it('rejects table-cell text replacement without modifying the document', () => {
+  it('replaces plain table-cell and document-title text without exposing structure', () => {
     const cell = { id: 'cell', type: 'table_cell', children: [text('cell-text', 'cell')] };
     const table = { id: 'table', type: 'table', children: [{ id: 'row', type: 'table_row', children: [cell] }] };
-    const document = makeDocument([paragraph('p1', 'one'), table]);
-    const originalElements = deepCopy(document.elements);
-
-    expectError(() => prepare(document, [{
-      kind: 'replace_element_content', target_element_id: 'cell', payload: { text: 'table cell' },
-    }]), 'unsupported_content', 0);
-
-    expect(document.elements).toEqual(originalElements);
-    expect(document.version).toBe(3);
-  });
-
-  it('rejects simple-text replacement on element types outside the specification', () => {
     const title = { id: 'title', type: 'title', children: [text('title-text', 'title')] };
-
-    expectError(() => prepare(makeDocument([title]), [{
-      kind: 'replace_element_content', target_element_id: 'title', payload: { text: 'replacement' },
-    }]), 'unsupported_content', 0);
+    const plan = prepare(makeDocument([title, table]), [
+      { kind: 'replace_element_content', target_element_id: 'title', payload: { text: 'replacement' } },
+      { kind: 'replace_element_content', target_element_id: 'cell', payload: { text: 'table cell' } },
+    ]);
+    expect(plan.elements[0].children[0].text).toBe('replacement');
+    expect(plan.elements[1].children[0].children[0].children[0].text).toBe('table cell');
+    expectError(() => prepare(makeDocument([table]), [{
+      kind: 'delete_element', target_element_id: 'cell',
+    }]), 'unsupported_element_type', 0);
   });
 
   it('preserves the media boundary while allowing document-node deletion', () => {
