@@ -8,6 +8,9 @@ let db_port = 3306;
 let connection_limit = 5;
 
 let server_port = 7070;
+let rate_limit_window_ms = 60 * 1000;
+let rate_limit_max = 600;
+let trust_proxy = false;
 
 let save_interval = 5 * 60 * 1000; // 5 min
 
@@ -35,6 +38,9 @@ if (filePath && fs.existsSync(filePath)) {
   connection_limit = config.connection_limit || connection_limit;
 
   server_port = config.server_port || server_port;
+  rate_limit_window_ms = config.rate_limit_window_ms ?? rate_limit_window_ms;
+  rate_limit_max = config.rate_limit_max ?? rate_limit_max;
+  trust_proxy = config.trust_proxy ?? trust_proxy;
 
   save_interval = config.save_interval || save_interval;
 
@@ -55,6 +61,20 @@ export const MYSQL_CONFIG = {
 };
 
 export const SERVER_PORT = Number(process.env.SERVER_PORT || server_port);
+
+export const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS ?? rate_limit_window_ms);
+
+export const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX ?? rate_limit_max);
+
+export const TRUST_PROXY = process.env.TRUST_PROXY || trust_proxy;
+
+if (!Number.isSafeInteger(RATE_LIMIT_WINDOW_MS) || RATE_LIMIT_WINDOW_MS < 1 || RATE_LIMIT_WINDOW_MS > 2147483647) {
+  throw new Error('RATE_LIMIT_WINDOW_MS must be an integer between 1 and 2147483647');
+}
+
+if (!Number.isSafeInteger(RATE_LIMIT_MAX) || RATE_LIMIT_MAX < 1) {
+  throw new Error('RATE_LIMIT_MAX must be a positive integer');
+}
 
 export const SAVE_INTERVAL = Number(process.env.SAVE_INTERVAL || save_interval);
 

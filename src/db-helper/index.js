@@ -16,7 +16,7 @@ const pool = mysql.createPool(mysql_config);
 
 const DBHelper = async function (sql, values) {
   try {
-    const [rows] = await pool.query(sql, values);
+    const [rows] = await pool.execute(sql, values);
     return rows;
   } catch (err) {
     const error = new Error(err.message.includes('connect') ? 'Error connecting to Database' : 'Query data from Database error');
