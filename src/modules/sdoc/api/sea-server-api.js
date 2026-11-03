@@ -3,6 +3,7 @@ import axios from 'axios';
 import FormData from 'form-data';
 import jwt from 'jsonwebtoken';
 import { SEADOC_PRIVATE_KEY, SEAHUB_SERVER } from '../../../config/config';
+import { encodePathSegment } from '../../../utils/seahub-url';
 
 axios.defaults.timeout = 60 * 1000;
 
@@ -26,6 +27,8 @@ class SeaServerAPI {
     const accessToken = this.generateJwtToken(docUuid, username);
     const config = {
       baseURL: SEAHUB_SERVER,
+      allowAbsoluteUrls: false,
+      maxRedirects: 0,
       headers: { 'Authorization': 'Token ' + accessToken },
     };
     return config;
@@ -33,24 +36,24 @@ class SeaServerAPI {
 
   getDocDownloadLink = (docUuid) => {
     const config = this.getConfig(docUuid);
-    const url = '/api/v2.1/seadoc/download-link/' + docUuid + '/';
+    const url = '/api/v2.1/seadoc/download-link/' + encodePathSegment(docUuid) + '/';
     return axios.get(url, config);
   };
 
   getDocUpdateLink = (docUuid) => {
     const config = this.getConfig(docUuid);
-    const url = '/api/v2.1/seadoc/upload-link/' + docUuid + '/';
+    const url = '/api/v2.1/seadoc/upload-link/' + encodePathSegment(docUuid) + '/';
     return axios.get(url, config);
   };
 
   getDocContent = (docUuid) => {
     const config = this.getConfig(docUuid);
-    const url = '/api/v2.1/seadoc/content/' + docUuid + '/';
+    const url = '/api/v2.1/seadoc/content/' + encodePathSegment(docUuid) + '/';
     return axios.get(url, config);
   };
 
   saveDocContent = (docUuid, docData, lastModifyUser) => {
-    const uploadLink = '/api/v2.1/seadoc/upload-file/' + docUuid + '/';
+    const uploadLink = '/api/v2.1/seadoc/upload-file/' + encodePathSegment(docUuid) + '/';
 
     const formData = new FormData();
     formData.append("file", fs.createReadStream(docData.path));
@@ -61,14 +64,14 @@ class SeaServerAPI {
   };
 
   listComments = (docUuid) => {
-    const uploadLink = '/api/v2.1/seadoc/comments/' + docUuid + '/';
+    const uploadLink = '/api/v2.1/seadoc/comments/' + encodePathSegment(docUuid) + '/';
 
     const config = this.getConfig(docUuid);
     return axios.get(uploadLink, config);
   };
 
   insertComment = (docUuid, comment) => {
-    const uploadLink = '/api/v2.1/seadoc/comments/' + docUuid + '/';
+    const uploadLink = '/api/v2.1/seadoc/comments/' + encodePathSegment(docUuid) + '/';
     const data = comment;
 
     const config = this.getConfig(docUuid);
@@ -76,28 +79,28 @@ class SeaServerAPI {
   };
 
   deleteComment = (docUuid, commentId, username) => {
-    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/';
+    const uploadLink = '/api/v2.1/seadoc/comment/' + encodePathSegment(docUuid) + '/' + encodePathSegment(commentId) + '/';
 
     const config = this.getConfig(docUuid, username);
     return axios.delete(uploadLink, config);
   };
 
   updateComment = (docUuid, commentId, comment, username) => {
-    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/';
+    const uploadLink = '/api/v2.1/seadoc/comment/' + encodePathSegment(docUuid) + '/' + encodePathSegment(commentId) + '/';
     const data = comment;
     const config = this.getConfig(docUuid, username);
     return axios.put(uploadLink, data, config);
   };
 
   listReplies = (docUuid, commentId) => {
-    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/';
+    const uploadLink = '/api/v2.1/seadoc/comment/' + encodePathSegment(docUuid) + '/' + encodePathSegment(commentId) + '/replies/';
 
     const config = this.getConfig(docUuid);
     return axios.get(uploadLink, config);
   };
 
   insertReply = (docUuid, commentId, reply) => {
-    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/';
+    const uploadLink = '/api/v2.1/seadoc/comment/' + encodePathSegment(docUuid) + '/' + encodePathSegment(commentId) + '/replies/';
     const data = reply;
 
     const config = this.getConfig(docUuid);
@@ -105,21 +108,21 @@ class SeaServerAPI {
   };
 
   deleteReply = (docUuid, commentId, replyId, username) => {
-    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/' + replyId + '/';
+    const uploadLink = '/api/v2.1/seadoc/comment/' + encodePathSegment(docUuid) + '/' + encodePathSegment(commentId) + '/replies/' + encodePathSegment(replyId) + '/';
 
     const config = this.getConfig(docUuid, username);
     return axios.delete(uploadLink, config);
   };
 
   updateReply = (docUuid, commentId, replyId, reply, username) => {
-    const uploadLink = '/api/v2.1/seadoc/comment/' + docUuid + '/' + commentId + '/replies/' + replyId + '/';
+    const uploadLink = '/api/v2.1/seadoc/comment/' + encodePathSegment(docUuid) + '/' + encodePathSegment(commentId) + '/replies/' + encodePathSegment(replyId) + '/';
     const data = reply;
     const config = this.getConfig(docUuid, username);
     return axios.put(uploadLink, data, config);
   };
 
   editorStatusCallback = (docUuid, status) => {
-    const url = '/api/v2.1/seadoc/editor-status-callback/' + docUuid + '/';
+    const url = '/api/v2.1/seadoc/editor-status-callback/' + encodePathSegment(docUuid) + '/';
 
     const formData = new FormData();
     formData.append("status", status);

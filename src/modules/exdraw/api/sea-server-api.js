@@ -3,6 +3,7 @@ import fs from 'fs';
 import FormData from 'form-data';
 import jwt from 'jsonwebtoken';
 import { SEADOC_PRIVATE_KEY, SEAHUB_SERVER } from '../../../config/config';
+import { encodePathSegment } from '../../../utils/seahub-url';
 
 axios.defaults.timeout = 60 * 1000;
 
@@ -26,6 +27,8 @@ class SeaServerAPI {
     const accessToken = this.generateJwtToken(exdrawUuid, username);
     const config = {
       baseURL: SEAHUB_SERVER,
+      allowAbsoluteUrls: false,
+      maxRedirects: 0,
       headers: { 'Authorization': 'Token ' + accessToken },
     };
 
@@ -34,19 +37,19 @@ class SeaServerAPI {
 
   getSceneDownloadLink = (exdrawUuid) => {
     const config = this.getConfig(exdrawUuid);
-    const url = '/api/v2.1/exdraw/download-link/' + exdrawUuid + '/';
+    const url = '/api/v2.1/exdraw/download-link/' + encodePathSegment(exdrawUuid) + '/';
 
     return axios.get(url, config);
   };
 
   getSceneContent = (exdrawUuid) => {
     const config = this.getConfig(exdrawUuid);
-    const url = '/api/v2.1/exdraw/content/' + exdrawUuid + '/';
+    const url = '/api/v2.1/exdraw/content/' + encodePathSegment(exdrawUuid) + '/';
     return axios.get(url, config);
   };
 
   saveSceneContent = (exdrawUuid, docData, lastModifyUser) => {
-    const uploadLink = '/api/v2.1/exdraw/upload-file/' + exdrawUuid + '/';
+    const uploadLink = '/api/v2.1/exdraw/upload-file/' + encodePathSegment(exdrawUuid) + '/';
     const formData = new FormData();
     formData.append("file", fs.createReadStream(docData.path));
     formData.append("last_modify_user", lastModifyUser);
