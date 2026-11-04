@@ -21,6 +21,7 @@ const ROOT_TYPES = [
 ];
 const LIST_TYPES = ['ordered_list', 'unordered_list'];
 const TEXT_TYPES = ['paragraph', 'header1', 'header2', 'header3', 'header4', 'header5', 'header6'];
+const DOCUMENT_TEXT_TYPES = ['title', 'subtitle'];
 const BLOCK_CONTAINER_TYPES = ['blockquote', 'callout'];
 const INSERT_TYPES = [...TEXT_TYPES, ...LIST_TYPES, 'list_item', ...BLOCK_CONTAINER_TYPES, 'check_list_item', 'code_block'];
 const HEADER_TYPES = ['header1', 'header2', 'header3', 'header4', 'header5', 'header6'];
@@ -194,6 +195,25 @@ const replacementChildren = (type, text) => {
 };
 
 class ElementCommandManager {
+  getCapabilities(node, parent) {
+    const textTarget = (TEXT_TYPES.includes(node.type) || DOCUMENT_TEXT_TYPES.includes(node.type) ||
+      node.type === 'table_cell' || node.type === 'check_list_item') && childrenAreSimpleText(node);
+    const plainText = textTarget && node.children.every(child => Object.keys(child).every(key => ['id', 'text'].includes(key)));
+    const typeCandidates = LIST_TYPES.includes(node.type) ? LIST_TYPES : TEXT_TYPES.includes(node.type) ? TEXT_TYPES : [];
+    return {
+      replace_block_text: {
+        supported: !!textTarget,
+        preserves_inline_format: !!plainText,
+        rebuilds_children: true,
+      },
+      [LIST_TYPES.includes(node.type) ? 'set_list_type' : 'set_block_type']: {
+        allowed_types: typeCandidates.filter(type => type !== node.type && isAllowedChild(parent, type) &&
+          (!HEADER_TYPES.includes(type) || childrenAreValidForHeader(node))),
+        preserves_children: true,
+      },
+    };
+  }
+
   prepare(document, request) {
     if (!isObject(request) || !Array.isArray(request.commands)) {
       invalid(null);
@@ -391,7 +411,7 @@ class ElementCommandManager {
     if (byteLength(command.payload.text) > ELEMENT_COMMAND_LIMITS.MAX_TEXT_BYTES) throw new ElementCommandError('batch_limit_exceeded', commandIndex);
     const target = this.resolveTarget(command, commandIndex, elements, clientRefs, 'unsupported_content');
     if (MEDIA_ELEMENT_TYPES.includes(target.node.type)) throw new ElementCommandError('unsupported_content', commandIndex);
-    const isSimpleTextTarget = (TEXT_TYPES.includes(target.node.type) || target.node.type === 'check_list_item') && childrenAreSimpleText(target.node);
+    const isSimpleTextTarget = this.getCapabilities(target.node, target.parent).replace_block_text.supported;
     const isSimpleBlockTarget = BLOCK_CONTAINER_TYPES.includes(target.node.type) && childrenAreSimpleBlockContent(target.node);
     const isSimpleCodeTarget = target.node.type === 'code_block' && childrenAreSimpleCode(target.node);
     if (!isSimpleTextTarget && !isSimpleBlockTarget && !isSimpleCodeTarget) throw new ElementCommandError('unsupported_content', commandIndex);
@@ -420,7 +440,9 @@ class ElementCommandManager {
       const listConversion = LIST_TYPES.includes(oldType) && LIST_TYPES.includes(newType);
       if (!textConversion && !listConversion) throw new ElementCommandError('unsupported_element_type', commandIndex);
       if (!isAllowedChild(target.parent, newType)) throw new ElementCommandError('invalid_parent_child', commandIndex);
-      if (HEADER_TYPES.includes(newType) && !childrenAreValidForHeader(target.node)) {
+      const capability = this.getCapabilities(target.node, target.parent)[listConversion ? 'set_list_type' : 'set_block_type'];
+      if ((!capability.allowed_types.includes(newType) && oldType !== newType) ||
+          (HEADER_TYPES.includes(newType) && !childrenAreValidForHeader(target.node))) {
         throw new ElementCommandError('unsupported_content', commandIndex);
       }
       target.node.type = newType;
@@ -468,7 +490,9 @@ class ElementCommandManager {
   assertDirectlyAddressableTarget(target, commandIndex, unsupportedErrorCode) {
     // Text leaves and structural internals are managed through their owning element's command.
     const { node, parent } = target;
-    if (isTextLeaf(node) || !isString(node.type) || NON_ADDRESSABLE_ELEMENT_TYPES.includes(node.type) ||
+    const cellReplacement = node.type === 'table_cell' && unsupportedErrorCode === 'unsupported_content';
+    if (isTextLeaf(node) || !isString(node.type) ||
+      (NON_ADDRESSABLE_ELEMENT_TYPES.includes(node.type) && !cellReplacement) ||
       (node.type === 'group' && parent && ['table', 'table_row'].includes(parent.type))) {
       throw new ElementCommandError(unsupportedErrorCode, commandIndex);
     }
