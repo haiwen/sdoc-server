@@ -7,6 +7,7 @@ import rateLimiter from './middleware/rate-limit';
 import responseTimeMiddleware from './middleware/response-time';
 import route from './modules/sdoc/route';
 import exdrawRoute from './modules/exdraw/route';
+import sharedExdrawRoute from './modules/exdraw/shared-route';
 import { BASE_URL_VERSION1, ELEMENT_COMMAND_LIMITS } from './modules/sdoc/constants';
 import { TRUST_PROXY } from './config/config';
 
@@ -37,6 +38,7 @@ app.use(bodyParser.json({ limit: '100mb' }));
 app.use(bodyParser.urlencoded({ limit: '100mb', extended: false }));
 app.use(responseTimeMiddleware);
 app.use(noAuthRouter);
+app.use(sharedExdrawRoute);
 app.use(auth);
 app.use(route);
 app.use(exdrawRoute);
