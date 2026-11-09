@@ -2,6 +2,8 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { SEADOC_PRIVATE_KEY } from '../../config/config';
 import ExcalidrawManager from './managers/excalidraw-manager';
+import DocumentManager from '../sdoc/managers/document-manager';
+import { hasWhiteboardReference } from './whiteboard-reference';
 
 const router = express.Router();
 const base = '/api/internal/v1/shared-exdraw/:file_uuid';
@@ -20,6 +22,9 @@ export const authorizeSharedRead = operation => (req, res, next) => {
         payload.file_uuid !== req.params.file_uuid || !Number.isInteger(payload.iat) ||
         !Number.isInteger(payload.exp) || payload.exp <= payload.iat || payload.exp - payload.iat > 60 ||
         payload.iat > Math.floor(Date.now() / 1000) ||
+        typeof payload.sdoc_uuid !== 'string' || !uuidPattern.test(payload.sdoc_uuid) ||
+        typeof payload.sdoc_filename !== 'string' || !payload.sdoc_filename ||
+        typeof payload.service_url !== 'string' || !/^https?:$/.test(new URL(payload.service_url).protocol) ||
         typeof payload.filename !== 'string' || !payload.filename) {
       throw new Error('Invalid scope');
     }
@@ -33,7 +38,26 @@ export const authorizeSharedRead = operation => (req, res, next) => {
 const loadScene = payload => ExcalidrawManager.getInstance().getSceneDoc(
   payload.file_uuid, payload.filename, payload.shared_by);
 
-router.get(`${base}/scene/`, authorizeSharedRead('read_scene'), async (req, res) => {
+const checkReference = async (req, res, next) => {
+  try {
+    const payload = req.sharedExdraw;
+    const doc = await DocumentManager.getInstance().getDoc(
+      payload.sdoc_uuid, payload.sdoc_filename, undefined, payload.shared_by);
+    if (!hasWhiteboardReference(doc.elements, payload.file_uuid, payload.service_url)) {
+      res.status(403).json({ error_code: 'permission_denied' });
+      return;
+    }
+    next();
+  } catch (error) {
+    res.status(502).json({ error_code: 'upstream_unavailable' });
+  }
+};
+
+router.get(`${base}/reference/`, authorizeSharedRead('verify_reference'), checkReference, (req, res) => {
+  res.set('Cache-Control', 'private, no-store').json({ referenced: true });
+});
+
+router.get(`${base}/scene/`, authorizeSharedRead('read_scene'), checkReference, async (req, res) => {
   try {
     const scene = await loadScene(req.sharedExdraw);
     res.set('Cache-Control', 'private, no-store').json(scene);
