@@ -69,16 +69,20 @@ export const formatTimeToMillisecond = (time) => {
 };
 
 export const getDocUuidFromUrl = (url) => {
-  const pathname = url.split('?')[0];
-  if (pathname.indexOf('/files/') === -1) {
+  if (typeof url !== 'string') {
     return null;
   }
-  const docUuidPath = pathname.split('/files/')[1];
-  const splitIndex = docUuidPath.indexOf('/');
-  if (splitIndex > -1) {
-    return docUuidPath.split('/')[0];
+  const pathname = url.split('?')[0];
+  const match = pathname.match(/^\/api\/v1\/(?:docs|exdraw)\/([^/]+)(?:\/|$)/i);
+  if (!match) {
+    return null;
   }
-  return docUuidPath;
+  try {
+    // Express decodes route parameters before passing them to controllers.
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
 };
 
 export const isRequestTimeout = (err) => {
