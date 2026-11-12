@@ -59,3 +59,5 @@ request handler and is outside this HTTP limit.
 
 Seahub API requests do not follow redirects. Set `seahub_service_url` (or
 `SEAHUB_SERVICE_URL`) to the final Seahub service URL.
+
+Operation-log queries use MySQL prepared statements through `mysql2`.

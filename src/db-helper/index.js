@@ -1,4 +1,4 @@
-import mysql from 'mysql2/promise'; 
+import mysql from 'mysql2/promise';
 import { MYSQL_CONFIG } from '../config/config';
 
 const mysql_config = {
@@ -21,7 +21,7 @@ const DBHelper = async function (sql, values) {
   } catch (err) {
     const error = new Error(err.message.includes('connect') ? 'Error connecting to Database' : 'Query data from Database error');
     error.error_type = 'database_error';
-    error.originalError = err; 
+    error.originalError = err;
     throw error;
   }
 };

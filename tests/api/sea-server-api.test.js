@@ -124,6 +124,14 @@ describe('Seahub API request boundaries', () => {
     expect(requests).toEqual([]);
   });
 
+  it.each([301, 302, 303, 307, 308])('does not follow an authenticated Seahub %s redirect', async status => {
+    redirectStatus = status;
+    await expect(sdocAPI.getDocDownloadLink('doc-1')).rejects.toMatchObject({ response: { status } });
+    await expect(exdrawAPI.getSceneDownloadLink('doc-1')).rejects.toMatchObject({ response: { status } });
+    expect(requests).toHaveLength(2);
+    expect(redirectRequests).toEqual([]);
+  });
+
   it.each([301, 302, 303, 307, 308])('does not follow an upstream %s redirect', async status => {
     redirectStatus = status;
     await expect(sdocAPI.getDocContent('doc-1')).rejects.toMatchObject({ response: { status } });

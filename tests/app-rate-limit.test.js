@@ -73,7 +73,7 @@ describe('HTTP request rate limit', () => {
     expect(verify).toHaveBeenCalledTimes(2);
   });
 
-  it.each(['/api/v1/docs/doc-1/element-commands', '/api/v1/docs/doc-1/'])('limits %s before JSON body parsing', async path => {
+  it.each(['/api/v1/docs/doc-1/element-commands', '/api/v1/docs/doc-1/', '/api/v1/exdraw/doc-1/'])('limits %s before JSON body parsing', async path => {
     await request(server);
     await request(server);
 
