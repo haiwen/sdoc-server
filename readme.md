@@ -66,3 +66,35 @@ origin. These links must use HTTP or HTTPS without embedded credentials; content
 downloads do not follow redirects or receive the Seahub authorization token.
 
 Operation-log queries use MySQL prepared statements through `mysql2`.
+
+## Socket.IO document authorization
+
+Collaboration connections require an HS256 token with a non-empty `file_uuid` and
+`username`, a finite `exp`, and permission `r` or `rw`. Existing Seahub browser
+tokens remain supported. Tokens marked `token_type: service` are reserved for
+server-to-server requests and cannot open collaboration connections.
+
+Each connection is bound to the document and identity in its token. Legacy event
+payloads may include `doc_uuid`, but a different UUID is rejected before any
+document access or broadcast. Omitting it uses the authenticated document.
+Connection middleware validates the token once; native `socket.use` middleware
+checks each incoming event against an explicit read/write permission map.
+Token expiration is checked when each event arrives. Authorized events do not
+recheck expiration during execution; validated token claims remain frozen.
+After asynchronous operations, disconnected sockets do not rejoin rooms or
+receive replies. Successful edits are still broadcast to online collaborators
+when the sender disconnects before the edit completes.
+Room joins use the default in-memory adapter synchronously.
+Unauthorized packets are acknowledged with an error when a callback is provided
+and never reach the event listener. Unknown events are rejected.
+Document and whiteboard edits require `rw`; read-only connections may join and
+synchronize their own document. User identity and permissions come from the
+token; the `user-updated` event may only change the display name.
+Legacy `server-volatile-broadcast` messages are rejected; whiteboard edits must
+use the versioned `elements-updated` event.
+
+Expired connections are rejected and disconnected when they next send an event.
+Idle connections remain subscribed to room broadcasts after token expiration.
+Clients must obtain a fresh Seahub token before reconnecting after expiration.
+Internal download and read requests use read-only service tokens; persistence
+retains write permission for authorized edits.
