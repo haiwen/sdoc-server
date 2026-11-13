@@ -23,9 +23,9 @@ const auth = (req, res, next) => {
   const token = authorization.split(' ')[1];
   jwt.verify(token, SEADOC_PRIVATE_KEY, {algorithms: ['HS256']}, function(err, decoded) {
     if (err || !decoded) {
-      logger.error(err.message);
-      if (err.name === 'TokenExpiredError') {
-        rejectRequest(req, res, 'Token expired.');
+      logger.error(err ? err.message : 'Invalid token payload');
+      if (err && err.name === 'TokenExpiredError') {
+        res.status(403).send({"error_msg": 'Token expired.'});
         return;
       } else {
         rejectRequest(req, res, 'You don\'t have permission to access.');
@@ -34,26 +34,21 @@ const auth = (req, res, next) => {
     }
 
     const doc_uuid = getDocUuidFromUrl(req.originalUrl);
-    // access request initiated with administrator privileges
-    if (!doc_uuid) {
-      // write jwt token to the req object
-      req.payload = decoded;
-      next();
-    } else {
-      // TODO: access_token file_uuid to doc_id
-      // token's uuid is file_uud
-      const { file_uuid: docUuid } = decoded;
-      if (docUuid !== doc_uuid) {
-        const message = `doc_uuid in token doesn't match the accessed doc. doc_uuid in token: ${docUuid}, accessed doc_uuid: ${doc_uuid}`;
-        logger.info(message);
-        rejectRequest(req, res, 'You don\'t have permission to access.');
-        return;
-      }
-
-      // write jwt token to the req object
-      req.payload = decoded;
-      next();
+    // Only the explicit system info endpoint accepts an unbound administrator token.
+    const isSystemInfoRequest = (req.method === 'GET' || req.method === 'HEAD') &&
+      /^\/api\/v1\/docs\/system\/info\/?$/i.test(req.path);
+    const isAuthorized = isSystemInfoRequest
+      ? decoded.admin === true
+      : doc_uuid && decoded.file_uuid === doc_uuid;
+    if (!isAuthorized) {
+      logger.info('Token does not authorize access to the requested document or system endpoint');
+      res.status(403).send({"error_msg": 'You don\'t have permission to access.'});
+      return;
     }
+
+    // write jwt token to the req object
+    req.payload = decoded;
+    next();
 
   });
 };

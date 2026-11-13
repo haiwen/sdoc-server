@@ -187,7 +187,12 @@ class DocumentController {
 
   async publishDoc(req, res) {
     const { doc_uuid: docUuid } = req.params;
-    const { origin_doc_uuid: originDocUuid, origin_doc_name: originDocName } = req.body;
+    const { origin_doc_uuid: originDocUuid, origin_doc_name: originDocName } = req.body || {};
+    if (typeof originDocUuid !== 'string' || !originDocUuid || req.payload.origin_doc_uuid !== originDocUuid) {
+      res.status(403).send({"error_msg": 'You don\'t have permission to access.'});
+      return;
+    }
+
     const documentManager = DocumentManager.getInstance();
 
     // send message to all: doc has been publish
