@@ -74,20 +74,6 @@ export default function(socket, next) {
       packet.splice(1, packet.length - 1, params, callback);
       next();
     });
-
-    // Disconnect idle readers too: rejecting new messages does not stop room broadcasts.
-    let expirationTimer;
-    const disconnectOnExpiration = () => {
-      const remaining = decoded.exp * 1000 - Date.now();
-      if (remaining <= 0) {
-        socket.disconnect();
-        return;
-      }
-      expirationTimer = setTimeout(disconnectOnExpiration, Math.min(remaining, 2147483647));
-      expirationTimer.unref();
-    };
-    socket.once('disconnect', () => clearTimeout(expirationTimer));
-    disconnectOnExpiration();
   } catch (err) {
     logger.debug(err.message);
     next(err);

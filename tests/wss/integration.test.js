@@ -157,17 +157,18 @@ describe('Socket.IO transport authorization', () => {
     }), 'Authorized.sdoc');
   });
 
-  it.each(['/', '/exdraw'])('removes idle readers from namespace %s when their token expires', async namespace => {
-    const client = await connect(namespace, { permission: 'r', exp: Date.now() / 1000 + 0.5 });
+  it.each(['/', '/exdraw'])('disconnects expired readers in namespace %s on their next event', async namespace => {
+    const client = await connect(namespace, { permission: 'r' });
     await client.emit('join-room');
-    expect(client.socket.rooms.has(ownUuid)).toBe(true);
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Expired socket remained connected')), 1500);
-      client.socket.once('disconnect', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
-    });
+    const now = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 301000);
+    try {
+      expect(client.socket.connected).toBe(true);
+      expect(client.socket.rooms.has(ownUuid)).toBe(true);
+      expect(await client.emit('join-room')).toEqual({ success: false, error_type: 'token_expired' });
+    } finally {
+      now.mockRestore();
+    }
+    expect(client.socket.disconnected).toBe(true);
     expect(client.socket.rooms.has(ownUuid)).toBe(false);
     expect(io.of(namespace).sockets.has(client.socket.id)).toBe(false);
   });

@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import auth from '../../src/wss/auth';
 import sdocAPI from '../../src/modules/sdoc/api/sea-server-api';
 import exdrawAPI from '../../src/modules/exdraw/api/sea-server-api';
-import { authenticateSocket, createSocket, ownUuid, privateKey, signToken } from './helpers';
+import { authenticateSocket, createSocket, dispatch, ownUuid, privateKey, signToken } from './helpers';
 
 jest.mock('../../src/config/config', () => ({ SEADOC_PRIVATE_KEY: 'socket-test-private-key' }));
 
@@ -73,28 +73,20 @@ describe('Socket.IO handshake authorization', () => {
     expect(next).toHaveBeenCalledWith(expect.any(Error));
   });
 
-  it('disconnects idle readers at expiration', () => {
+  it.each(['r', 'rw'])('keeps idle %s connections until their next event after expiration', permission => {
     jest.setSystemTime(new Date('2026-11-13T00:00:00Z'));
-    const socket = authenticateSocket({ permission: 'r', exp: Date.now() / 1000 + 3 });
-    jest.advanceTimersByTime(2999);
+    const socket = authenticateSocket({ permission, exp: Date.now() / 1000 + 3 });
+    const listener = jest.fn();
+    socket.on('sync-document', listener);
+    jest.advanceTimersByTime(3000);
     expect(socket.disconnect).not.toHaveBeenCalled();
-    jest.advanceTimersByTime(1);
+    expect(socket.connected).toBe(true);
+
+    const callback = jest.fn();
+    dispatch(socket, 'sync-document', { version: 0 }, callback);
+    expect(callback).toHaveBeenCalledWith({ success: false, error_type: 'token_expired' });
+    expect(listener).not.toHaveBeenCalled();
     expect(socket.disconnect).toHaveBeenCalledTimes(1);
     expect(socket.disconnected).toBe(true);
-    expect(jest.getTimerCount()).toBe(0);
-  });
-
-  it('cleans up expiration timers after disconnect', () => {
-    const socket = authenticateSocket();
-    socket.disconnect();
-    expect(jest.getTimerCount()).toBe(0);
-  });
-
-  it('does not immediately disconnect tokens whose lifetime exceeds the timer limit', () => {
-    const socket = authenticateSocket({ exp: Math.floor(Date.now() / 1000) + 30 * 86400 });
-    jest.advanceTimersByTime(2147483647);
-    expect(socket.disconnect).not.toHaveBeenCalled();
-    socket.disconnect();
-    expect(jest.getTimerCount()).toBe(0);
   });
 });

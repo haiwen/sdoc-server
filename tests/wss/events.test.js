@@ -262,12 +262,13 @@ describe('document socket event authorization', () => {
     expectNoDocumentEffects();
   });
 
-  it('does not rejoin a room when a document load finishes after token expiration', async () => {
+  it('does not rejoin a room when an expired event disconnects the socket during loading', async () => {
     const socket = connect();
     let resolveLoad;
     documentManager.getDoc.mockReturnValue(new Promise(resolve => { resolveLoad = resolve; }));
     const join = dispatch(socket, 'join-room', jest.fn());
     jest.advanceTimersByTime(301000);
+    await dispatch(socket, 'reload-image', {}, jest.fn());
     resolveLoad({ version: 16 });
     await join;
     expect(socket.join).not.toHaveBeenCalled();
@@ -275,13 +276,14 @@ describe('document socket event authorization', () => {
     expect(documentManager.saveDoc).not.toHaveBeenCalled();
   });
 
-  it('does not return document content after expiration disconnects the socket during loading', async () => {
+  it('does not return document content after an expired event disconnects the socket during loading', async () => {
     const socket = connect();
     let resolveLoad;
     documentManager.getDoc.mockReturnValue(new Promise(resolve => { resolveLoad = resolve; }));
     const callback = jest.fn();
     const sync = dispatch(socket, 'sync-document', { version: -1001 }, callback);
     jest.advanceTimersByTime(301000);
+    await dispatch(socket, 'reload-image', {}, jest.fn());
     resolveLoad({ version: 16, elements: [{ text: 'Must not be disclosed' }] });
     await sync;
     expect(socket.disconnected).toBe(true);
@@ -304,7 +306,7 @@ describe('document socket event authorization', () => {
     Object.values(ioHelper).forEach(mock => expect(mock).not.toHaveBeenCalled());
   });
 
-  it('does not return operations after expiration disconnects the socket during lookup', async () => {
+  it('does not return operations after an expired event disconnects the socket during lookup', async () => {
     const socket = connect();
     let resolveOperations;
     operationsManager.getLoseOperationList.mockReturnValue(new Promise(resolve => { resolveOperations = resolve; }));
@@ -313,6 +315,7 @@ describe('document socket event authorization', () => {
     await Promise.resolve();
     expect(operationsManager.getLoseOperationList).toHaveBeenCalledWith(ownUuid, 15);
     jest.advanceTimersByTime(301000);
+    await dispatch(socket, 'reload-image', {}, jest.fn());
     resolveOperations([{ version: 16, operations: [] }]);
     await sync;
     expect(socket.disconnected).toBe(true);
@@ -332,8 +335,8 @@ describe('document socket event authorization', () => {
     const pending = dispatch(socket, event, {
       version: -1001, operations: [{ type: 'insert_text', text: 'Edit' }], elements: [],
     }, callback);
-    // Move past expiration without running the timer, modeling a delayed disconnect.
-    jest.setSystemTime(new Date(Date.now() + 301000));
+    // Move past expiration while the authorized event is still running.
+    jest.advanceTimersByTime(301000);
     resolveOperation({ success: true, version: 16, elements: [{ text: 'Authorized content' }] });
     await pending;
     expect(documentManager[method]).toHaveBeenCalledTimes(1);
@@ -385,6 +388,7 @@ describe('document socket event authorization', () => {
       const edit = dispatch(socket, event, params, callback);
       if (reason === 'expiration') {
         jest.advanceTimersByTime(301000);
+        await dispatch(socket, 'leave-room', {}, jest.fn());
       } else {
         socket.disconnect();
       }

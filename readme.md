@@ -93,7 +93,8 @@ token; the `user-updated` event may only change the display name.
 Legacy `server-volatile-broadcast` messages are rejected; whiteboard edits must
 use the versioned `elements-updated` event.
 
-Connections are disconnected when their token expires, including idle readers
-subscribed to room broadcasts. Clients must obtain a fresh Seahub token before
-reconnecting after expiration. Internal download and read requests use read-only
-service tokens; persistence retains write permission for authorized edits.
+Expired connections are rejected and disconnected when they next send an event.
+Idle connections remain subscribed to room broadcasts after token expiration.
+Clients must obtain a fresh Seahub token before reconnecting after expiration.
+Internal download and read requests use read-only service tokens; persistence
+retains write permission for authorized edits.
