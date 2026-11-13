@@ -1,11 +1,13 @@
 import formatDocContentToNewVersion from './document-format';
 import { normalizeChildren } from "./document-utils";
+import { v4 } from "uuid";
 
 class Document {
 
   constructor(docUuid, docName, docContent) {
     this.docUuid = docUuid;
     this.docName = docName;
+    this.document_incarnation = v4();
 
     // const newDocContent = docContent;
     const newDocContent = formatDocContentToNewVersion(docContent);
