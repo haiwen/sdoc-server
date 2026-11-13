@@ -129,7 +129,7 @@ describe('HTTP document authorization', () => {
 
   it.each([
     `/API/V1/DOCS/${targetUuid}/collaborators`,
-    `/api/v1/docs/${targetUuid.replace('-', '%2D')}/collaborators`,
+    `/api/v1/docs/${targetUuid.replace(/-/g, '%2D')}/collaborators`,
     `/api/v1/docs/${targetUuid}/collaborators?file_uuid=${otherUuid}`,
   ])('matches Express routing and decoding for %s', async path => {
     expectDenied(await request('GET', path, { file_uuid: otherUuid }));
