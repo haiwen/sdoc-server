@@ -173,6 +173,46 @@ describe('Socket.IO transport authorization', () => {
     expect(io.of(namespace).sockets.has(client.socket.id)).toBe(false);
   });
 
+  it.each(['/', '/exdraw'])('notifies idle readers before disconnecting in namespace %s', async namespace => {
+    const client = await connect(namespace, { permission: 'r', exp: Date.now() / 1000 + 0.3 });
+    await client.emit('join-room');
+    const packets = [];
+    const prefix = namespace === '/' ? '' : `${namespace},`;
+    for (let attempt = 0; attempt < 4 && !packets.includes(`41${prefix}`); attempt++) {
+      packets.push(...await client.receive());
+    }
+    const notification = `42${prefix}${JSON.stringify(['token-expired', { error_type: 'token_expired' }])}`;
+    expect(packets).toContain(notification);
+    expect(packets.indexOf(notification)).toBeLessThan(packets.indexOf(`41${prefix}`));
+    expect(client.socket.rooms.has(ownUuid)).toBe(false);
+    expect(client.socket.disconnected).toBe(true);
+  });
+
+  it.each([['/', 'update-cursor'], ['/exdraw', 'mouse-location-updated']])(
+    'notifies callback-free expired events: %s %s', async (namespace, event) => {
+      const client = await connect(namespace);
+      const now = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 301000);
+      try {
+        await client.send(event, {});
+        const packets = await client.receive();
+        const prefix = namespace === '/' ? '' : `${namespace},`;
+        expect(packets).toContain(`42${prefix}${JSON.stringify(['token-expired', { error_type: 'token_expired' }])}`);
+        expect(packets).toContain(`41${prefix}`);
+      } finally {
+        now.mockRestore();
+      }
+    }
+  );
+
+  it('includes a structured code in an expired handshake rejection', async () => {
+    const basePath = '/socket.io/?EIO=4&transport=polling';
+    const { sid } = JSON.parse((await request('GET', basePath)).slice(1));
+    clients.push(sid);
+    const path = `${basePath}&sid=${sid}`;
+    await request('POST', path, `40${JSON.stringify({ token: signToken({ exp: Math.floor(Date.now() / 1000) - 1 }) })}`);
+    expect(await request('GET', path)).toContain(`44${JSON.stringify({ message: 'jwt expired', data: { code: 'token_expired' } })}`);
+  });
+
   it.each([['/', 'update-document'], ['/exdraw', 'elements-updated']])(
     'delivers committed edits to an online reader after the sender disconnects: %s %s', async (namespace, event) => {
       const sender = await connect(namespace);

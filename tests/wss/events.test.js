@@ -335,8 +335,8 @@ describe('document socket event authorization', () => {
     const pending = dispatch(socket, event, {
       version: -1001, operations: [{ type: 'insert_text', text: 'Edit' }], elements: [],
     }, callback);
-    // Move past expiration while the authorized event is still running.
-    jest.advanceTimersByTime(301000);
+    // A delayed timer does not change authorization of an event already running.
+    jest.setSystemTime(Date.now() + 301000);
     resolveOperation({ success: true, version: 16, elements: [{ text: 'Authorized content' }] });
     await pending;
     expect(documentManager[method]).toHaveBeenCalledTimes(1);

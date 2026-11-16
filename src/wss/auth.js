@@ -40,6 +40,12 @@ export default function(socket, next) {
     socket.payload = Object.freeze(decoded);
     socket.authToken = token;
 
+    const disconnectExpired = () => {
+      if (socket.disconnected) return;
+      socket.emit('token-expired', { error_type: 'token_expired' });
+      socket.disconnect();
+    };
+
     socket.use((packet, next) => {
       const [event] = packet;
       const lastArgument = packet[packet.length - 1];
@@ -66,7 +72,7 @@ export default function(socket, next) {
       }
       if (error) {
         callback && callback({ success: false, error_type: error });
-        if (error === 'token_expired') socket.disconnect();
+        if (error === 'token_expired') disconnectExpired();
         return;
       }
 
@@ -74,8 +80,23 @@ export default function(socket, next) {
       packet.splice(1, packet.length - 1, params, callback);
       next();
     });
+
+    // Expiration also ends read access for idle room subscribers.
+    let expirationTimer;
+    const checkExpiration = () => {
+      const remaining = decoded.exp * 1000 - Date.now();
+      if (remaining <= 0) {
+        disconnectExpired();
+        return;
+      }
+      expirationTimer = setTimeout(checkExpiration, Math.min(remaining, 2147483647));
+      expirationTimer.unref();
+    };
+    socket.once('disconnect', () => clearTimeout(expirationTimer));
+    checkExpiration();
   } catch (err) {
     logger.debug(err.message);
+    if (err.name === 'TokenExpiredError') err.data = { code: 'token_expired' };
     next(err);
     return;
   }
