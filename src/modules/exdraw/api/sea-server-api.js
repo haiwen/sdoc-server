@@ -8,23 +8,24 @@ import { encodePathSegment, validateDownloadLink } from '../../../utils/seahub-u
 axios.defaults.timeout = 60 * 1000;
 
 class SeaServerAPI {
-  generateJwtToken = (exdrawUuid, username) => {
+  generateJwtToken = (exdrawUuid, username, permission = 'rw') => {
     // TODO: update file_uuid to doc_uuid
     let payload = {
       exp: Math.floor(Date.now() / 1000) + (5 * 60),
-      permission: 'rw',
+      permission,
       file_uuid: exdrawUuid,
+      token_type: 'service',
     };
     if (username) {
       payload.username = username;
     }
-    const token = jwt.sign(payload, SEADOC_PRIVATE_KEY);
+    const token = jwt.sign(payload, SEADOC_PRIVATE_KEY, { algorithm: 'HS256' });
 
     return token;
   };
 
-  getConfig = (exdrawUuid, username) => {
-    const accessToken = this.generateJwtToken(exdrawUuid, username);
+  getConfig = (exdrawUuid, username, permission = 'rw') => {
+    const accessToken = this.generateJwtToken(exdrawUuid, username, permission);
     const config = {
       baseURL: SEAHUB_SERVER,
       allowAbsoluteUrls: false,
@@ -36,7 +37,7 @@ class SeaServerAPI {
   };
 
   getSceneDownloadLink = (exdrawUuid) => {
-    const config = this.getConfig(exdrawUuid);
+    const config = this.getConfig(exdrawUuid, undefined, 'r');
     const url = '/api/v2.1/exdraw/download-link/' + encodePathSegment(exdrawUuid) + '/';
 
     return axios.get(url, config);

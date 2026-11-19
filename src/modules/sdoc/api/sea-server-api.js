@@ -9,22 +9,23 @@ axios.defaults.timeout = 60 * 1000;
 
 class SeaServerAPI {
 
-  generateJwtToken = (docUuid, username) => {
+  generateJwtToken = (docUuid, username, permission = 'rw') => {
     // TODO: update file_uuid to doc_uuid
     let payload = {
       exp: Math.floor(Date.now() / 1000) + (5 * 60),
-      permission: 'rw',
+      permission,
       file_uuid: docUuid,
+      token_type: 'service',
     };
     if (username) {
       payload.username = username;
     }
-    const token = jwt.sign(payload, SEADOC_PRIVATE_KEY);
+    const token = jwt.sign(payload, SEADOC_PRIVATE_KEY, { algorithm: 'HS256' });
     return token;
   };
 
-  getConfig = (docUuid, username) => {
-    const accessToken = this.generateJwtToken(docUuid, username);
+  getConfig = (docUuid, username, permission = 'rw') => {
+    const accessToken = this.generateJwtToken(docUuid, username, permission);
     const config = {
       baseURL: SEAHUB_SERVER,
       allowAbsoluteUrls: false,
@@ -35,7 +36,7 @@ class SeaServerAPI {
   };
 
   getDocDownloadLink = (docUuid) => {
-    const config = this.getConfig(docUuid);
+    const config = this.getConfig(docUuid, undefined, 'r');
     const url = '/api/v2.1/seadoc/download-link/' + encodePathSegment(docUuid) + '/';
     return axios.get(url, config);
   };
@@ -64,7 +65,7 @@ class SeaServerAPI {
   listComments = (docUuid) => {
     const uploadLink = '/api/v2.1/seadoc/comments/' + encodePathSegment(docUuid) + '/';
 
-    const config = this.getConfig(docUuid);
+    const config = this.getConfig(docUuid, undefined, 'r');
     return axios.get(uploadLink, config);
   };
 
@@ -93,7 +94,7 @@ class SeaServerAPI {
   listReplies = (docUuid, commentId) => {
     const uploadLink = '/api/v2.1/seadoc/comment/' + encodePathSegment(docUuid) + '/' + encodePathSegment(commentId) + '/replies/';
 
-    const config = this.getConfig(docUuid);
+    const config = this.getConfig(docUuid, undefined, 'r');
     return axios.get(uploadLink, config);
   };
 

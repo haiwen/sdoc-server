@@ -20,8 +20,8 @@ class IOHelper {
     return this.io.sockets.sockets.size;
   };
 
-  broadcastMessage = () => {
-    this.io.emit('message', `server error`);
+  broadcastMessage = (docUuid) => {
+    this.io.to(docUuid).emit('message', `server error`);
   };
 
   sendMessageToRoom = (socket, roomId, params) => {

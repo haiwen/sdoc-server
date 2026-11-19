@@ -7,7 +7,6 @@ import DocumentManager from "../managers/document-manager";
 import OperationsManager from "../managers/operations-manager";
 import UsersManager from "../managers/users-manager";
 import IOHelper from "./io-helper";
-import isPermissionValid from "./is-permission-valid";
 
 const recordSocketLogger = (docUuid, operations, costsTime) => {
 
@@ -39,144 +38,169 @@ class IOHandler {
   };
 
   onConnection(socket) {
-    // todo permission check
-
-    socket.on('join-room', async (callback) => {
-      let docContent = null;
-      const { docUuid, docName } = socket;
+    socket.on('join-room', async (params, callback = () => {}) => {
       try {
-        // get doc content and add doc into memory
+        let docContent = null;
+        const { docUuid, docName } = socket;
+        try {
+          // get doc content and add doc into memory
+          const documentManager = DocumentManager.getInstance();
+          docContent = await documentManager.getDoc(docUuid, docName);
+        } catch(err) {
+          logger.error(`SOCKET_MESSAGE: Load ${docName}(${docUuid}) doc content error`);
+          callback({ success: 0 });
+          return;
+        }
+
+        // join room
+        if (socket.disconnected) return;
+        socket.join(docUuid);
+
+        // add current user into memory
+        const { userInfo } = socket;
+        const usersManager = UsersManager.getInstance();
+        usersManager.addUser(docUuid, socket.id, userInfo);
+        this.ioHelper.sendJoinRoomMessage(socket, docUuid, userInfo);
+
+        const { version } = docContent;
+        callback({success: 1, version});
+      } catch (err) {
+        logger.error(`Socket event join-room failed: ${err.message}`);
+        callback({ success: false, error_type: 'server_error' });
+      }
+    });
+
+    socket.on('update-document', async (params, callback = () => {}) => {
+      try {
+        const start = Date.now();
+        const { docUuid, docName } = socket;
+        const { operations, selection, cursor_data } = params;
+        const user = { ...socket.userInfo };
         const documentManager = DocumentManager.getInstance();
-        docContent = await documentManager.getDoc(docUuid, docName);
-      } catch(err) {
-        logger.error(`SOCKET_MESSAGE: Load ${docName}(${docUuid}) doc content error`);
-        callback && callback({success: 0});
-        return;
+        const result = await documentManager.execOperationsBySocket({ ...params, doc_uuid: docUuid, user }, docName);
+
+        const end = Date.now();
+        const costsTime = end - start;
+        try {
+          recordSocketLogger(docUuid, operations, costsTime);
+        } catch (e) {
+          logger.warn(`recordSocketLogger error: ${e}`);
+        }
+
+        if (result.success) {
+          const { version } = result;
+          // The edit is already applied; online collaborators still need it after the sender disconnects.
+          this.ioHelper.sendMessageToRoom(socket, docUuid, { operations, version, user, selection, cursor_data});
+        }
+        if (socket.disconnected) return;
+        callback(result);
+      } catch (err) {
+        logger.error(`Socket event update-document failed: ${err.message}`);
+        if (!socket.disconnected) callback({ success: false, error_type: 'server_error' });
       }
-
-      // join room
-      socket.join(docUuid);
-
-      // add current user into memory
-      const { userInfo } = socket;
-      const usersManager = UsersManager.getInstance();
-      usersManager.addUser(docUuid, socket.id, userInfo);
-      this.ioHelper.sendJoinRoomMessage(socket, docUuid, userInfo);
-
-      // const sid = socket.id;
-      // this.ioHelper.sendMessageToPrivate(sid, params);
-
-      const { version } = docContent;
-      callback && callback({success: 1, version});
     });
 
-    socket.on('update-document', async (params, callback) => {
-      const isValid = isPermissionValid(socket);
-      if (!isValid) {
-        const result = {
-          success: false,
-          error_type: 'token_expired',
-        };
-        callback && callback(result);
-        return;
-      }
-
-      const { permission } = socket.payload;
-      if (permission !== 'rw') {
-        logger.error('You don\'t have permission to update the current sdoc.', params.doc_uuid);
-        const result = {
-          success: false,
-          error_type: 'permission_denied'
-        };
-        callback && callback(result);
-        return;
-      }
-
-      const start = Date.now();
-      const { docName } = socket;
-      const { doc_uuid: docUuid, operations, user, selection, cursor_data } = params;
-      const documentManager = DocumentManager.getInstance();
-      const result = await documentManager.execOperationsBySocket(params, docName);
-
-      const end = Date.now();
-      const costsTime = end - start;
+    socket.on('update-cursor', (params, callback = () => {}) => {
       try {
-        recordSocketLogger(docUuid, operations, costsTime);
-      } catch (e) {
-        logger.warn(`recordSocketLogger error: ${e}`);
-      }
+        // update cursor
+        const { docUuid } = socket;
+        const { location, cursor_data } = params;
+        const user = { ...socket.userInfo };
+        const documentManager = DocumentManager.getInstance();
+        documentManager.setCursorLocation({ ...params, doc_uuid: docUuid, user });
 
-      if (result.success) {
-        const { version } = result;
-        this.ioHelper.sendMessageToRoom(socket, docUuid, { operations, version, user, selection, cursor_data});
+        // send message to others
+        this.ioHelper.sendCursorMessageToRoom(socket, docUuid, {user, location, cursor_data});
+      } catch (err) {
+        logger.error(`Socket event update-cursor failed: ${err.message}`);
+        callback({ success: false, error_type: 'server_error' });
       }
-      callback && callback(result);
     });
 
-    socket.on('update-cursor', (params) => {
-      // update cursor
-      const documentManager = DocumentManager.getInstance();
-      documentManager.setCursorLocation(params);
+    socket.on('sync-document', async (params, callback = () => {}) => {
+      try {
+        const { docUuid, docName } = socket;
+        const documentManager = DocumentManager.getInstance();
+        const docContent = await documentManager.getDoc(docUuid, docName);
+        if (socket.disconnected) return;
+        const { version: serverVersion } = docContent;
+        const { version: clientVersion } = params;
+        // return document
+        if (serverVersion - clientVersion > OPERATIONS_CACHE_LIMIT) {
+          const result = {
+            success: true,
+            mode: 'document',
+            content: docContent
+          };
+          callback(result);
+          return;
+        }
 
-      // send message to others
-      const { doc_uuid: docUuid, user, location, cursor_data } = params;
-      this.ioHelper.sendCursorMessageToRoom(socket, docUuid, {user, location, cursor_data});
-    });
-
-    socket.on('sync-document', async (params, callback) => {
-      const { docName } = socket;
-      const { doc_uuid: docUuid } = params;
-      const documentManager = DocumentManager.getInstance();
-      const docContent = await documentManager.getDoc(docUuid, docName);
-      const { version: serverVersion } = docContent;
-      const { version: clientVersion } = params;
-      // return document
-      if (serverVersion - clientVersion > OPERATIONS_CACHE_LIMIT) {
+        // return operations
+        const operationsManager = OperationsManager.getInstance();
+        const operationList = await operationsManager.getLoseOperationList(docUuid, clientVersion);
+        if (socket.disconnected) return;
         const result = {
           success: true,
-          mode: 'document',
-          content: docContent
+          mode: 'operations',
+          content: operationList,
         };
-        callback && callback(result);
+        callback(result);
         return;
+      } catch (err) {
+        logger.error(`Socket event sync-document failed: ${err.message}`);
+        callback({ success: false, error_type: 'server_error' });
       }
-
-      // return operations
-      const operationsManager = OperationsManager.getInstance();
-      const operationList = await operationsManager.getLoseOperationList(docUuid, clientVersion);
-      const result = {
-        success: true,
-        mode: 'operations',
-        content: operationList,
-      };
-      callback && callback(result);
-      return;
     });
 
-    socket.on('user-updated', (params) => {
+    socket.on('user-updated', (params, callback = () => {}) => {
+      try {
+        const { docUuid } = socket;
+        // A display name may change; the authenticated identity and permission may not.
+        const user = {
+          ...socket.userInfo,
+          ...(typeof params.user?.name === 'string' ? { name: params.user.name } : {}),
+        };
+        socket.userInfo = user;
 
-      const { user } = params;
-      const { docUuid } = socket;
+        // update storage user name
+        const usersManager = UsersManager.getInstance();
+        usersManager.deleteUser(docUuid, socket.id);
+        usersManager.addUser(docUuid, socket.id, user);
 
-      // update storage user name
-      const usersManager = UsersManager.getInstance();
-      usersManager.deleteUser(docUuid, socket.id);
-      usersManager.addUser(docUuid, socket.id, user);
-
-      this.ioHelper.sendUserUpdatedMessage(socket, docUuid, user);
+        this.ioHelper.sendUserUpdatedMessage(socket, docUuid, user);
+      } catch (err) {
+        logger.error(`Socket event user-updated failed: ${err.message}`);
+        callback({ success: false, error_type: 'server_error' });
+      }
     });
 
-    socket.on('reload-image', () => {
-      const { docUuid } = socket;
-      this.ioHelper.sendReloadImageMessage(socket, docUuid);
+    socket.on('reload-image', (params, callback = () => {}) => {
+      try {
+        const { docUuid } = socket;
+        this.ioHelper.sendReloadImageMessage(socket, docUuid);
+      } catch (err) {
+        logger.error(`Socket event reload-image failed: ${err.message}`);
+        callback({ success: false, error_type: 'server_error' });
+      }
     });
 
-    socket.on('server-error', (params) => {
-      this.ioHelper.broadcastMessage(params);
+    socket.on('server-error', (params, callback = () => {}) => {
+      try {
+        this.ioHelper.broadcastMessage(socket.docUuid);
+      } catch (err) {
+        logger.error(`Socket event server-error failed: ${err.message}`);
+        callback({ success: false, error_type: 'server_error' });
+      }
     });
 
-    socket.on('leave-room', async () => {
-      await this.handleDisconnect(socket);
+    socket.on('leave-room', async (params, callback = () => {}) => {
+      try {
+        await this.handleDisconnect(socket);
+      } catch (err) {
+        logger.error(`Socket event leave-room failed: ${err.message}`);
+        callback({ success: false, error_type: 'server_error' });
+      }
     });
 
     socket.on('disconnect', async () => {
@@ -188,12 +212,14 @@ class IOHandler {
     const { docUuid, docName } = socket;
     const usersManager = UsersManager.getInstance();
     const user = usersManager.getUser(docUuid, socket.id);
+    const usersCount = user ? usersManager.deleteUser(docUuid, socket.id) : 0;
+    await socket.leave(docUuid);
+    if (!user) return;
     if (user) {
       this.ioHelper.sendLeaveRoomMessage(socket, docUuid, user.username);
     }
 
     // delete current user from memory
-    const usersCount = usersManager.deleteUser(docUuid, socket.id);
     const documentManager = DocumentManager.getInstance();
     user && documentManager.deleteCursor(docUuid, user);
     if (usersCount === 0) {

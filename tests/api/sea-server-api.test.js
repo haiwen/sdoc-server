@@ -2,6 +2,7 @@ import fs from 'fs';
 import http from 'http';
 import os from 'os';
 import path from 'path';
+import jwt from 'jsonwebtoken';
 import sdocAPI from '../../src/modules/sdoc/api/sea-server-api';
 import exdrawAPI from '../../src/modules/exdraw/api/sea-server-api';
 
@@ -102,6 +103,11 @@ describe('Seahub API request boundaries', () => {
       url: `/seahub/api/v2.1/${endpoint}`,
       authorization: expect.stringMatching(/^Token /),
     }]);
+    const payload = jwt.verify(requests[0].authorization.split(' ')[1], 'test-private-key', { algorithms: ['HS256'] });
+    expect(payload).toMatchObject({
+      file_uuid: 'doc-1', token_type: 'service',
+      permission: httpMethod === 'GET' && method !== 'getDocUpdateLink' ? 'r' : 'rw',
+    });
     expect(redirectRequests).toEqual([]);
   });
 
